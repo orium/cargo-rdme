@@ -4,7 +4,6 @@
 [![crates.io](https://img.shields.io/crates/v/cargo-rdme.svg)](https://crates.io/crates/cargo-rdme)
 [![Downloads](https://img.shields.io/crates/d/cargo-rdme.svg)](https://crates.io/crates/cargo-rdme)
 [![Github stars](https://img.shields.io/github/stars/orium/cargo-rdme.svg?logo=github)](https://github.com/orium/cargo-rdme/stargazers)
-[![Documentation](https://docs.rs/cargo-rdme/badge.svg)](https://docs.rs/cargo-rdme/)
 [![License](https://img.shields.io/crates/l/cargo-rdme.svg)](./LICENSE.md)
 
 # Cargo rdme

@@ -24,6 +24,7 @@ license = "MPL-2.0"
 include = [
     "/src/**/*.rs",
     "/Cargo.toml",
+    "/Cargo.lock",
     "/LICENSE.md",
     "/README.md",
     "/release-notes.md",
@@ -33,9 +34,14 @@ include = [
 codecov = { repository = "orium/cargo-rdme", branch = "master", service = "github" }
 
 [dependencies]
+toml = "0.5"
+thiserror = "1"
+syn = { version = "1", features = ["full", "extra-traits"] }
+proc-macro2 = { version = "1", features = ["span-locations"] }
 
 [dev-dependencies]
 pretty_assertions = "1.0"
+itertools = "0.10"
 
 [features]
 fatal-warnings = []
