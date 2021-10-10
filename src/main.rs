@@ -19,8 +19,8 @@
 //!
 //! Cargo command to create your `README.md` from your crate's documentation.
 
-use cargo_rdme::Project;
-use cargo_rdme::{Doc, ProjectError};
+use cargo_rdme::{inject_doc, Project};
+use cargo_rdme::{Doc, ProjectError, Readme};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
@@ -30,6 +30,12 @@ enum RunError {
     ProjectError(cargo_rdme::ProjectError),
     #[error("failed to process rust doc: {0}")]
     DocError(cargo_rdme::DocError),
+    #[error("failed to process README: {0}")]
+    ReadmeError(cargo_rdme::ReadmeError),
+    #[error("no crate-level rustdoc found")]
+    NoRustdoc,
+    #[error("failed to inject the documentation in the README: {0}")]
+    InjectDocError(cargo_rdme::InjectDocError),
 }
 
 impl From<cargo_rdme::ProjectError> for RunError {
@@ -44,19 +50,30 @@ impl From<cargo_rdme::DocError> for RunError {
     }
 }
 
+impl From<cargo_rdme::ReadmeError> for RunError {
+    fn from(e: cargo_rdme::ReadmeError) -> RunError {
+        RunError::ReadmeError(e)
+    }
+}
+
+impl From<cargo_rdme::InjectDocError> for RunError {
+    fn from(e: cargo_rdme::InjectDocError) -> RunError {
+        RunError::InjectDocError(e)
+    }
+}
+
 fn run(current_dir: impl AsRef<Path>) -> Result<(), RunError> {
     let project: Project = Project::from_path(current_dir)?;
     let entryfile: PathBuf = project.get_src_entryfile();
     let doc: Doc = match Doc::from_source_file(entryfile)? {
-        None => {
-            panic!()
-        }
+        None => return Err(RunError::NoRustdoc),
         Some(doc) => doc,
     };
+    let readme: Readme = Readme::from_file(project.get_readme())?;
 
-    for line in doc.lines() {
-        println!("{}", line);
-    }
+    let new_readme = inject_doc(&readme, &doc)?;
+
+    new_readme.write_to_file(project.get_readme())?;
 
     Ok(())
 }

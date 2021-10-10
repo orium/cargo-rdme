@@ -15,8 +15,14 @@
 #![allow(clippy::inline_always)]
 #![allow(clippy::partialeq_ne_impl)]
 
+use crate::markdown::{Markdown, MarkdownError};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
+
+mod doc_inject;
+mod markdown;
+
+pub use doc_inject::{inject_doc, InjectDocError};
 
 #[derive(Error, Debug)]
 pub enum ManifestError {
@@ -95,6 +101,12 @@ impl Project {
 
         self.directory.join(entryfile).to_path_buf()
     }
+
+    pub fn get_readme(&self) -> PathBuf {
+        let filename = self.manifest.readme.as_deref().unwrap_or("README.md");
+
+        self.directory.join(filename).to_path_buf()
+    }
 }
 
 #[derive(Error, Debug)]
@@ -106,7 +118,7 @@ pub enum DocError {
 }
 
 pub struct Doc {
-    lines: Vec<String>,
+    markdown: Markdown,
 }
 
 impl Doc {
@@ -114,7 +126,11 @@ impl Doc {
         let source: String = std::fs::read_to_string(file.as_ref())
             .map_err(|_| DocError::ErrorReadingSourceFile(file.as_ref().to_path_buf()))?;
 
-        Doc::from_source(&source)
+        Doc::from_source_str(&source)
+    }
+
+    pub fn from_str(str: impl Into<String>) -> Doc {
+        Doc { markdown: Markdown::from_str(str) }
     }
 
     fn is_toplevel_doc(attr: &syn::Attribute) -> bool {
@@ -124,7 +140,7 @@ impl Doc {
         attr.style == AttrStyle::Inner(Bang::default()) && attr.path.is_ident("doc")
     }
 
-    fn from_source(source: &str) -> Result<Option<Doc>, DocError> {
+    pub fn from_source_str(source: &str) -> Result<Option<Doc>, DocError> {
         use syn::{parse_str, Lit, Meta, MetaNameValue};
 
         let ast: syn::File = parse_str(source).map_err(|e| DocError::ErrorParsingSourceFile(e))?;
@@ -152,7 +168,7 @@ impl Doc {
                             lines.push(line.to_owned());
                         }
 
-                        // multiline comment.
+                        // Multiline comment.
                         _ => {
                             fn empty_line(str: &str) -> bool {
                                 str.chars().all(|c| c.is_whitespace())
@@ -173,41 +189,82 @@ impl Doc {
 
         match lines.is_empty() {
             true => Ok(None),
-            false => Ok(Some(Doc { lines })),
+            false => Ok(Some(Doc { markdown: Markdown::from_lines(&lines) })),
         }
     }
 
     pub fn lines(&self) -> impl Iterator<Item = &str> {
-        self.lines.iter().map(|v| v.as_ref())
+        self.markdown.lines()
+    }
+
+    pub fn content_str(&self) -> &str {
+        self.markdown.content_str()
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum ReadmeError {
+    #[error("failed to read README file \"{0}\"")]
+    ErrorReadingReadme(PathBuf),
+    #[error("failed to write README file \"{0}\"")]
+    ErrorWritingMarkdown(PathBuf),
+}
+
+impl From<MarkdownError> for ReadmeError {
+    fn from(e: MarkdownError) -> ReadmeError {
+        match e {
+            MarkdownError::ErrorReadingMarkdown(p) => ReadmeError::ErrorReadingReadme(p),
+            MarkdownError::ErrorWritingMarkdown(p) => ReadmeError::ErrorWritingMarkdown(p),
+        }
+    }
+}
+
+pub struct Readme {
+    markdown: Markdown,
+}
+
+impl Readme {
+    pub fn from_file(file: impl AsRef<Path>) -> Result<Readme, ReadmeError> {
+        Ok(Readme { markdown: Markdown::from_file(file)? })
+    }
+
+    pub fn from_str(str: impl Into<String>) -> Readme {
+        Readme { markdown: Markdown::from_str(str) }
+    }
+
+    pub fn from_lines(lines: &[impl AsRef<str>]) -> Readme {
+        Readme { markdown: Markdown::from_lines(lines) }
+    }
+
+    pub fn lines(&self) -> impl Iterator<Item = &str> {
+        self.markdown.lines()
+    }
+
+    pub fn content_str(&self) -> &str {
+        self.markdown.content_str()
+    }
+
+    pub fn write_to_file(&self, file: impl AsRef<Path>) -> Result<(), ReadmeError> {
+        Ok(self.markdown.write_to_file(file)?)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use itertools::Itertools;
+    use indoc::indoc;
     use pretty_assertions::assert_eq;
-    use Iterator;
-
-    trait StrTrimIndent {
-        fn trim_indent(&self) -> String;
-    }
-
-    impl StrTrimIndent for &str {
-        fn trim_indent(&self) -> String {
-            self.lines().map(|l| l.chars().dropping(8).join("")).join("\n")
-        }
-    }
 
     #[test]
     fn test_manifest_from_str() {
-        let str = r#"
-        [package]
-        readme = "README.md"
+        let str = indoc! { r#"
+            [package]
+            readme = "README.md"
 
-        [lib]
-        path = "src/lib.rs"
-        "#;
+            [lib]
+            path = "src/lib.rs"
+            "#
+        };
 
         let expected_manifest = Manifest {
             lib_path: Some("src/lib.rs".to_owned()),
@@ -218,31 +275,33 @@ mod tests {
     }
 
     #[test]
-    fn test_doc_from_source_no_doc() {
-        let str = r#"
-        use std::fs;
+    fn test_doc_from_source_str_no_doc() {
+        let str = indoc! { r#"
+            use std::fs;
 
-        struct Nothing {}
-        "#;
+            struct Nothing {}
+            "#
+        };
 
-        assert!(Doc::from_source(str).unwrap().is_none());
+        assert!(Doc::from_source_str(str).unwrap().is_none());
     }
 
     #[test]
-    fn test_doc_from_source_single_line_comment() {
-        let str = r#"
-        #![cfg_attr(not(feature = "std"), no_std)]
-        // normal comment
+    fn test_doc_from_source_str_single_line_comment() {
+        let str = indoc! { r#"
+            #![cfg_attr(not(feature = "std"), no_std)]
+            // normal comment
 
-        //! This is the doc for the crate.
-        //!This line doesn't start with space.
-        //!
-        //! And a nice empty line above us.
+            //! This is the doc for the crate.
+            //!This line doesn't start with space.
+            //!
+            //! And a nice empty line above us.
 
-        struct Nothing {}
-        "#;
+            struct Nothing {}
+            "#
+        };
 
-        let doc = Doc::from_source(str).unwrap().unwrap();
+        let doc = Doc::from_source_str(str).unwrap().unwrap();
         let lines: Vec<&str> = doc.lines().collect();
 
         let expected = vec![
@@ -256,23 +315,23 @@ mod tests {
     }
 
     #[test]
-    fn test_doc_from_source_multi_line_comment() {
-        let str = r#"
-        #![cfg_attr(not(feature = "std"), no_std)]
-        /* normal comment */
+    fn test_doc_from_source_str_multi_line_comment() {
+        let str = indoc! { r#"
+            #![cfg_attr(not(feature = "std"), no_std)]
+            /* normal comment */
 
-        /*!
-        This is the doc for the crate.
-         This line start with space.
+            /*!
+            This is the doc for the crate.
+             This line start with space.
 
-        And a nice empty line above us.
-        */
+            And a nice empty line above us.
+            */
 
-        struct Nothing {}
-        "#
-        .trim_indent();
+            struct Nothing {}
+            "#
+        };
 
-        let doc = Doc::from_source(&str).unwrap().unwrap();
+        let doc = Doc::from_source_str(&str).unwrap().unwrap();
         let lines: Vec<&str> = doc.lines().collect();
 
         let expected = vec![

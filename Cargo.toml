@@ -38,10 +38,12 @@ toml = "0.5"
 thiserror = "1"
 syn = { version = "1", features = ["full", "extra-traits"] }
 proc-macro2 = { version = "1", features = ["span-locations"] }
+pulldown-cmark = "0.8"
+itertools = "0.10"
 
 [dev-dependencies]
-pretty_assertions = "1.0"
-itertools = "0.10"
+pretty_assertions = "1"
+indoc = "1"
 
 [features]
 fatal-warnings = []
