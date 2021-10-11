@@ -77,6 +77,8 @@ fn run_test_with_options(test_name: &str, options: TestOptions) {
             "The generated README does not match what was expected.\n\n{}\n==== stderr ====\n{}",
             diff_msg, stderr
         );
+    } else {
+        std::fs::remove_file(readme).unwrap();
     }
 }
 
@@ -114,4 +116,9 @@ fn integration_test_custom_readme_path() {
 #[test]
 fn integration_test_line_terminator_crlf() {
     run_test("line_terminator_crlf");
+}
+
+#[test]
+fn integration_test_multiline_doc() {
+    run_test("multiline_doc");
 }
