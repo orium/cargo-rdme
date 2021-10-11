@@ -52,16 +52,12 @@ fn run_test_with_options(test_name: &str, options: TestOptions) {
     std::fs::copy(&template_readme, &readme).unwrap();
 
     let output = Command::new(&cargo_rdme_bin)
-        .arg("sync-readme")
         .current_dir(test_dir)
         .output()
         .expect(&format!("Failed to execute {}", cargo_rdme_bin.display()));
 
     let expected = std::fs::read_to_string(&expected_readme).unwrap();
     let got = std::fs::read_to_string(&readme).unwrap();
-
-    // To ensure this works on windows, we ignore '\r'.
-    let got = got.replace("\r", "");
 
     if expected != got {
         let in_ci = std::env::var_os("CI").is_some();
@@ -113,4 +109,9 @@ fn integration_test_custom_readme_path() {
     let option = TestOptions { readme_filename: "READ-ME.md".to_owned() };
 
     run_test_with_options("custom_readme_path", option);
+}
+
+#[test]
+fn integration_test_line_terminator_crlf() {
+    run_test("line_terminator_crlf");
 }

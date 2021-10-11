@@ -82,6 +82,7 @@ pub fn inject_doc(readme: &Readme, doc: &Doc) -> Result<Readme, InjectDocError> 
 mod tests {
     use super::*;
     use indoc::indoc;
+    use itertools::Itertools;
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -161,7 +162,7 @@ mod tests {
 
         let new_readme = inject_doc(&readme, &doc).unwrap();
 
-        assert_eq!(new_readme.content_str(), expected);
+        assert_eq!(new_readme.lines().join("\n"), expected.lines().join("\n"));
     }
 
     #[test]
@@ -210,27 +211,6 @@ mod tests {
 
         let new_readme = inject_doc(&readme, &doc).unwrap();
 
-        assert_eq!(new_readme.content_str(), expected);
-    }
-
-    #[test]
-    fn test_inject_doc_new_readme_ends_in_newline() {
-        let readme_str = indoc! { r#"
-            This is a really nice crate.
-
-            <!-- cargo-rdme start -->
-            <!-- cargo-rdme end -->"#
-        };
-        let doc_str = indoc! { r#"
-            Doc.
-            "#
-        };
-
-        let readme = Readme::from_str(readme_str);
-        let doc = Doc::from_str(doc_str);
-
-        let new_readme = inject_doc(&readme, &doc).unwrap();
-
-        assert!(new_readme.content_str().ends_with('\n'));
+        assert_eq!(new_readme.lines().join("\n"), expected.lines().join("\n"));
     }
 }

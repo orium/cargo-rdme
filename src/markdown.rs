@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+use crate::LineTerminator;
 use itertools::Itertools;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -17,6 +18,7 @@ pub enum MarkdownError {
 }
 
 pub struct Markdown {
+    /// Content of the markdown.  The line terminator is always `\n`.
     content: String,
 }
 
@@ -29,16 +31,18 @@ impl Markdown {
     }
 
     pub fn from_str(str: impl Into<String>) -> Markdown {
-        Markdown { content: str.into() }
+        let mut content = str.into().replace("\r\n", "\n");
+
+        // Lines must always end in newlines.
+        if !content.ends_with('\n') {
+            content.push('\n')
+        }
+
+        Markdown { content }
     }
 
     pub fn from_lines(lines: &[impl AsRef<str>]) -> Markdown {
-        let mut str = lines.iter().map(AsRef::as_ref).join("\n");
-
-        // Lines must always end in newlines.
-        if !str.ends_with('\n') {
-            str.push('\n')
-        }
+        let str = lines.iter().map(AsRef::as_ref).join("\n");
 
         Markdown::from_str(str)
     }
@@ -47,15 +51,26 @@ impl Markdown {
         self.content.lines()
     }
 
-    pub fn content_str(&self) -> &str {
-        &self.content
-    }
-
-    pub fn write_to_file(&self, file: impl AsRef<Path>) -> Result<(), MarkdownError> {
+    pub fn write_to_file(
+        &self,
+        file: impl AsRef<Path>,
+        line_terminator: LineTerminator,
+    ) -> Result<(), MarkdownError> {
         use std::io::prelude::*;
 
         File::create(&file)
-            .and_then(|mut f| f.write_all(self.content.as_bytes()))
+            .and_then(|mut f| {
+                for line in self.lines() {
+                    f.write_all(line.as_bytes())?;
+
+                    match line_terminator {
+                        LineTerminator::Lf => f.write_all("\n".as_bytes())?,
+                        LineTerminator::CrLf => f.write_all("\r\n".as_bytes())?,
+                    }
+                }
+
+                Ok(())
+            })
             .map_err(|_| MarkdownError::ErrorWritingMarkdown(file.as_ref().to_path_buf()))
     }
 }

@@ -19,7 +19,7 @@
 //!
 //! Cargo command to create your `README.md` from your crate's documentation.
 
-use cargo_rdme::{inject_doc, Project};
+use cargo_rdme::{inject_doc, line_terminator, Project};
 use cargo_rdme::{Doc, ProjectError, Readme};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -36,6 +36,8 @@ enum RunError {
     NoRustdoc,
     #[error("failed to inject the documentation in the README: {0}")]
     InjectDocError(cargo_rdme::InjectDocError),
+    #[error("IO error: {0}")]
+    IOError(std::io::Error),
 }
 
 impl From<cargo_rdme::ProjectError> for RunError {
@@ -62,6 +64,12 @@ impl From<cargo_rdme::InjectDocError> for RunError {
     }
 }
 
+impl From<std::io::Error> for RunError {
+    fn from(e: std::io::Error) -> RunError {
+        RunError::IOError(e)
+    }
+}
+
 fn run(current_dir: impl AsRef<Path>) -> Result<(), RunError> {
     let project: Project = Project::from_path(current_dir)?;
     let entryfile: PathBuf = project.get_src_entryfile();
@@ -69,11 +77,11 @@ fn run(current_dir: impl AsRef<Path>) -> Result<(), RunError> {
         None => return Err(RunError::NoRustdoc),
         Some(doc) => doc,
     };
-    let readme: Readme = Readme::from_file(project.get_readme())?;
+    let original_readme: Readme = Readme::from_file(project.get_readme())?;
+    let original_readme_line_terminator = line_terminator(project.get_readme())?;
+    let new_readme = inject_doc(&original_readme, &doc)?;
 
-    let new_readme = inject_doc(&readme, &doc)?;
-
-    new_readme.write_to_file(project.get_readme())?;
+    new_readme.write_to_file(project.get_readme(), original_readme_line_terminator)?;
 
     Ok(())
 }

@@ -196,10 +196,6 @@ impl Doc {
     pub fn lines(&self) -> impl Iterator<Item = &str> {
         self.markdown.lines()
     }
-
-    pub fn content_str(&self) -> &str {
-        self.markdown.content_str()
-    }
 }
 
 #[derive(Error, Debug)]
@@ -217,6 +213,12 @@ impl From<MarkdownError> for ReadmeError {
             MarkdownError::ErrorWritingMarkdown(p) => ReadmeError::ErrorWritingMarkdown(p),
         }
     }
+}
+
+#[derive(Eq, PartialEq, Debug)]
+pub enum LineTerminator {
+    Lf,
+    CrLf,
 }
 
 pub struct Readme {
@@ -240,12 +242,25 @@ impl Readme {
         self.markdown.lines()
     }
 
-    pub fn content_str(&self) -> &str {
-        self.markdown.content_str()
+    pub fn write_to_file(
+        &self,
+        file: impl AsRef<Path>,
+        line_terminator: LineTerminator,
+    ) -> Result<(), ReadmeError> {
+        Ok(self.markdown.write_to_file(file, line_terminator)?)
     }
+}
 
-    pub fn write_to_file(&self, file: impl AsRef<Path>) -> Result<(), ReadmeError> {
-        Ok(self.markdown.write_to_file(file)?)
+pub fn line_terminator(file: impl AsRef<Path>) -> std::io::Result<LineTerminator> {
+    let content: String = std::fs::read_to_string(file.as_ref())?;
+
+    let crlf_lines: usize = content.matches("\r\n").count();
+    let lf_lines: usize = content.matches("\n").count() - crlf_lines;
+
+    if crlf_lines > lf_lines {
+        Ok(LineTerminator::CrLf)
+    } else {
+        Ok(LineTerminator::Lf)
     }
 }
 
