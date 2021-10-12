@@ -19,10 +19,10 @@ use crate::markdown::{Markdown, MarkdownError};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
-mod doc_inject;
+mod inject_doc;
 mod markdown;
 
-pub use doc_inject::{inject_doc, InjectDocError};
+pub use inject_doc::{inject_doc, InjectDocError};
 
 #[derive(Error, Debug)]
 pub enum ManifestError {
