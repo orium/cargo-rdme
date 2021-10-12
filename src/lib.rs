@@ -102,7 +102,7 @@ impl Project {
         self.directory.join(entryfile).to_path_buf()
     }
 
-    pub fn get_readme(&self) -> PathBuf {
+    pub fn get_readme_path(&self) -> PathBuf {
         let filename = self.manifest.readme.as_deref().unwrap_or("README.md");
 
         self.directory.join(filename).to_path_buf()
@@ -201,21 +201,28 @@ impl Doc {
 #[derive(Error, Debug)]
 pub enum ReadmeError {
     #[error("failed to read README file \"{0}\"")]
-    ErrorReadingReadme(PathBuf),
+    ErrorReadingReadmeFromFile(PathBuf),
     #[error("failed to write README file \"{0}\"")]
-    ErrorWritingMarkdown(PathBuf),
+    ErrorWritingMarkdownToFile(PathBuf),
+    #[error("failed to write README")]
+    ErrorWritingMarkdown,
 }
 
 impl From<MarkdownError> for ReadmeError {
     fn from(e: MarkdownError) -> ReadmeError {
         match e {
-            MarkdownError::ErrorReadingMarkdown(p) => ReadmeError::ErrorReadingReadme(p),
-            MarkdownError::ErrorWritingMarkdown(p) => ReadmeError::ErrorWritingMarkdown(p),
+            MarkdownError::ErrorReadingMarkdownFromFile(p) => {
+                ReadmeError::ErrorReadingReadmeFromFile(p)
+            }
+            MarkdownError::ErrorWritingMarkdownToFile(p) => {
+                ReadmeError::ErrorWritingMarkdownToFile(p)
+            }
+            MarkdownError::ErrorWritingMarkdown => ReadmeError::ErrorWritingMarkdown,
         }
     }
 }
 
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug, Copy, Clone)]
 pub enum LineTerminator {
     Lf,
     CrLf,
@@ -248,6 +255,14 @@ impl Readme {
         line_terminator: LineTerminator,
     ) -> Result<(), ReadmeError> {
         Ok(self.markdown.write_to_file(file, line_terminator)?)
+    }
+
+    pub fn write(
+        &self,
+        writer: impl std::io::Write,
+        line_terminator: LineTerminator,
+    ) -> Result<(), ReadmeError> {
+        Ok(self.markdown.write(writer, line_terminator)?)
     }
 }
 

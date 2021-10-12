@@ -12,9 +12,11 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum MarkdownError {
     #[error("failed to read markdown file \"{0}\"")]
-    ErrorReadingMarkdown(PathBuf),
+    ErrorReadingMarkdownFromFile(PathBuf),
     #[error("failed to write markdown file \"{0}\"")]
-    ErrorWritingMarkdown(PathBuf),
+    ErrorWritingMarkdownToFile(PathBuf),
+    #[error("failed to write markdown")]
+    ErrorWritingMarkdown,
 }
 
 pub struct Markdown {
@@ -24,8 +26,9 @@ pub struct Markdown {
 
 impl Markdown {
     pub fn from_file(file: impl AsRef<Path>) -> Result<Markdown, MarkdownError> {
-        let content: String = std::fs::read_to_string(file.as_ref())
-            .map_err(|_| MarkdownError::ErrorReadingMarkdown(file.as_ref().to_path_buf()))?;
+        let content: String = std::fs::read_to_string(file.as_ref()).map_err(|_| {
+            MarkdownError::ErrorReadingMarkdownFromFile(file.as_ref().to_path_buf())
+        })?;
 
         Ok(Markdown::from_str(content))
     }
@@ -56,21 +59,28 @@ impl Markdown {
         file: impl AsRef<Path>,
         line_terminator: LineTerminator,
     ) -> Result<(), MarkdownError> {
-        use std::io::prelude::*;
-
         File::create(&file)
-            .and_then(|mut f| {
-                for line in self.lines() {
-                    f.write_all(line.as_bytes())?;
+            .map_err(|_| MarkdownError::ErrorWritingMarkdownToFile(file.as_ref().to_path_buf()))
+            .and_then(|f| self.write(f, line_terminator))
+    }
 
-                    match line_terminator {
-                        LineTerminator::Lf => f.write_all("\n".as_bytes())?,
-                        LineTerminator::CrLf => f.write_all("\r\n".as_bytes())?,
-                    }
-                }
+    pub fn write(
+        &self,
+        mut writer: impl std::io::Write,
+        line_terminator: LineTerminator,
+    ) -> Result<(), MarkdownError> {
+        let mut write_line = |line: &str| -> std::io::Result<()> {
+            writer.write_all(line.as_bytes())?;
+            match line_terminator {
+                LineTerminator::Lf => writer.write_all("\n".as_bytes()),
+                LineTerminator::CrLf => writer.write_all("\r\n".as_bytes()),
+            }
+        };
 
-                Ok(())
-            })
-            .map_err(|_| MarkdownError::ErrorWritingMarkdown(file.as_ref().to_path_buf()))
+        for line in self.lines() {
+            write_line(line).map_err(|_| MarkdownError::ErrorWritingMarkdown)?;
+        }
+
+        Ok(())
     }
 }

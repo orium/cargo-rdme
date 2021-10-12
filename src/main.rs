@@ -28,6 +28,10 @@ use thiserror::Error;
 
 mod options;
 
+const EXIT_CODE_ERROR: i32 = 1;
+/// Exit code when we run in "check mode" and the README is not up to date.
+const EXIT_CODE_CHECK: i32 = 2;
+
 #[derive(Error, Debug)]
 enum RunError {
     #[error("failed to get project info: {0}")]
@@ -74,6 +78,24 @@ impl From<std::io::Error> for RunError {
     }
 }
 
+/// Check if the README is up to date.
+///
+/// This will check if the README has the given line terminator as well.
+fn is_readme_up_to_date(
+    readme_path: impl AsRef<Path>,
+    new_readme: &Readme,
+    line_terminator: LineTerminator,
+) -> Result<bool, RunError> {
+    let current_readme_raw: String = std::fs::read_to_string(readme_path)?;
+    let new_readme_raw: Vec<u8> = {
+        let mut bytes: Vec<u8> = Vec::with_capacity(32 * 1024);
+        new_readme.write(&mut bytes, line_terminator)?;
+        bytes
+    };
+
+    Ok(current_readme_raw.as_bytes() == new_readme_raw.as_slice())
+}
+
 fn run(current_dir: impl AsRef<Path>, options: Options) -> Result<(), RunError> {
     let project: Project = Project::from_path(current_dir)?;
     let entryfile: PathBuf = project.get_src_entryfile();
@@ -81,16 +103,25 @@ fn run(current_dir: impl AsRef<Path>, options: Options) -> Result<(), RunError> 
         None => return Err(RunError::NoRustdoc),
         Some(doc) => doc,
     };
-    let original_readme: Readme = Readme::from_file(project.get_readme())?;
-    let new_readme = inject_doc(&original_readme, &doc)?;
+    let readme_path: PathBuf = project.get_readme_path();
+    let original_readme: Readme = Readme::from_file(&readme_path)?;
+    let new_readme: Readme = inject_doc(&original_readme, &doc)?;
 
     let line_terminator = match options.line_terminator {
-        Some(LineTerminatorOpt::Auto) | None => infer_line_terminator(project.get_readme())?,
+        Some(LineTerminatorOpt::Auto) | None => infer_line_terminator(project.get_readme_path())?,
         Some(LineTerminatorOpt::Lf) => LineTerminator::Lf,
         Some(LineTerminatorOpt::CrLf) => LineTerminator::CrLf,
     };
 
-    new_readme.write_to_file(project.get_readme(), line_terminator)?;
+    match options.check {
+        false => new_readme.write_to_file(project.get_readme_path(), line_terminator)?,
+        true => {
+            if !is_readme_up_to_date(readme_path, &new_readme, line_terminator)? {
+                eprintln!("README is not up to date.");
+                std::process::exit(EXIT_CODE_CHECK);
+            }
+        }
+    };
 
     Ok(())
 }
@@ -102,12 +133,12 @@ fn main() {
         Ok(current_dir) => {
             if let Err(e) = run(current_dir, options) {
                 eprintln!("error: {}", e);
-                std::process::exit(1);
+                std::process::exit(EXIT_CODE_ERROR);
             }
         }
         Err(_) => {
             eprintln!("error: unable to get current directory.");
-            std::process::exit(1);
+            std::process::exit(EXIT_CODE_ERROR);
         }
     }
 }

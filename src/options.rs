@@ -40,6 +40,7 @@ impl FromStr for LineTerminatorOpt {
 
 pub struct Options {
     pub line_terminator: Option<LineTerminatorOpt>,
+    pub check: bool,
 }
 
 pub fn options_from_cmd() -> Options {
@@ -57,6 +58,12 @@ pub fn options_from_cmd() -> Options {
                 .possible_values(LineTerminatorOpt::VALUES)
                 .default_value(LineTerminatorOpt::DEFAULT),
         )
+        .arg(
+            Arg::with_name("check")
+                .long("check")
+                .short("c")
+                .help("checks if the README is up to date"),
+        )
         .get_matches();
 
     let line_terminator: Option<LineTerminatorOpt> = cmd_opts
@@ -64,5 +71,5 @@ pub fn options_from_cmd() -> Options {
         .map(LineTerminatorOpt::from_str)
         .map(|r| r.unwrap_or_else(|e| panic!("this should never happen: {:?}", e)));
 
-    Options { line_terminator }
+    Options { line_terminator, check: cmd_opts.is_present("check") }
 }

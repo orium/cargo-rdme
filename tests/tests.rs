@@ -12,11 +12,17 @@ struct TestOptions {
     readme_filename: &'static str,
     args: &'static [&'static str],
     exit_status: i32,
+    check_readme_expected: bool,
 }
 
 impl Default for TestOptions {
     fn default() -> Self {
-        TestOptions { readme_filename: "README.md", args: &[], exit_status: 0 }
+        TestOptions {
+            readme_filename: "README.md",
+            args: &[],
+            exit_status: 0,
+            check_readme_expected: true,
+        }
     }
 }
 
@@ -53,21 +59,21 @@ fn run_test_with_options(test_name: &str, options: TestOptions) {
         panic!("Test directory not found: {}", test_dir.display());
     }
 
-    let expected_readme = test_readme_expected(test_name);
-
-    if !expected_readme.is_file() {
-        panic!("Expected readme not found: {}", expected_readme.display());
-    }
-
-    let template_readme = test_readme_template(test_name);
-
-    if !template_readme.is_file() {
-        panic!("Template readme not found: {}", template_readme.display());
-    }
-
+    let expected_readme: PathBuf = test_readme_expected(test_name);
+    let template_readme: PathBuf = test_readme_template(test_name);
     let readme = test_dir.join(options.readme_filename);
 
-    std::fs::copy(&template_readme, &readme).unwrap();
+    if options.check_readme_expected {
+        if !expected_readme.is_file() {
+            panic!("Expected readme not found: {}", expected_readme.display());
+        }
+
+        if !template_readme.is_file() {
+            panic!("Template readme not found: {}", template_readme.display());
+        }
+
+        std::fs::copy(&template_readme, &readme).unwrap();
+    }
 
     let output = Command::new(&cargo_rdme_bin)
         .args(options.args)
@@ -75,7 +81,15 @@ fn run_test_with_options(test_name: &str, options: TestOptions) {
         .output()
         .expect(&format!("Failed to execute {}", cargo_rdme_bin.display()));
 
-    if options.exit_status == 0 {
+    if output.status.code() != Some(options.exit_status) {
+        panic!(
+            "Expected code {} but got code {} instead.",
+            options.exit_status,
+            output.status.code().map(|c| c.to_string()).unwrap_or("?".to_string())
+        );
+    }
+
+    if options.check_readme_expected {
         let expected = std::fs::read_to_string(&expected_readme).unwrap();
         let got = std::fs::read_to_string(&readme).unwrap();
 
@@ -99,14 +113,6 @@ fn run_test_with_options(test_name: &str, options: TestOptions) {
             );
         } else {
             std::fs::remove_file(readme).unwrap();
-        }
-    } else {
-        if output.status.code() != Some(options.exit_status) {
-            panic!(
-                "Expected code {} but got code {} instead.",
-                options.exit_status,
-                output.status.code().map(|c| c.to_string()).unwrap_or("?".to_string())
-            );
         }
     }
 }
@@ -183,6 +189,56 @@ fn integration_test_option_line_terminator_crlf() {
     assert_eq!(infer_line_terminator(readme_expected).unwrap(), LineTerminator::CrLf);
 
     let option = TestOptions { args: &["--line-terminator", "crlf"], ..TestOptions::default() };
+
+    run_test_with_options(test_name, option);
+}
+
+#[test]
+fn integration_test_option_check_ok() {
+    let test_name = "option_check_ok";
+    let option = TestOptions {
+        args: &["--check"],
+        check_readme_expected: false,
+        exit_status: 0,
+        ..TestOptions::default()
+    };
+
+    run_test_with_options(test_name, option);
+}
+
+#[test]
+fn integration_test_option_check_fail() {
+    let test_name = "option_check_fail";
+    let option = TestOptions {
+        args: &["--check"],
+        check_readme_expected: false,
+        exit_status: 2,
+        ..TestOptions::default()
+    };
+
+    run_test_with_options(test_name, option);
+}
+
+#[test]
+fn integration_test_option_check_fail_line_terminator() {
+    let test_name = "option_check_fail_line_terminator";
+
+    // First check that the test would pass without the line terminator override.
+    let option = TestOptions {
+        args: &["--check"],
+        check_readme_expected: false,
+        exit_status: 0,
+        ..TestOptions::default()
+    };
+
+    run_test_with_options(test_name, option);
+
+    let option = TestOptions {
+        args: &["--check", "--line-terminator", "crlf"],
+        check_readme_expected: false,
+        exit_status: 2,
+        ..TestOptions::default()
+    };
 
     run_test_with_options(test_name, option);
 }
