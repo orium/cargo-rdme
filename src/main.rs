@@ -19,10 +19,14 @@
 //!
 //! Cargo command to create your `README.md` from your crate's documentation.
 
-use cargo_rdme::{inject_doc, line_terminator, Project};
+use crate::options::LineTerminatorOpt;
+use cargo_rdme::{infer_line_terminator, inject_doc, LineTerminator, Project};
 use cargo_rdme::{Doc, ProjectError, Readme};
+use options::Options;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
+
+mod options;
 
 #[derive(Error, Debug)]
 enum RunError {
@@ -70,7 +74,7 @@ impl From<std::io::Error> for RunError {
     }
 }
 
-fn run(current_dir: impl AsRef<Path>) -> Result<(), RunError> {
+fn run(current_dir: impl AsRef<Path>, options: Options) -> Result<(), RunError> {
     let project: Project = Project::from_path(current_dir)?;
     let entryfile: PathBuf = project.get_src_entryfile();
     let doc: Doc = match Doc::from_source_file(entryfile)? {
@@ -78,18 +82,25 @@ fn run(current_dir: impl AsRef<Path>) -> Result<(), RunError> {
         Some(doc) => doc,
     };
     let original_readme: Readme = Readme::from_file(project.get_readme())?;
-    let original_readme_line_terminator = line_terminator(project.get_readme())?;
     let new_readme = inject_doc(&original_readme, &doc)?;
 
-    new_readme.write_to_file(project.get_readme(), original_readme_line_terminator)?;
+    let line_terminator = match options.line_terminator {
+        Some(LineTerminatorOpt::Auto) | None => infer_line_terminator(project.get_readme())?,
+        Some(LineTerminatorOpt::Lf) => LineTerminator::Lf,
+        Some(LineTerminatorOpt::CrLf) => LineTerminator::CrLf,
+    };
+
+    new_readme.write_to_file(project.get_readme(), line_terminator)?;
 
     Ok(())
 }
 
 fn main() {
+    let options = options::options_from_cmd();
+
     match std::env::current_dir() {
         Ok(current_dir) => {
-            if let Err(e) = run(current_dir) {
+            if let Err(e) = run(current_dir, options) {
                 eprintln!("error: {}", e);
                 std::process::exit(1);
             }

@@ -251,7 +251,7 @@ impl Readme {
     }
 }
 
-pub fn line_terminator(file: impl AsRef<Path>) -> std::io::Result<LineTerminator> {
+pub fn infer_line_terminator(file: impl AsRef<Path>) -> std::io::Result<LineTerminator> {
     let content: String = std::fs::read_to_string(file.as_ref())?;
 
     let crlf_lines: usize = content.matches("\r\n").count();
