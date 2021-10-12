@@ -3,16 +3,34 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+use std::path::PathBuf;
 use std::process::Command;
 
+use cargo_rdme::{infer_line_terminator, LineTerminator};
+
 struct TestOptions {
-    readme_filename: String,
+    readme_filename: &'static str,
+    args: &'static [&'static str],
+    exit_status: i32,
 }
 
 impl Default for TestOptions {
     fn default() -> Self {
-        TestOptions { readme_filename: "README.md".to_owned() }
+        TestOptions { readme_filename: "README.md", args: &[], exit_status: 0 }
     }
+}
+
+fn test_dir(test_name: &str) -> PathBuf {
+    let cargo_rdme_dir = std::env::current_dir().unwrap();
+    cargo_rdme_dir.join("tests").join(test_name)
+}
+
+fn test_readme_template(test_name: &str) -> PathBuf {
+    test_dir(test_name).join("README-template.md")
+}
+
+fn test_readme_expected(test_name: &str) -> PathBuf {
+    test_dir(test_name).join("README-expected.md")
 }
 
 fn run_test_with_options(test_name: &str, options: TestOptions) {
@@ -29,19 +47,19 @@ fn run_test_with_options(test_name: &str, options: TestOptions) {
             .expect(&format!("{} binary not found", name))
     };
 
-    let test_dir = cargo_rdme_dir.join("tests").join(test_name);
+    let test_dir = test_dir(test_name);
 
     if !test_dir.is_dir() {
         panic!("Test directory not found: {}", test_dir.display());
     }
 
-    let expected_readme = test_dir.join("README-expected.md");
+    let expected_readme = test_readme_expected(test_name);
 
     if !expected_readme.is_file() {
         panic!("Expected readme not found: {}", expected_readme.display());
     }
 
-    let template_readme = test_dir.join("README-template.md");
+    let template_readme = test_readme_template(test_name);
 
     if !template_readme.is_file() {
         panic!("Template readme not found: {}", template_readme.display());
@@ -52,33 +70,44 @@ fn run_test_with_options(test_name: &str, options: TestOptions) {
     std::fs::copy(&template_readme, &readme).unwrap();
 
     let output = Command::new(&cargo_rdme_bin)
+        .args(options.args)
         .current_dir(test_dir)
         .output()
         .expect(&format!("Failed to execute {}", cargo_rdme_bin.display()));
 
-    let expected = std::fs::read_to_string(&expected_readme).unwrap();
-    let got = std::fs::read_to_string(&readme).unwrap();
+    if options.exit_status == 0 {
+        let expected = std::fs::read_to_string(&expected_readme).unwrap();
+        let got = std::fs::read_to_string(&readme).unwrap();
 
-    if expected != got {
-        let in_ci = std::env::var_os("CI").is_some();
+        if expected != got {
+            let in_ci = std::env::var_os("CI").is_some();
 
-        let diff_msg = match in_ci {
-            true => format!("==== Expected ====\n{}\n==== Got ====\n{}", expected, got),
-            false => format!(
-                "See the diff with `diff {} {}`.",
-                readme.display(),
-                expected_readme.display()
-            ),
-        };
+            let diff_msg = match in_ci {
+                true => format!("==== Expected ====\n{}\n==== Got ====\n{}", expected, got),
+                false => format!(
+                    "See the diff with `diff {} {}`.",
+                    readme.display(),
+                    expected_readme.display()
+                ),
+            };
 
-        let stderr = String::from_utf8_lossy(&output.stderr);
+            let stderr = String::from_utf8_lossy(&output.stderr);
 
-        panic!(
-            "The generated README does not match what was expected.\n\n{}\n==== stderr ====\n{}",
-            diff_msg, stderr
-        );
+            panic!(
+                "The generated README does not match what was expected.\n\n{}\n==== stderr ====\n{}",
+                diff_msg, stderr
+            );
+        } else {
+            std::fs::remove_file(readme).unwrap();
+        }
     } else {
-        std::fs::remove_file(readme).unwrap();
+        if output.status.code() != Some(options.exit_status) {
+            panic!(
+                "Expected code {} but got code {} instead.",
+                options.exit_status,
+                output.status.code().map(|c| c.to_string()).unwrap_or("?".to_string())
+            );
+        }
     }
 }
 
@@ -108,17 +137,52 @@ fn integration_test_custom_lib_path() {
 
 #[test]
 fn integration_test_custom_readme_path() {
-    let option = TestOptions { readme_filename: "READ-ME.md".to_owned() };
+    let option = TestOptions { readme_filename: "READ-ME.md", ..TestOptions::default() };
 
     run_test_with_options("custom_readme_path", option);
 }
 
 #[test]
 fn integration_test_line_terminator_crlf() {
-    run_test("line_terminator_crlf");
+    let test_name = "line_terminator_crlf";
+    let readme_template = test_readme_template(test_name);
+    let readme_expected = test_readme_expected(test_name);
+
+    assert_eq!(infer_line_terminator(readme_template).unwrap(), LineTerminator::CrLf);
+    assert_eq!(infer_line_terminator(readme_expected).unwrap(), LineTerminator::CrLf);
+
+    run_test(test_name);
 }
 
 #[test]
 fn integration_test_multiline_doc() {
     run_test("multiline_doc");
+}
+
+#[test]
+fn integration_test_option_line_terminator_lf() {
+    let test_name = "option_line_terminator_lf";
+    let readme_template = test_readme_template(test_name);
+    let readme_expected = test_readme_expected(test_name);
+
+    assert_eq!(infer_line_terminator(readme_template).unwrap(), LineTerminator::CrLf);
+    assert_eq!(infer_line_terminator(readme_expected).unwrap(), LineTerminator::Lf);
+
+    let option = TestOptions { args: &["--line-terminator", "lf"], ..TestOptions::default() };
+
+    run_test_with_options(test_name, option);
+}
+
+#[test]
+fn integration_test_option_line_terminator_crlf() {
+    let test_name = "option_line_terminator_crlf";
+    let readme_template = test_readme_template(test_name);
+    let readme_expected = test_readme_expected(test_name);
+
+    assert_eq!(infer_line_terminator(readme_template).unwrap(), LineTerminator::Lf);
+    assert_eq!(infer_line_terminator(readme_expected).unwrap(), LineTerminator::CrLf);
+
+    let option = TestOptions { args: &["--line-terminator", "crlf"], ..TestOptions::default() };
+
+    run_test_with_options(test_name, option);
 }
