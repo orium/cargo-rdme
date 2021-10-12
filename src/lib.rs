@@ -151,15 +151,7 @@ impl Doc {
                 if let Ok(Meta::NameValue(MetaNameValue { lit: Lit::Str(lstr), .. })) =
                     attr.parse_meta()
                 {
-                    let string = lstr.value();
-
-                    // `LitStr` will have leading and trailing `"` for whatever reason, so we need
-                    // to strip them.
-                    let string = string
-                        .strip_prefix('"')
-                        .unwrap_or(&string)
-                        .strip_suffix('"')
-                        .unwrap_or(&string);
+                    let string = &lstr.value();
 
                     match string.lines().count() {
                         0 => lines.push("".to_owned()),
@@ -326,6 +318,7 @@ mod tests {
             //!This line doesn't start with space.
             //!
             //! And a nice empty line above us.
+            //! Also a line ending in "
 
             struct Nothing {}
             "#
@@ -339,6 +332,7 @@ mod tests {
             "This line doesn't start with space.",
             "",
             "And a nice empty line above us.",
+            "Also a line ending in \"",
         ];
 
         assert_eq!(lines, expected);
@@ -369,6 +363,34 @@ mod tests {
             " This line start with space.",
             "",
             "And a nice empty line above us.",
+        ];
+
+        assert_eq!(lines, expected);
+    }
+
+    #[test]
+    fn test_doc_from_source_str_single_line_keep_indentation() {
+        let str = indoc! { r#"
+            #![cfg_attr(not(feature = "std"), no_std)]
+            // normal comment
+
+            //! This is the doc for the crate.  This crate does:
+            //!
+            //!   1. nothing.
+            //!   2. niente.
+
+            struct Nothing {}
+            "#
+        };
+
+        let doc = Doc::from_source_str(str).unwrap().unwrap();
+        let lines: Vec<&str> = doc.lines().collect();
+
+        let expected = vec![
+            "This is the doc for the crate.  This crate does:",
+            "",
+            "  1. nothing.",
+            "  2. niente.",
         ];
 
         assert_eq!(lines, expected);
