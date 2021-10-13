@@ -39,9 +39,9 @@ pub struct Manifest {
 }
 
 impl Manifest {
-    pub fn from_file(dir: impl AsRef<Path>) -> Result<Manifest, ManifestError> {
-        let str: String = std::fs::read_to_string(dir.as_ref())
-            .map_err(|_| ManifestError::ErrorReadingManifest(dir.as_ref().to_path_buf()))?;
+    pub fn from_file(file_path: impl AsRef<Path>) -> Result<Manifest, ManifestError> {
+        let str: String = std::fs::read_to_string(&file_path)
+            .map_err(|_| ManifestError::ErrorReadingManifest(file_path.as_ref().to_path_buf()))?;
         Manifest::from_str(&str)
     }
 
@@ -79,21 +79,28 @@ pub struct Project {
     directory: PathBuf,
 }
 
+pub fn find_first_file_in_ancestors(dir: impl AsRef<Path>, filename: &str) -> Option<PathBuf> {
+    for ancestor_dir in dir.as_ref().ancestors() {
+        let file = ancestor_dir.join(filename);
+        if file.is_file() {
+            return Some(file);
+        }
+    }
+
+    None
+}
+
 impl Project {
     /// Creates a [`Project`] from a path.  It will ancestor paths until it finds the root of the
     /// project.
     pub fn from_path(dir: impl AsRef<Path>) -> Result<Project, ProjectError> {
-        for ancestor_dir in dir.as_ref().ancestors() {
-            let manifest_file = ancestor_dir.join("Cargo.toml");
-            if manifest_file.is_file() {
-                return Ok(Project {
-                    manifest: Manifest::from_file(manifest_file)?,
-                    directory: ancestor_dir.to_path_buf(),
-                });
-            }
+        match find_first_file_in_ancestors(dir, "Cargo.toml") {
+            None => Err(ProjectError::ProjectRootNotFound),
+            Some(manifest_file) => Ok(Project {
+                manifest: Manifest::from_file(&manifest_file)?,
+                directory: manifest_file.parent().expect("this should never happen").to_path_buf(),
+            }),
         }
-
-        Err(ProjectError::ProjectRootNotFound)
     }
 
     pub fn get_src_entryfile(&self) -> PathBuf {

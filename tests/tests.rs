@@ -81,11 +81,14 @@ fn run_test_with_options(test_name: &str, options: TestOptions) {
         .output()
         .expect(&format!("Failed to execute {}", cargo_rdme_bin.display()));
 
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
     if output.status.code() != Some(options.exit_status) {
         panic!(
-            "Expected code {} but got code {} instead.",
+            "Expected code {} but got code {} instead.\n==== stderr ====\n{}",
             options.exit_status,
-            output.status.code().map(|c| c.to_string()).unwrap_or("?".to_string())
+            output.status.code().map(|c| c.to_string()).unwrap_or("?".to_string()),
+            stderr
         );
     }
 
@@ -104,8 +107,6 @@ fn run_test_with_options(test_name: &str, options: TestOptions) {
                     expected_readme.display()
                 ),
             };
-
-            let stderr = String::from_utf8_lossy(&output.stderr);
 
             panic!(
                 "The generated README does not match what was expected.\n\n{}\n==== stderr ====\n{}",
@@ -166,8 +167,8 @@ fn integration_test_multiline_doc() {
 }
 
 #[test]
-fn integration_test_option_line_terminator_lf() {
-    let test_name = "option_line_terminator_lf";
+fn integration_test_option_cmd_line_terminator_lf() {
+    let test_name = "option_cmd_line_terminator_lf";
     let readme_template = test_readme_template(test_name);
     let readme_expected = test_readme_expected(test_name);
 
@@ -180,8 +181,8 @@ fn integration_test_option_line_terminator_lf() {
 }
 
 #[test]
-fn integration_test_option_line_terminator_crlf() {
-    let test_name = "option_line_terminator_crlf";
+fn integration_test_option_cmd_line_terminator_crlf() {
+    let test_name = "option_cmd_line_terminator_crlf";
     let readme_template = test_readme_template(test_name);
     let readme_expected = test_readme_expected(test_name);
 
@@ -194,8 +195,32 @@ fn integration_test_option_line_terminator_crlf() {
 }
 
 #[test]
-fn integration_test_option_check_ok() {
-    let test_name = "option_check_ok";
+fn integration_test_option_conf_file_line_terminator_lf() {
+    let test_name = "option_conf_file_line_terminator_lf";
+    let readme_template = test_readme_template(test_name);
+    let readme_expected = test_readme_expected(test_name);
+
+    assert_eq!(infer_line_terminator(readme_template).unwrap(), LineTerminator::CrLf);
+    assert_eq!(infer_line_terminator(readme_expected).unwrap(), LineTerminator::Lf);
+
+    run_test(test_name);
+}
+
+#[test]
+fn integration_test_option_conf_file_line_terminator_crlf() {
+    let test_name = "option_conf_file_line_terminator_crlf";
+    let readme_template = test_readme_template(test_name);
+    let readme_expected = test_readme_expected(test_name);
+
+    assert_eq!(infer_line_terminator(readme_template).unwrap(), LineTerminator::Lf);
+    assert_eq!(infer_line_terminator(readme_expected).unwrap(), LineTerminator::CrLf);
+
+    run_test(test_name);
+}
+
+#[test]
+fn integration_test_option_cmd_check_ok() {
+    let test_name = "option_cmd_check_ok";
     let option = TestOptions {
         args: &["--check"],
         check_readme_expected: false,
@@ -207,8 +232,8 @@ fn integration_test_option_check_ok() {
 }
 
 #[test]
-fn integration_test_option_check_fail() {
-    let test_name = "option_check_fail";
+fn integration_test_option_cmd_check_fail() {
+    let test_name = "option_cmd_check_fail";
     let option = TestOptions {
         args: &["--check"],
         check_readme_expected: false,
@@ -220,8 +245,8 @@ fn integration_test_option_check_fail() {
 }
 
 #[test]
-fn integration_test_option_check_fail_line_terminator() {
-    let test_name = "option_check_fail_line_terminator";
+fn integration_test_option_cmd_check_fail_line_terminator() {
+    let test_name = "option_cmd_check_fail_line_terminator";
 
     // First check that the test would pass without the line terminator override.
     let option = TestOptions {

@@ -22,7 +22,6 @@
 use crate::options::LineTerminatorOpt;
 use cargo_rdme::{infer_line_terminator, inject_doc, LineTerminator, Project};
 use cargo_rdme::{Doc, ProjectError, Readme};
-use options::Options;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
@@ -96,7 +95,7 @@ fn is_readme_up_to_date(
     Ok(current_readme_raw.as_bytes() == new_readme_raw.as_slice())
 }
 
-fn run(current_dir: impl AsRef<Path>, options: Options) -> Result<(), RunError> {
+fn run(current_dir: impl AsRef<Path>, options: options::Options) -> Result<(), RunError> {
     let project: Project = Project::from_path(current_dir)?;
     let entryfile: PathBuf = project.get_src_entryfile();
     let doc: Doc = match Doc::from_source_file(entryfile)? {
@@ -108,9 +107,9 @@ fn run(current_dir: impl AsRef<Path>, options: Options) -> Result<(), RunError> 
     let new_readme: Readme = inject_doc(&original_readme, &doc)?;
 
     let line_terminator = match options.line_terminator {
-        Some(LineTerminatorOpt::Auto) | None => infer_line_terminator(project.get_readme_path())?,
-        Some(LineTerminatorOpt::Lf) => LineTerminator::Lf,
-        Some(LineTerminatorOpt::CrLf) => LineTerminator::CrLf,
+        LineTerminatorOpt::Auto => infer_line_terminator(project.get_readme_path())?,
+        LineTerminatorOpt::Lf => LineTerminator::Lf,
+        LineTerminatorOpt::CrLf => LineTerminator::CrLf,
     };
 
     match options.check {
@@ -127,17 +126,27 @@ fn run(current_dir: impl AsRef<Path>, options: Options) -> Result<(), RunError> 
 }
 
 fn main() {
-    let options = options::options_from_cmd();
+    let cmd_options = options::cmd_options();
 
     match std::env::current_dir() {
         Ok(current_dir) => {
+            let config_file_options = match options::config_file_options(&current_dir) {
+                Ok(opts) => opts,
+                Err(e) => {
+                    eprintln!("error: unable to read config file: {}", e);
+                    std::process::exit(EXIT_CODE_ERROR);
+                }
+            };
+
+            let options = options::merge_options(cmd_options, config_file_options);
+
             if let Err(e) = run(current_dir, options) {
                 eprintln!("error: {}", e);
                 std::process::exit(EXIT_CODE_ERROR);
             }
         }
-        Err(_) => {
-            eprintln!("error: unable to get current directory.");
+        Err(e) => {
+            eprintln!("error: unable to get current directory: {}", e);
             std::process::exit(EXIT_CODE_ERROR);
         }
     }
