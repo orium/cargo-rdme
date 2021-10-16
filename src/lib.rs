@@ -79,8 +79,8 @@ pub struct Project {
     directory: PathBuf,
 }
 
-pub fn find_first_file_in_ancestors(dir: impl AsRef<Path>, filename: &str) -> Option<PathBuf> {
-    for ancestor_dir in dir.as_ref().ancestors() {
+pub fn find_first_file_in_ancestors(dir_path: impl AsRef<Path>, filename: &str) -> Option<PathBuf> {
+    for ancestor_dir in dir_path.as_ref().ancestors() {
         let file = ancestor_dir.join(filename);
         if file.is_file() {
             return Some(file);
@@ -93,8 +93,8 @@ pub fn find_first_file_in_ancestors(dir: impl AsRef<Path>, filename: &str) -> Op
 impl Project {
     /// Creates a [`Project`] from a path.  It will ancestor paths until it finds the root of the
     /// project.
-    pub fn from_path(dir: impl AsRef<Path>) -> Result<Project, ProjectError> {
-        match find_first_file_in_ancestors(dir, "Cargo.toml") {
+    pub fn from_dir(dir_path: impl AsRef<Path>) -> Result<Project, ProjectError> {
+        match find_first_file_in_ancestors(dir_path, "Cargo.toml") {
             None => Err(ProjectError::ProjectRootNotFound),
             Some(manifest_file) => Ok(Project {
                 manifest: Manifest::from_file(&manifest_file)?,
@@ -103,7 +103,7 @@ impl Project {
         }
     }
 
-    pub fn get_lib_entryfile(&self) -> PathBuf {
+    pub fn get_lib_entryfile_path(&self) -> PathBuf {
         let default = || Path::new("src").join("lib.rs").to_path_buf();
         let entryfile = self.manifest.lib_path.clone().unwrap_or_else(default);
 
@@ -131,9 +131,9 @@ pub struct Doc {
 }
 
 impl Doc {
-    pub fn from_source_file(file: impl AsRef<Path>) -> Result<Option<Doc>, DocError> {
-        let source: String = std::fs::read_to_string(file.as_ref())
-            .map_err(|_| DocError::ErrorReadingSourceFile(file.as_ref().to_path_buf()))?;
+    pub fn from_source_file(file_path: impl AsRef<Path>) -> Result<Option<Doc>, DocError> {
+        let source: String = std::fs::read_to_string(file_path.as_ref())
+            .map_err(|_| DocError::ErrorReadingSourceFile(file_path.as_ref().to_path_buf()))?;
 
         Doc::from_source_str(&source)
     }
@@ -234,8 +234,8 @@ pub struct Readme {
 }
 
 impl Readme {
-    pub fn from_file(file: impl AsRef<Path>) -> Result<Readme, ReadmeError> {
-        Ok(Readme { markdown: Markdown::from_file(file)? })
+    pub fn from_file(file_path: impl AsRef<Path>) -> Result<Readme, ReadmeError> {
+        Ok(Readme { markdown: Markdown::from_file(file_path)? })
     }
 
     pub fn from_str(str: impl Into<String>) -> Readme {
@@ -267,8 +267,8 @@ impl Readme {
     }
 }
 
-pub fn infer_line_terminator(file: impl AsRef<Path>) -> std::io::Result<LineTerminator> {
-    let content: String = std::fs::read_to_string(file.as_ref())?;
+pub fn infer_line_terminator(file_path: impl AsRef<Path>) -> std::io::Result<LineTerminator> {
+    let content: String = std::fs::read_to_string(file_path.as_ref())?;
 
     let crlf_lines: usize = content.matches("\r\n").count();
     let lf_lines: usize = content.matches("\n").count() - crlf_lines;

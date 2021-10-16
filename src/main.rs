@@ -95,9 +95,9 @@ fn is_readme_up_to_date(
     Ok(current_readme_raw.as_bytes() == new_readme_raw.as_slice())
 }
 
-fn run(current_dir: impl AsRef<Path>, options: options::Options) -> Result<(), RunError> {
-    let project: Project = Project::from_path(current_dir)?;
-    let entryfile: PathBuf = project.get_lib_entryfile();
+fn run(current_dir_path: impl AsRef<Path>, options: options::Options) -> Result<(), RunError> {
+    let project: Project = Project::from_dir(current_dir_path)?;
+    let entryfile: PathBuf = project.get_lib_entryfile_path();
     let doc: Doc = match Doc::from_source_file(entryfile)? {
         None => return Err(RunError::NoRustdoc),
         Some(doc) => doc,

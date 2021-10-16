@@ -25,9 +25,9 @@ pub struct Markdown {
 }
 
 impl Markdown {
-    pub fn from_file(file: impl AsRef<Path>) -> Result<Markdown, MarkdownError> {
-        let content: String = std::fs::read_to_string(file.as_ref()).map_err(|_| {
-            MarkdownError::ErrorReadingMarkdownFromFile(file.as_ref().to_path_buf())
+    pub fn from_file(file_path: impl AsRef<Path>) -> Result<Markdown, MarkdownError> {
+        let content: String = std::fs::read_to_string(file_path.as_ref()).map_err(|_| {
+            MarkdownError::ErrorReadingMarkdownFromFile(file_path.as_ref().to_path_buf())
         })?;
 
         Ok(Markdown::from_str(content))
