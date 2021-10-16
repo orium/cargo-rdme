@@ -123,34 +123,34 @@ fn run_test(test_name: &str) {
 }
 
 #[test]
-fn integration_test_simple_single_marker() {
+fn system_test_simple_single_marker() {
     run_test("simple_single_marker");
 }
 
 #[test]
-fn integration_test_simple_single_marker_no_footer() {
+fn system_test_simple_single_marker_no_footer() {
     run_test("simple_single_marker_no_footer");
 }
 
 #[test]
-fn integration_test_simple_start_end_marker() {
+fn system_test_simple_start_end_marker() {
     run_test("simple_start_end_marker");
 }
 
 #[test]
-fn integration_test_custom_lib_path() {
+fn system_test_custom_lib_path() {
     run_test("custom_lib_path");
 }
 
 #[test]
-fn integration_test_custom_readme_path() {
+fn system_test_custom_readme_path() {
     let option = TestOptions { readme_filename: "READ-ME.md", ..TestOptions::default() };
 
     run_test_with_options("custom_readme_path", option);
 }
 
 #[test]
-fn integration_test_line_terminator_crlf() {
+fn system_test_line_terminator_crlf() {
     let test_name = "line_terminator_crlf";
     let readme_template = test_readme_template(test_name);
     let readme_expected = test_readme_expected(test_name);
@@ -162,12 +162,12 @@ fn integration_test_line_terminator_crlf() {
 }
 
 #[test]
-fn integration_test_multiline_doc() {
+fn system_test_multiline_doc() {
     run_test("multiline_doc");
 }
 
 #[test]
-fn integration_test_option_cmd_line_terminator_lf() {
+fn system_test_option_cmd_line_terminator_lf() {
     let test_name = "option_cmd_line_terminator_lf";
     let readme_template = test_readme_template(test_name);
     let readme_expected = test_readme_expected(test_name);
@@ -181,7 +181,7 @@ fn integration_test_option_cmd_line_terminator_lf() {
 }
 
 #[test]
-fn integration_test_option_cmd_line_terminator_crlf() {
+fn system_test_option_cmd_line_terminator_crlf() {
     let test_name = "option_cmd_line_terminator_crlf";
     let readme_template = test_readme_template(test_name);
     let readme_expected = test_readme_expected(test_name);
@@ -195,7 +195,7 @@ fn integration_test_option_cmd_line_terminator_crlf() {
 }
 
 #[test]
-fn integration_test_option_conf_file_line_terminator_lf() {
+fn system_test_option_conf_file_line_terminator_lf() {
     let test_name = "option_conf_file_line_terminator_lf";
     let readme_template = test_readme_template(test_name);
     let readme_expected = test_readme_expected(test_name);
@@ -207,7 +207,7 @@ fn integration_test_option_conf_file_line_terminator_lf() {
 }
 
 #[test]
-fn integration_test_option_conf_file_line_terminator_crlf() {
+fn system_test_option_conf_file_line_terminator_crlf() {
     let test_name = "option_conf_file_line_terminator_crlf";
     let readme_template = test_readme_template(test_name);
     let readme_expected = test_readme_expected(test_name);
@@ -219,7 +219,7 @@ fn integration_test_option_conf_file_line_terminator_crlf() {
 }
 
 #[test]
-fn integration_test_option_cmd_check_ok() {
+fn system_test_option_cmd_check_ok() {
     let test_name = "option_cmd_check_ok";
     let option = TestOptions {
         args: &["--check"],
@@ -232,7 +232,7 @@ fn integration_test_option_cmd_check_ok() {
 }
 
 #[test]
-fn integration_test_option_cmd_check_fail() {
+fn system_test_option_cmd_check_fail() {
     let test_name = "option_cmd_check_fail";
     let option = TestOptions {
         args: &["--check"],
@@ -245,7 +245,7 @@ fn integration_test_option_cmd_check_fail() {
 }
 
 #[test]
-fn integration_test_option_cmd_check_fail_line_terminator() {
+fn system_test_option_cmd_check_fail_line_terminator() {
     let test_name = "option_cmd_check_fail_line_terminator";
 
     // First check that the test would pass without the line terminator override.
@@ -269,11 +269,11 @@ fn integration_test_option_cmd_check_fail_line_terminator() {
 }
 
 #[test]
-fn integration_test_entrypoint_bin_crate() {
+fn system_test_entrypoint_bin_crate() {
     run_test("entrypoint_bin_crate");
 }
 
 #[test]
-fn integration_test_entrypoint_bin_lib_crate_lib_wins() {
+fn system_test_entrypoint_bin_lib_crate_lib_wins() {
     run_test("entrypoint_bin_lib_crate_lib_wins");
 }
