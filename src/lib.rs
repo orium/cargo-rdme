@@ -34,8 +34,8 @@ pub enum ManifestError {
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct Manifest {
-    lib_path: Option<String>,
-    readme: Option<String>,
+    lib_path: Option<PathBuf>,
+    readme_path: Option<PathBuf>,
 }
 
 impl Manifest {
@@ -48,14 +48,14 @@ impl Manifest {
     pub fn from_str(str: &str) -> Result<Manifest, ManifestError> {
         let toml: toml::Value = toml::from_str(str).map_err(|_| ManifestError::ErrorParsingToml)?;
 
-        let get_str = |section: &str, field: &str| -> Option<String> {
-            toml.get(section)
-                .and_then(|v| v.get(field))
-                .and_then(|p| p.as_str())
-                .map(|v| v.to_owned())
+        let get_str = |section: &str, field: &str| -> Option<&str> {
+            toml.get(section).and_then(|v| v.get(field)).and_then(|p| p.as_str())
         };
 
-        Ok(Manifest { lib_path: get_str("lib", "path"), readme: get_str("package", "readme") })
+        Ok(Manifest {
+            lib_path: get_str("lib", "path").map(|v| Path::new(v).to_path_buf()),
+            readme_path: get_str("package", "readme").map(|v| Path::new(v).to_path_buf()),
+        })
     }
 }
 
@@ -103,14 +103,16 @@ impl Project {
         }
     }
 
-    pub fn get_src_entryfile(&self) -> PathBuf {
-        let entryfile = self.manifest.lib_path.as_deref().unwrap_or("src/lib.rs");
+    pub fn get_lib_entryfile(&self) -> PathBuf {
+        let default = || Path::new("src").join("lib.rs").to_path_buf();
+        let entryfile = self.manifest.lib_path.clone().unwrap_or_else(default);
 
         self.directory.join(entryfile).to_path_buf()
     }
 
     pub fn get_readme_path(&self) -> PathBuf {
-        let filename = self.manifest.readme.as_deref().unwrap_or("README.md");
+        let default = || Path::new("README.md").to_path_buf();
+        let filename = self.manifest.readme_path.clone().unwrap_or_else(default);
 
         self.directory.join(filename).to_path_buf()
     }
@@ -296,8 +298,8 @@ mod tests {
         };
 
         let expected_manifest = Manifest {
-            lib_path: Some("src/lib.rs".to_owned()),
-            readme: Some("README.md".to_owned()),
+            lib_path: Some(Path::new("src").join("lib.rs").to_path_buf()),
+            readme_path: Some(Path::new("README.md").to_path_buf()),
         };
 
         assert_eq!(Manifest::from_str(str).unwrap(), expected_manifest);

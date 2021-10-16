@@ -97,7 +97,7 @@ fn is_readme_up_to_date(
 
 fn run(current_dir: impl AsRef<Path>, options: options::Options) -> Result<(), RunError> {
     let project: Project = Project::from_path(current_dir)?;
-    let entryfile: PathBuf = project.get_src_entryfile();
+    let entryfile: PathBuf = project.get_lib_entryfile();
     let doc: Doc = match Doc::from_source_file(entryfile)? {
         None => return Err(RunError::NoRustdoc),
         Some(doc) => doc,
