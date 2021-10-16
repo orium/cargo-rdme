@@ -103,18 +103,37 @@ impl Project {
         }
     }
 
-    pub fn get_lib_entryfile_path(&self) -> PathBuf {
+    pub fn get_lib_entryfile_path(&self) -> Option<PathBuf> {
         let default = || Path::new("src").join("lib.rs").to_path_buf();
-        let entryfile = self.manifest.lib_path.clone().unwrap_or_else(default);
+        let rel_path = self.manifest.lib_path.clone().unwrap_or_else(default);
+        let path = self.directory.join(rel_path).to_path_buf();
 
-        self.directory.join(entryfile).to_path_buf()
+        match path.is_file() {
+            true => Some(path),
+            false => None,
+        }
     }
 
-    pub fn get_readme_path(&self) -> PathBuf {
-        let default = || Path::new("README.md").to_path_buf();
-        let filename = self.manifest.readme_path.clone().unwrap_or_else(default);
+    pub fn get_bin_default_entryfile_path(&self) -> Option<PathBuf> {
+        let default = || Path::new("src").join("main.rs").to_path_buf();
+        let rel_path = self.manifest.lib_path.clone().unwrap_or_else(default);
+        let path = self.directory.join(rel_path).to_path_buf();
 
-        self.directory.join(filename).to_path_buf()
+        match path.is_file() {
+            true => Some(path),
+            false => None,
+        }
+    }
+
+    pub fn get_readme_path(&self) -> Option<PathBuf> {
+        let default = || Path::new("README.md").to_path_buf();
+        let rel_path = self.manifest.readme_path.clone().unwrap_or_else(default);
+        let path = self.directory.join(rel_path).to_path_buf();
+
+        match path.is_file() {
+            true => Some(path),
+            false => None,
+        }
     }
 }
 

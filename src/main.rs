@@ -39,6 +39,10 @@ enum RunError {
     DocError(cargo_rdme::DocError),
     #[error("failed to process README: {0}")]
     ReadmeError(cargo_rdme::ReadmeError),
+    #[error("failed get crate's entry source file")]
+    NoEntrySourceFile,
+    #[error("failed get crate's README file")]
+    NoReadmeFile,
     #[error("no crate-level rustdoc found")]
     NoRustdoc,
     #[error("failed to inject the documentation in the README: {0}")]
@@ -97,25 +101,28 @@ fn is_readme_up_to_date(
 
 fn run(current_dir_path: impl AsRef<Path>, options: options::Options) -> Result<(), RunError> {
     let project: Project = Project::from_dir(current_dir_path)?;
-    let entryfile: PathBuf = project.get_lib_entryfile_path();
+    let entryfile: PathBuf = project
+        .get_lib_entryfile_path()
+        .or_else(|| project.get_bin_default_entryfile_path())
+        .ok_or(RunError::NoEntrySourceFile)?;
     let doc: Doc = match Doc::from_source_file(entryfile)? {
         None => return Err(RunError::NoRustdoc),
         Some(doc) => doc,
     };
-    let readme_path: PathBuf = project.get_readme_path();
+    let readme_path: PathBuf = project.get_readme_path().ok_or(RunError::NoReadmeFile)?;
     let original_readme: Readme = Readme::from_file(&readme_path)?;
     let new_readme: Readme = inject_doc(&original_readme, &doc)?;
 
     let line_terminator = match options.line_terminator {
-        LineTerminatorOpt::Auto => infer_line_terminator(project.get_readme_path())?,
+        LineTerminatorOpt::Auto => infer_line_terminator(&readme_path)?,
         LineTerminatorOpt::Lf => LineTerminator::Lf,
         LineTerminatorOpt::CrLf => LineTerminator::CrLf,
     };
 
     match options.check {
-        false => new_readme.write_to_file(project.get_readme_path(), line_terminator)?,
+        false => new_readme.write_to_file(&readme_path, line_terminator)?,
         true => {
-            if !is_readme_up_to_date(readme_path, &new_readme, line_terminator)? {
+            if !is_readme_up_to_date(&readme_path, &new_readme, line_terminator)? {
                 eprintln!("README is not up to date.");
                 std::process::exit(EXIT_CODE_CHECK);
             }

@@ -267,3 +267,13 @@ fn integration_test_option_cmd_check_fail_line_terminator() {
 
     run_test_with_options(test_name, option);
 }
+
+#[test]
+fn integration_test_entrypoint_bin_crate() {
+    run_test("entrypoint_bin_crate");
+}
+
+#[test]
+fn integration_test_entrypoint_bin_lib_crate_lib_wins() {
+    run_test("entrypoint_bin_lib_crate_lib_wins");
+}
