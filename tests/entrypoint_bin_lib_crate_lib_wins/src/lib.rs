@@ -2,4 +2,4 @@
 //!
 //! This is a lib crate that does nothing.
 
-fn main() {}
+fn foo() {}
