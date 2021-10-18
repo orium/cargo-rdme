@@ -43,7 +43,7 @@ cargo package --allow-dirty
 echo 'Checking code style:'
 cargo fmt -- --check
 echo 'Checking readme:'
-# TODO
+cargo run -- --check
 
 echo
 echo -e "${GREEN}Everything looks lovely!$NC"

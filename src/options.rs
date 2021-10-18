@@ -31,7 +31,6 @@ impl Default for LineTerminatorOpt {
 }
 
 impl LineTerminatorOpt {
-    // TODO trait for options?
     const VALUES: &'static [&'static str] = &["auto", "lf", "crlf"];
 }
 

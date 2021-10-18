@@ -14,7 +14,7 @@
 #![allow(clippy::single_match_else)]
 #![allow(clippy::inline_always)]
 #![allow(clippy::partialeq_ne_impl)]
-// Note: If you change this remember to update `README.md`.  To do so run `cargo rdme`.
+// Note: If you change this remember to update `README.md`.  To do so run `cargo run`.
 //! # Cargo rdme
 //!
 //! Cargo command to create your `README.md` from your crate's documentation.
