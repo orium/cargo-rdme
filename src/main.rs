@@ -19,7 +19,7 @@
 //!
 //! Cargo command to create your `README.md` from your crate's documentation.
 
-use crate::options::LineTerminatorOpt;
+use crate::options::{EntrypointOpt, LineTerminatorOpt};
 use cargo_rdme::{infer_line_terminator, inject_doc, LineTerminator, Project};
 use cargo_rdme::{Doc, ProjectError, Readme};
 use std::path::{Path, PathBuf};
@@ -99,12 +99,21 @@ fn is_readme_up_to_date(
     Ok(current_readme_raw.as_bytes() == new_readme_raw.as_slice())
 }
 
+fn entrypoint(project: &Project, entrypoint_opt: EntrypointOpt) -> Option<PathBuf> {
+    match entrypoint_opt {
+        EntrypointOpt::Auto => {
+            project.get_lib_entryfile_path().or_else(|| project.get_bin_default_entryfile_path())
+        }
+        EntrypointOpt::Lib => project.get_lib_entryfile_path(),
+        EntrypointOpt::BinDefault => project.get_bin_default_entryfile_path(),
+        EntrypointOpt::BinName(name) => project.get_bin_entryfile_path(&name),
+    }
+}
+
 fn run(current_dir_path: impl AsRef<Path>, options: options::Options) -> Result<(), RunError> {
     let project: Project = Project::from_dir(current_dir_path)?;
-    let entryfile: PathBuf = project
-        .get_lib_entryfile_path()
-        .or_else(|| project.get_bin_default_entryfile_path())
-        .ok_or(RunError::NoEntrySourceFile)?;
+    let entryfile: PathBuf =
+        entrypoint(&project, options.entrypoint).ok_or(RunError::NoEntrySourceFile)?;
     let doc: Doc = match Doc::from_source_file(entryfile)? {
         None => return Err(RunError::NoRustdoc),
         Some(doc) => doc,

@@ -16,8 +16,10 @@
 #![allow(clippy::partialeq_ne_impl)]
 
 use crate::markdown::{Markdown, MarkdownError};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
+use toml::Value;
 
 mod inject_doc;
 mod markdown;
@@ -36,6 +38,7 @@ pub enum ManifestError {
 pub struct Manifest {
     lib_path: Option<PathBuf>,
     readme_path: Option<PathBuf>,
+    bin_path: HashMap<String, PathBuf>,
 }
 
 impl Manifest {
@@ -48,13 +51,32 @@ impl Manifest {
     pub fn from_str(str: &str) -> Result<Manifest, ManifestError> {
         let toml: toml::Value = toml::from_str(str).map_err(|_| ManifestError::ErrorParsingToml)?;
 
-        let get_str = |section: &str, field: &str| -> Option<&str> {
-            toml.get(section).and_then(|v| v.get(field)).and_then(|p| p.as_str())
+        let get_str = |value: &Value, field: &str| -> Option<String> {
+            value.get(field).and_then(|p| p.as_str()).map(ToOwned::to_owned)
+        };
+        let get_str_table = |table: &str, field: &str| -> Option<&str> {
+            toml.get(table).and_then(|v| v.get(field)).and_then(|p| p.as_str())
         };
 
+        let mut bin_path = HashMap::new();
+
+        if let Some(bin_table) = toml.get("bin").and_then(|v| v.as_array()) {
+            for bin in bin_table {
+                match (get_str(bin, "name"), get_str(bin, "path")) {
+                    (Some(name), Some(path)) => {
+                        bin_path.insert(name, Path::new(&path).to_path_buf());
+                    }
+                    _ => (),
+                }
+            }
+        }
+
+        toml.get("bin").and_then(|v| v.as_array()).map(|t| t.iter());
+
         Ok(Manifest {
-            lib_path: get_str("lib", "path").map(|v| Path::new(v).to_path_buf()),
-            readme_path: get_str("package", "readme").map(|v| Path::new(v).to_path_buf()),
+            lib_path: get_str_table("lib", "path").map(|v| Path::new(v).to_path_buf()),
+            readme_path: get_str_table("package", "readme").map(|v| Path::new(v).to_path_buf()),
+            bin_path,
         })
     }
 }
@@ -123,6 +145,17 @@ impl Project {
             true => Some(path),
             false => None,
         }
+    }
+
+    pub fn get_bin_entryfile_path(&self, name: &str) -> Option<PathBuf> {
+        self.manifest.bin_path.get(name).and_then(|rel_path| {
+            let path = self.directory.join(rel_path).to_path_buf();
+
+            match path.is_file() {
+                true => Some(path),
+                false => None,
+            }
+        })
     }
 
     pub fn get_readme_path(&self) -> Option<PathBuf> {
@@ -304,6 +337,7 @@ mod tests {
     use super::*;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
+    use std::iter::FromIterator;
 
     #[test]
     fn test_manifest_from_str() {
@@ -319,6 +353,38 @@ mod tests {
         let expected_manifest = Manifest {
             lib_path: Some(Path::new("src").join("lib.rs").to_path_buf()),
             readme_path: Some(Path::new("README.md").to_path_buf()),
+            bin_path: HashMap::new(),
+        };
+
+        assert_eq!(Manifest::from_str(str).unwrap(), expected_manifest);
+    }
+
+    #[test]
+    fn test_manifest_from_str_multiple_bin() {
+        let str = indoc! { r#"
+            [package]
+
+            [[bin]]
+            name = "foo"
+            path = "src/m.rs"
+
+            [[bin]]
+            name = "bar"
+            path = "src/bar.rs"
+            "#
+        };
+
+        let expected_manifest = Manifest {
+            lib_path: None,
+            readme_path: None,
+            bin_path: HashMap::from_iter(
+                [
+                    ("foo".to_owned(), Path::new("src").join("m.rs")),
+                    ("bar".to_owned(), Path::new("src").join("bar.rs")),
+                ]
+                .iter()
+                .cloned(),
+            ),
         };
 
         assert_eq!(Manifest::from_str(str).unwrap(), expected_manifest);

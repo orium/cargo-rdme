@@ -277,3 +277,31 @@ fn system_test_entrypoint_bin_crate() {
 fn system_test_entrypoint_bin_lib_crate_lib_wins() {
     run_test("entrypoint_bin_lib_crate_lib_wins");
 }
+
+#[test]
+fn system_test_option_conf_file_entrypoint_bin() {
+    run_test("option_conf_file_entrypoint_bin");
+}
+
+#[test]
+fn system_test_option_conf_file_entrypoint_select_bin() {
+    run_test("option_conf_file_entrypoint_select_bin");
+}
+
+#[test]
+fn system_test_option_cmd_entrypoint_bin() {
+    let test_name = "option_cmd_entrypoint_bin";
+
+    let option = TestOptions { args: &["--entrypoint", "bin"], ..TestOptions::default() };
+
+    run_test_with_options(test_name, option);
+}
+
+#[test]
+fn system_test_option_cmd_entrypoint_select_bin() {
+    let test_name = "option_cmd_entrypoint_select_bin";
+
+    let option = TestOptions { args: &["--entrypoint", "bin:foo"], ..TestOptions::default() };
+
+    run_test_with_options(test_name, option);
+}
