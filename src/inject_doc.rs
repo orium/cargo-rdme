@@ -19,13 +19,29 @@ enum CargoRdmeLine<'a> {
 }
 
 fn cargo_rdme_line_iterator(readme: &Readme) -> impl Iterator<Item = CargoRdmeLine<'_>> {
-    readme.lines().map(|line| {
+    let mut depth = 0;
+
+    readme.lines().map(move |line| {
         let trimmed_line = line.strip_suffix("\r").unwrap_or(line).trim();
 
         match trimmed_line {
-            MARKER_RDME => CargoRdmeLine::MarkerCargoRdme,
-            MARKER_RDME_START => CargoRdmeLine::MarkerCargoRdmeStart,
-            MARKER_RDME_END => CargoRdmeLine::MarkerCargoRdmeEnd,
+            MARKER_RDME if depth == 0 => CargoRdmeLine::MarkerCargoRdme,
+            MARKER_RDME_START if depth == 0 => {
+                depth += 1;
+                CargoRdmeLine::MarkerCargoRdmeStart
+            }
+            MARKER_RDME_END if depth == 1 => {
+                depth -= 1;
+                CargoRdmeLine::MarkerCargoRdmeEnd
+            }
+            MARKER_RDME_START => {
+                depth += 1;
+                CargoRdmeLine::Line(line)
+            }
+            MARKER_RDME_END => {
+                depth -= 1;
+                CargoRdmeLine::Line(line)
+            }
             _ => CargoRdmeLine::Line(line),
         }
     })
@@ -97,7 +113,9 @@ mod tests {
             <!-- cargo-rdme end --> <- Does not count.
              <!-- cargo-rdme start -->
             <!-- cargo-rdme end -->\r
+            <!-- cargo-rdme start -->
             <!-- cargo-rdme end --> \r
+            <!-- cargo-rdme start -->
             <!-- cargo-rdme end --> "
         };
 
@@ -116,8 +134,43 @@ mod tests {
         );
         assert_eq!(iter.next(), Some(CargoRdmeLine::MarkerCargoRdmeStart));
         assert_eq!(iter.next(), Some(CargoRdmeLine::MarkerCargoRdmeEnd));
+        assert_eq!(iter.next(), Some(CargoRdmeLine::MarkerCargoRdmeStart));
         assert_eq!(iter.next(), Some(CargoRdmeLine::MarkerCargoRdmeEnd));
+        assert_eq!(iter.next(), Some(CargoRdmeLine::MarkerCargoRdmeStart));
         assert_eq!(iter.next(), Some(CargoRdmeLine::MarkerCargoRdmeEnd));
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_cargo_rdme_line_iterator_nested() {
+        let str = indoc! { "
+            A
+            <!-- cargo-rdme start -->
+            B
+            <!-- cargo-rdme -->
+            C
+            <!-- cargo-rdme start -->
+            D
+            <!-- cargo-rdme end -->
+            E
+            <!-- cargo-rdme end -->
+            F"
+        };
+
+        let readme = Readme::from_str(str);
+        let mut iter = cargo_rdme_line_iterator(&readme);
+
+        assert_eq!(iter.next(), Some(CargoRdmeLine::Line("A")));
+        assert_eq!(iter.next(), Some(CargoRdmeLine::MarkerCargoRdmeStart));
+        assert_eq!(iter.next(), Some(CargoRdmeLine::Line("B")));
+        assert_eq!(iter.next(), Some(CargoRdmeLine::Line("<!-- cargo-rdme -->")));
+        assert_eq!(iter.next(), Some(CargoRdmeLine::Line("C")));
+        assert_eq!(iter.next(), Some(CargoRdmeLine::Line("<!-- cargo-rdme start -->")));
+        assert_eq!(iter.next(), Some(CargoRdmeLine::Line("D")));
+        assert_eq!(iter.next(), Some(CargoRdmeLine::Line("<!-- cargo-rdme end -->")));
+        assert_eq!(iter.next(), Some(CargoRdmeLine::Line("E")));
+        assert_eq!(iter.next(), Some(CargoRdmeLine::MarkerCargoRdmeEnd));
+        assert_eq!(iter.next(), Some(CargoRdmeLine::Line("F")));
         assert_eq!(iter.next(), None);
     }
 
