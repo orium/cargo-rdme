@@ -305,3 +305,8 @@ fn system_test_option_cmd_entrypoint_select_bin() {
 
     run_test_with_options(test_name, option);
 }
+
+#[test]
+fn system_test_marker_inside_doc() {
+    run_test("marker_inside_doc");
+}
