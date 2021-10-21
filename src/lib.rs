@@ -382,8 +382,7 @@ mod tests {
                     ("foo".to_owned(), Path::new("src").join("m.rs")),
                     ("bar".to_owned(), Path::new("src").join("bar.rs")),
                 ]
-                .iter()
-                .cloned(),
+                .into_iter(),
             ),
         };
 
