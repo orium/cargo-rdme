@@ -1,0 +1,3 @@
+[entrypoint]
+type = "bin"
+bin-name = "foo"

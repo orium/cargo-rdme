@@ -42,7 +42,7 @@ pub enum ManifestError {
 pub struct Manifest {
     lib_path: Option<PathBuf>,
     readme_path: Option<PathBuf>,
-    bin_path: HashMap<String, PathBuf>,
+    bin_path: HashMap<String, Option<PathBuf>>,
 }
 
 impl Manifest {
@@ -66,13 +66,19 @@ impl FromStr for Manifest {
             toml.get(table).and_then(|v| v.get(field)).and_then(toml::Value::as_str)
         };
 
-        let mut bin_path = HashMap::new();
+        let mut bin_path: HashMap<String, Option<PathBuf>> = HashMap::new();
 
         if let Some(bin_table) = toml.get("bin").and_then(toml::Value::as_array) {
             for bin in bin_table {
-                if let (Some(name), Some(path)) = (get_str(bin, "name"), get_str(bin, "path")) {
-                    bin_path.insert(name, Path::new(&path).to_path_buf());
-                }
+                match (get_str(bin, "name"), get_str(bin, "path")) {
+                    (Some(name), Some(path)) => {
+                        bin_path.insert(name, Some(Path::new(&path).to_path_buf()));
+                    }
+                    (Some(name), None) => {
+                        bin_path.insert(name, None);
+                    }
+                    (None, _) => (),
+                };
             }
         }
 
@@ -156,14 +162,19 @@ impl Project {
 
     #[must_use]
     pub fn get_bin_entryfile_path(&self, name: &str) -> Option<PathBuf> {
-        self.manifest.bin_path.get(name).and_then(|rel_path| {
-            let path = self.directory.join(rel_path);
+        match self.manifest.bin_path.get(name) {
+            Some(maybe_rel_path) => {
+                let default = || Path::new("src").join("bin").join(format!("{}.rs", name));
+                let rel_path = maybe_rel_path.clone().unwrap_or_else(default);
+                let path = self.directory.join(rel_path);
 
-            match path.is_file() {
-                true => Some(path),
-                false => None,
+                match path.is_file() {
+                    true => Some(path),
+                    false => None,
+                }
             }
-        })
+            None => None,
+        }
     }
 
     #[must_use]
@@ -379,7 +390,6 @@ mod tests {
 
             [[bin]]
             name = "foo"
-            path = "src/m.rs"
 
             [[bin]]
             name = "bar"
@@ -392,8 +402,8 @@ mod tests {
             readme_path: None,
             bin_path: HashMap::from_iter(
                 [
-                    ("foo".to_owned(), Path::new("src").join("m.rs")),
-                    ("bar".to_owned(), Path::new("src").join("bar.rs")),
+                    ("foo".to_owned(), None),
+                    ("bar".to_owned(), Some(Path::new("src").join("bar.rs"))),
                 ]
                 .into_iter(),
             ),
