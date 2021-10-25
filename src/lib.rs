@@ -8,16 +8,20 @@
 #![warn(clippy::pedantic)]
 #![allow(clippy::match_bool)]
 #![allow(clippy::if_not_else)]
-#![allow(clippy::stutter)]
+#![allow(clippy::module_name_repetitions)]
 #![allow(clippy::similar_names)]
 #![allow(clippy::use_self)]
 #![allow(clippy::single_match_else)]
 #![allow(clippy::inline_always)]
 #![allow(clippy::partialeq_ne_impl)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::non_ascii_literal)]
+#![allow(clippy::enum_variant_names)]
 
 use crate::markdown::{Markdown, MarkdownError};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use thiserror::Error;
 use toml::Value;
 
@@ -47,31 +51,32 @@ impl Manifest {
             .map_err(|_| ManifestError::ErrorReadingManifest(file_path.as_ref().to_path_buf()))?;
         Manifest::from_str(&str)
     }
+}
 
-    pub fn from_str(str: &str) -> Result<Manifest, ManifestError> {
+impl FromStr for Manifest {
+    type Err = ManifestError;
+
+    fn from_str(str: &str) -> Result<Manifest, ManifestError> {
         let toml: toml::Value = toml::from_str(str).map_err(|_| ManifestError::ErrorParsingToml)?;
 
         let get_str = |value: &Value, field: &str| -> Option<String> {
-            value.get(field).and_then(|p| p.as_str()).map(ToOwned::to_owned)
+            value.get(field).and_then(toml::Value::as_str).map(ToOwned::to_owned)
         };
         let get_str_table = |table: &str, field: &str| -> Option<&str> {
-            toml.get(table).and_then(|v| v.get(field)).and_then(|p| p.as_str())
+            toml.get(table).and_then(|v| v.get(field)).and_then(toml::Value::as_str)
         };
 
         let mut bin_path = HashMap::new();
 
-        if let Some(bin_table) = toml.get("bin").and_then(|v| v.as_array()) {
+        if let Some(bin_table) = toml.get("bin").and_then(toml::Value::as_array) {
             for bin in bin_table {
-                match (get_str(bin, "name"), get_str(bin, "path")) {
-                    (Some(name), Some(path)) => {
-                        bin_path.insert(name, Path::new(&path).to_path_buf());
-                    }
-                    _ => (),
+                if let (Some(name), Some(path)) = (get_str(bin, "name"), get_str(bin, "path")) {
+                    bin_path.insert(name, Path::new(&path).to_path_buf());
                 }
             }
         }
 
-        toml.get("bin").and_then(|v| v.as_array()).map(|t| t.iter());
+        toml.get("bin").and_then(toml::Value::as_array).map(|t| t.iter());
 
         Ok(Manifest {
             lib_path: get_str_table("lib", "path").map(|v| Path::new(v).to_path_buf()),
@@ -125,10 +130,11 @@ impl Project {
         }
     }
 
+    #[must_use]
     pub fn get_lib_entryfile_path(&self) -> Option<PathBuf> {
-        let default = || Path::new("src").join("lib.rs").to_path_buf();
+        let default = || Path::new("src").join("lib.rs");
         let rel_path = self.manifest.lib_path.clone().unwrap_or_else(default);
-        let path = self.directory.join(rel_path).to_path_buf();
+        let path = self.directory.join(rel_path);
 
         match path.is_file() {
             true => Some(path),
@@ -136,10 +142,11 @@ impl Project {
         }
     }
 
+    #[must_use]
     pub fn get_bin_default_entryfile_path(&self) -> Option<PathBuf> {
-        let default = || Path::new("src").join("main.rs").to_path_buf();
+        let default = || Path::new("src").join("main.rs");
         let rel_path = self.manifest.lib_path.clone().unwrap_or_else(default);
-        let path = self.directory.join(rel_path).to_path_buf();
+        let path = self.directory.join(rel_path);
 
         match path.is_file() {
             true => Some(path),
@@ -147,9 +154,10 @@ impl Project {
         }
     }
 
+    #[must_use]
     pub fn get_bin_entryfile_path(&self, name: &str) -> Option<PathBuf> {
         self.manifest.bin_path.get(name).and_then(|rel_path| {
-            let path = self.directory.join(rel_path).to_path_buf();
+            let path = self.directory.join(rel_path);
 
             match path.is_file() {
                 true => Some(path),
@@ -158,10 +166,11 @@ impl Project {
         })
     }
 
+    #[must_use]
     pub fn get_readme_path(&self) -> Option<PathBuf> {
         let default = || Path::new("README.md").to_path_buf();
         let rel_path = self.manifest.readme_path.clone().unwrap_or_else(default);
-        let path = self.directory.join(rel_path).to_path_buf();
+        let path = self.directory.join(rel_path);
 
         match path.is_file() {
             true => Some(path),
@@ -190,6 +199,8 @@ impl Doc {
         Doc::from_source_str(&source)
     }
 
+    // TODO implement FromStr when ! type is stable.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(str: impl Into<String>) -> Doc {
         Doc { markdown: Markdown::from_str(str) }
     }
@@ -204,10 +215,10 @@ impl Doc {
     pub fn from_source_str(source: &str) -> Result<Option<Doc>, DocError> {
         use syn::{parse_str, Lit, Meta, MetaNameValue};
 
-        let ast: syn::File = parse_str(source).map_err(|e| DocError::ErrorParsingSourceFile(e))?;
+        let ast: syn::File = parse_str(source).map_err(DocError::ErrorParsingSourceFile)?;
         let mut lines: Vec<String> = Vec::with_capacity(1024);
 
-        for attr in ast.attrs.iter() {
+        for attr in &ast.attrs {
             if Doc::is_toplevel_doc(attr) {
                 if let Ok(Meta::NameValue(MetaNameValue { lit: Lit::Str(lstr), .. })) =
                     attr.parse_meta()
@@ -224,7 +235,7 @@ impl Doc {
                         // Multiline comment.
                         _ => {
                             fn empty_line(str: &str) -> bool {
-                                str.chars().all(|c| c.is_whitespace())
+                                str.chars().all(char::is_whitespace)
                             }
 
                             let x = string
@@ -233,7 +244,7 @@ impl Doc {
                                 .filter(|(i, l)| !(*i == 0 && empty_line(l)))
                                 .map(|(_, l)| l);
 
-                            lines.extend(x.map(|s| s.to_owned()));
+                            lines.extend(x.map(ToOwned::to_owned));
                         }
                     }
                 }
@@ -290,6 +301,8 @@ impl Readme {
         Ok(Readme { markdown: Markdown::from_file(file_path)? })
     }
 
+    // TODO implement FromStr when ! type is stable.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(str: impl Into<String>) -> Readme {
         Readme { markdown: Markdown::from_str(str) }
     }
@@ -323,7 +336,7 @@ pub fn infer_line_terminator(file_path: impl AsRef<Path>) -> std::io::Result<Lin
     let content: String = std::fs::read_to_string(file_path.as_ref())?;
 
     let crlf_lines: usize = content.matches("\r\n").count();
-    let lf_lines: usize = content.matches("\n").count() - crlf_lines;
+    let lf_lines: usize = content.matches('\n').count() - crlf_lines;
 
     if crlf_lines > lf_lines {
         Ok(LineTerminator::CrLf)

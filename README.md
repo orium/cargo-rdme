@@ -62,7 +62,7 @@ bin-name = "my-bin-name"
 These setting can be overridden with command line flags.  Run `cargo rdme --help` for more
 information.
 
-# Integration with CI
+## Integration with CI
 
 To verify that your README is up to date with your crate’s documentation you can run
 `cargo rdme --check`.  The exit code will be `0` if the README is up to date, or `2` if it’s

@@ -8,12 +8,15 @@
 #![warn(clippy::pedantic)]
 #![allow(clippy::match_bool)]
 #![allow(clippy::if_not_else)]
-#![allow(clippy::stutter)]
+#![allow(clippy::module_name_repetitions)]
 #![allow(clippy::similar_names)]
 #![allow(clippy::use_self)]
 #![allow(clippy::single_match_else)]
 #![allow(clippy::inline_always)]
 #![allow(clippy::partialeq_ne_impl)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::non_ascii_literal)]
+#![allow(clippy::enum_variant_names)]
 // Note: If you change this remember to update `README.md`.  To do so run `cargo run`.
 //! # Cargo rdme
 //!
@@ -69,7 +72,7 @@
 //! These setting can be overridden with command line flags.  Run `cargo rdme --help` for more
 //! information.
 //!
-//! # Integration with CI
+//! ## Integration with CI
 //!
 //! To verify that your README is up to date with your crate’s documentation you can run
 //! `cargo rdme --check`.  The exit code will be `0` if the README is up to date, or `2` if it’s

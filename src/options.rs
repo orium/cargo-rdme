@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use thiserror::Error;
 
-const PROJECT_NAME: &'static str = env!("CARGO_PKG_NAME");
-const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+const PROJECT_NAME: &str = env!("CARGO_PKG_NAME");
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug)]
 pub struct InvalidOptValue {
@@ -71,6 +71,7 @@ pub struct CmdOptions {
 pub fn cmd_options() -> CmdOptions {
     use clap::{App, Arg};
 
+    #[allow(clippy::needless_pass_by_value)]
     fn validator_entrypoint(value: String) -> Result<(), String> {
         match value.as_str() {
             "auto" | "lib" | "bin" => Ok(()),
@@ -119,7 +120,7 @@ pub fn cmd_options() -> CmdOptions {
 
             let name = bin_name["bin:".len()..].to_owned();
 
-            assert!(name.len() > 0, "clap should validate this");
+            assert!(!name.is_empty(), "clap should validate this");
 
             Some(EntrypointOpt::BinName(name))
         }
@@ -151,7 +152,7 @@ fn config_file_options_from_str(
     config_str: &str,
 ) -> Result<ConfigFileOptions, ConfigFileOptionsError> {
     let config_toml: toml::Value =
-        toml::from_str(&config_str).map_err(|_| ConfigFileOptionsError::ErrorParsingToml)?;
+        toml::from_str(config_str).map_err(|_| ConfigFileOptionsError::ErrorParsingToml)?;
 
     let line_terminator = config_toml
         .get("line-terminator")
@@ -165,11 +166,12 @@ fn config_file_options_from_str(
         })
         .transpose()?;
 
-    let entrypoint_table = config_toml.get("entrypoint").and_then(|v| v.as_table());
+    let entrypoint_table = config_toml.get("entrypoint").and_then(toml::Value::as_table);
 
-    let entrypoint_type = entrypoint_table.and_then(|t| t.get("type")).and_then(|v| v.as_str());
+    let entrypoint_type =
+        entrypoint_table.and_then(|t| t.get("type")).and_then(toml::Value::as_str);
     let entrypoint_bin_name =
-        entrypoint_table.and_then(|t| t.get("bin-name")).and_then(|v| v.as_str());
+        entrypoint_table.and_then(|t| t.get("bin-name")).and_then(toml::Value::as_str);
 
     let entrypoint = match (entrypoint_type, entrypoint_bin_name) {
         (Some("lib"), None) => Some(EntrypointOpt::Lib),
@@ -202,6 +204,7 @@ pub struct Options {
     pub check: bool,
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn merge_options(
     cmd_options: CmdOptions,
     config_file_options: Option<ConfigFileOptions>,
@@ -209,12 +212,12 @@ pub fn merge_options(
     Options {
         entrypoint: cmd_options
             .entrypoint
-            .or(config_file_options.as_ref().and_then(|c| c.entrypoint.clone()))
-            .unwrap_or(EntrypointOpt::default()),
+            .or_else(|| config_file_options.as_ref().and_then(|c| c.entrypoint.clone()))
+            .unwrap_or_default(),
         line_terminator: cmd_options
             .line_terminator
-            .or(config_file_options.as_ref().and_then(|c| c.line_terminator))
-            .unwrap_or(LineTerminatorOpt::default()),
+            .or_else(|| config_file_options.as_ref().and_then(|c| c.line_terminator))
+            .unwrap_or_default(),
         check: cmd_options.check,
     }
 }

@@ -38,7 +38,7 @@ impl Markdown {
 
         // Lines must always end in newlines.
         if !content.ends_with('\n') {
-            content.push('\n')
+            content.push('\n');
         }
 
         Markdown { content }

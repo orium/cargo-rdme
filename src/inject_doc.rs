@@ -22,7 +22,7 @@ fn cargo_rdme_line_iterator(readme: &Readme) -> impl Iterator<Item = CargoRdmeLi
     let mut depth = 0;
 
     readme.lines().map(move |line| {
-        let trimmed_line = line.strip_suffix("\r").unwrap_or(line).trim();
+        let trimmed_line = line.strip_suffix('\r').unwrap_or(line).trim();
 
         match trimmed_line {
             MARKER_RDME if depth == 0 => CargoRdmeLine::MarkerCargoRdme,
@@ -56,9 +56,6 @@ pub enum InjectDocError {
 }
 
 pub fn inject_doc(readme: &Readme, doc: &Doc) -> Result<Readme, InjectDocError> {
-    let mut new_readme: Vec<String> = Vec::with_capacity(1024);
-    let mut inside_markers = false;
-
     fn inject(new_readme: &mut Vec<String>, doc: &Doc) {
         new_readme.push(MARKER_RDME_START.to_owned());
         new_readme.push("".to_owned());
@@ -67,7 +64,10 @@ pub fn inject_doc(readme: &Readme, doc: &Doc) -> Result<Readme, InjectDocError> 
         new_readme.push(MARKER_RDME_END.to_owned());
     }
 
-    for (i, line) in cargo_rdme_line_iterator(&readme).enumerate() {
+    let mut new_readme: Vec<String> = Vec::with_capacity(1024);
+    let mut inside_markers = false;
+
+    for (i, line) in cargo_rdme_line_iterator(readme).enumerate() {
         match (inside_markers, line) {
             (true, CargoRdmeLine::MarkerCargoRdmeEnd) => {
                 inside_markers = false;
