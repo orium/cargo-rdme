@@ -25,10 +25,12 @@ use std::str::FromStr;
 use thiserror::Error;
 use toml::Value;
 
+mod extract_doc;
 mod inject_doc;
 mod markdown;
 
-pub use inject_doc::{inject_doc, InjectDocError};
+pub use extract_doc::{extract_doc_from_source_file, ExtractDocError};
+pub use inject_doc::{inject_doc_in_readme, InjectDocError};
 
 #[derive(Error, Debug)]
 pub enum ManifestError {
@@ -190,24 +192,14 @@ impl Project {
     }
 }
 
-#[derive(Error, Debug)]
-pub enum DocError {
-    #[error("cannot open source file \"{0}\"")]
-    ErrorReadingSourceFile(PathBuf),
-    #[error("cannot parse source file: {0}")]
-    ErrorParsingSourceFile(syn::Error),
-}
-
 pub struct Doc {
     markdown: Markdown,
 }
 
 impl Doc {
-    pub fn from_source_file(file_path: impl AsRef<Path>) -> Result<Option<Doc>, DocError> {
-        let source: String = std::fs::read_to_string(file_path.as_ref())
-            .map_err(|_| DocError::ErrorReadingSourceFile(file_path.as_ref().to_path_buf()))?;
-
-        Doc::from_source_str(&source)
+    #[must_use]
+    pub fn from_markdown(markdown: Markdown) -> Doc {
+        Doc { markdown }
     }
 
     // TODO implement FromStr when ! type is stable.
@@ -221,51 +213,6 @@ impl Doc {
         use syn::AttrStyle;
 
         attr.style == AttrStyle::Inner(Bang::default()) && attr.path.is_ident("doc")
-    }
-
-    pub fn from_source_str(source: &str) -> Result<Option<Doc>, DocError> {
-        use syn::{parse_str, Lit, Meta, MetaNameValue};
-
-        let ast: syn::File = parse_str(source).map_err(DocError::ErrorParsingSourceFile)?;
-        let mut lines: Vec<String> = Vec::with_capacity(1024);
-
-        for attr in &ast.attrs {
-            if Doc::is_toplevel_doc(attr) {
-                if let Ok(Meta::NameValue(MetaNameValue { lit: Lit::Str(lstr), .. })) =
-                    attr.parse_meta()
-                {
-                    let string = &lstr.value();
-
-                    match string.lines().count() {
-                        0 => lines.push("".to_owned()),
-                        1 => {
-                            let line = string.strip_prefix(' ').unwrap_or(string);
-                            lines.push(line.to_owned());
-                        }
-
-                        // Multiline comment.
-                        _ => {
-                            fn empty_line(str: &str) -> bool {
-                                str.chars().all(char::is_whitespace)
-                            }
-
-                            let x = string
-                                .lines()
-                                .enumerate()
-                                .filter(|(i, l)| !(*i == 0 && empty_line(l)))
-                                .map(|(_, l)| l);
-
-                            lines.extend(x.map(ToOwned::to_owned));
-                        }
-                    }
-                }
-            }
-        }
-
-        match lines.is_empty() {
-            true => Ok(None),
-            false => Ok(Some(Doc { markdown: Markdown::from_lines(&lines) })),
-        }
     }
 
     pub fn lines(&self) -> impl Iterator<Item = &str> {
@@ -410,105 +357,5 @@ mod tests {
         };
 
         assert_eq!(Manifest::from_str(str).unwrap(), expected_manifest);
-    }
-
-    #[test]
-    fn test_doc_from_source_str_no_doc() {
-        let str = indoc! { r#"
-            use std::fs;
-
-            struct Nothing {}
-            "#
-        };
-
-        assert!(Doc::from_source_str(str).unwrap().is_none());
-    }
-
-    #[test]
-    fn test_doc_from_source_str_single_line_comment() {
-        let str = indoc! { r#"
-            #![cfg_attr(not(feature = "std"), no_std)]
-            // normal comment
-
-            //! This is the doc for the crate.
-            //!This line doesn't start with space.
-            //!
-            //! And a nice empty line above us.
-            //! Also a line ending in "
-
-            struct Nothing {}
-            "#
-        };
-
-        let doc = Doc::from_source_str(str).unwrap().unwrap();
-        let lines: Vec<&str> = doc.lines().collect();
-
-        let expected = vec![
-            "This is the doc for the crate.",
-            "This line doesn't start with space.",
-            "",
-            "And a nice empty line above us.",
-            "Also a line ending in \"",
-        ];
-
-        assert_eq!(lines, expected);
-    }
-
-    #[test]
-    fn test_doc_from_source_str_multi_line_comment() {
-        let str = indoc! { r#"
-            #![cfg_attr(not(feature = "std"), no_std)]
-            /* normal comment */
-
-            /*!
-            This is the doc for the crate.
-             This line start with space.
-
-            And a nice empty line above us.
-            */
-
-            struct Nothing {}
-            "#
-        };
-
-        let doc = Doc::from_source_str(&str).unwrap().unwrap();
-        let lines: Vec<&str> = doc.lines().collect();
-
-        let expected = vec![
-            "This is the doc for the crate.",
-            " This line start with space.",
-            "",
-            "And a nice empty line above us.",
-        ];
-
-        assert_eq!(lines, expected);
-    }
-
-    #[test]
-    fn test_doc_from_source_str_single_line_keep_indentation() {
-        let str = indoc! { r#"
-            #![cfg_attr(not(feature = "std"), no_std)]
-            // normal comment
-
-            //! This is the doc for the crate.  This crate does:
-            //!
-            //!   1. nothing.
-            //!   2. niente.
-
-            struct Nothing {}
-            "#
-        };
-
-        let doc = Doc::from_source_str(str).unwrap().unwrap();
-        let lines: Vec<&str> = doc.lines().collect();
-
-        let expected = vec![
-            "This is the doc for the crate.  This crate does:",
-            "",
-            "  1. nothing.",
-            "  2. niente.",
-        ];
-
-        assert_eq!(lines, expected);
     }
 }

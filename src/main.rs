@@ -79,7 +79,10 @@
 //! not.
 
 use crate::options::{EntrypointOpt, LineTerminatorOpt};
-use cargo_rdme::{infer_line_terminator, inject_doc, LineTerminator, Project};
+use cargo_rdme::{
+    extract_doc_from_source_file, infer_line_terminator, inject_doc_in_readme, LineTerminator,
+    Project,
+};
 use cargo_rdme::{Doc, ProjectError, Readme};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -94,8 +97,8 @@ const EXIT_CODE_CHECK: i32 = 2;
 enum RunError {
     #[error("failed to get project info: {0}")]
     ProjectError(cargo_rdme::ProjectError),
-    #[error("failed to process rust doc: {0}")]
-    DocError(cargo_rdme::DocError),
+    #[error("failed to extract rust doc: {0}")]
+    ExtractDocError(cargo_rdme::ExtractDocError),
     #[error("failed to process README: {0}")]
     ReadmeError(cargo_rdme::ReadmeError),
     #[error("failed get crate's entry source file")]
@@ -116,9 +119,9 @@ impl From<cargo_rdme::ProjectError> for RunError {
     }
 }
 
-impl From<cargo_rdme::DocError> for RunError {
-    fn from(e: cargo_rdme::DocError) -> RunError {
-        RunError::DocError(e)
+impl From<cargo_rdme::ExtractDocError> for RunError {
+    fn from(e: cargo_rdme::ExtractDocError) -> RunError {
+        RunError::ExtractDocError(e)
     }
 }
 
@@ -173,13 +176,13 @@ fn run(current_dir_path: impl AsRef<Path>, options: options::Options) -> Result<
     let project: Project = Project::from_dir(current_dir_path)?;
     let entryfile: PathBuf =
         entrypoint(&project, options.entrypoint).ok_or(RunError::NoEntrySourceFile)?;
-    let doc: Doc = match Doc::from_source_file(entryfile)? {
+    let doc: Doc = match extract_doc_from_source_file(entryfile)? {
         None => return Err(RunError::NoRustdoc),
         Some(doc) => doc,
     };
     let readme_path: PathBuf = project.get_readme_path().ok_or(RunError::NoReadmeFile)?;
     let original_readme: Readme = Readme::from_file(&readme_path)?;
-    let new_readme: Readme = inject_doc(&original_readme, &doc)?;
+    let new_readme: Readme = inject_doc_in_readme(&original_readme, &doc)?;
 
     let line_terminator = match options.line_terminator {
         LineTerminatorOpt::Auto => infer_line_terminator(&readme_path)?,

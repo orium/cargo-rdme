@@ -55,7 +55,7 @@ pub enum InjectDocError {
     UnmatchedMarkerCargoRdmeStart,
 }
 
-pub fn inject_doc(readme: &Readme, doc: &Doc) -> Result<Readme, InjectDocError> {
+pub fn inject_doc_in_readme(readme: &Readme, doc: &Doc) -> Result<Readme, InjectDocError> {
     fn inject(new_readme: &mut Vec<String>, doc: &Doc) {
         new_readme.push(MARKER_RDME_START.to_owned());
         new_readme.push("".to_owned());
@@ -213,7 +213,7 @@ mod tests {
         let readme = Readme::from_str(readme_str);
         let doc = Doc::from_str(doc_str);
 
-        let new_readme = inject_doc(&readme, &doc).unwrap();
+        let new_readme = inject_doc_in_readme(&readme, &doc).unwrap();
 
         assert_eq!(new_readme.lines().join("\n"), expected.lines().join("\n"));
     }
@@ -262,7 +262,7 @@ mod tests {
         let readme = Readme::from_str(readme_str);
         let doc = Doc::from_str(doc_str);
 
-        let new_readme = inject_doc(&readme, &doc).unwrap();
+        let new_readme = inject_doc_in_readme(&readme, &doc).unwrap();
 
         assert_eq!(new_readme.lines().join("\n"), expected.lines().join("\n"));
     }
