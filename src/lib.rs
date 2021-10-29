@@ -28,6 +28,7 @@ use toml::Value;
 mod extract_doc;
 mod inject_doc;
 mod markdown;
+pub mod transform;
 
 pub use extract_doc::{extract_doc_from_source_file, ExtractDocError};
 pub use inject_doc::{inject_doc_in_readme, InjectDocError};
@@ -192,6 +193,7 @@ impl Project {
     }
 }
 
+#[derive(Eq, PartialEq, Debug)]
 pub struct Doc {
     markdown: Markdown,
 }

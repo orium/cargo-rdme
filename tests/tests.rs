@@ -318,3 +318,8 @@ fn system_test_option_cmd_entrypoint_select_bin_custom_path() {
 fn system_test_marker_inside_doc() {
     run_test("marker_inside_doc");
 }
+
+#[test]
+fn system_test_rust_code_block_remove_comments() {
+    run_test("rust_code_block_remove_comments");
+}

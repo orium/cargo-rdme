@@ -50,6 +50,13 @@
 //! Whenever change your crate’s documentation you just need to run `cargo rdme` to update your
 //! README file.
 //!
+//!
+//! ### Automatic transformations
+//!
+//! Cargo rdme will apply some automatic transformations to your documentation when generating the README file:
+//!
+//! 1. Rust code blocks starting with `#` will be omitted, just like in `rustdoc`.
+//!
 //! ## Config file
 //!
 //! If the default behavior of `cargo rdme` is not appropriate for your project you can crate a
@@ -79,6 +86,7 @@
 //! not.
 
 use crate::options::{EntrypointOpt, LineTerminatorOpt};
+use cargo_rdme::transform::DocTransform;
 use cargo_rdme::{
     extract_doc_from_source_file, infer_line_terminator, inject_doc_in_readme, LineTerminator,
     Project,
@@ -180,6 +188,11 @@ fn run(current_dir_path: impl AsRef<Path>, options: options::Options) -> Result<
         None => return Err(RunError::NoRustdoc),
         Some(doc) => doc,
     };
+
+    let transform =
+        cargo_rdme::transform::rust_remove_comments::DocTransformRemoveRustComments::new();
+    let doc = transform.transform(&doc).unwrap();
+
     let readme_path: PathBuf = project.get_readme_path().ok_or(RunError::NoReadmeFile)?;
     let original_readme: Readme = Readme::from_file(&readme_path)?;
     let new_readme: Readme = inject_doc_in_readme(&original_readme, &doc)?;

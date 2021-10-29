@@ -40,6 +40,13 @@ After running `cargo rdme` you will find your README to be something like:
 Whenever change your crate’s documentation you just need to run `cargo rdme` to update your
 README file.
 
+
+### Automatic transformations
+
+Cargo rdme will apply some automatic transformations to your documentation when generating the README file:
+
+1. Rust code blocks starting with `#` will be omitted, just like in `rustdoc`.
+
 ## Config file
 
 If the default behavior of `cargo rdme` is not appropriate for your project you can crate a

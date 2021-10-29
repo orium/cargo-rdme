@@ -5,6 +5,7 @@
 
 use crate::LineTerminator;
 use itertools::Itertools;
+use std::fmt::Formatter;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -19,6 +20,7 @@ pub enum MarkdownError {
     ErrorWritingMarkdown,
 }
 
+#[derive(Eq, PartialEq)]
 pub struct Markdown {
     /// Content of the markdown.  The line terminator is always `\n`.
     content: String,
@@ -82,5 +84,171 @@ impl Markdown {
         }
 
         Ok(())
+    }
+}
+
+impl std::fmt::Debug for Markdown {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        use std::fmt::Write;
+
+        for line in self.lines() {
+            f.write_str(line)?;
+            f.write_char('\n')?;
+        }
+
+        Ok(())
+    }
+}
+
+pub mod parsing_utils {
+    use itertools::Itertools;
+    use std::ops::Range;
+
+    #[derive(Eq, PartialEq, Debug, Clone)]
+    pub struct Span {
+        pub start: usize,
+        pub end: usize,
+    }
+
+    impl From<Range<usize>> for Span {
+        fn from(range: Range<usize>) -> Self {
+            Span { start: range.start, end: range.end }
+        }
+    }
+
+    #[derive(PartialEq, Eq, Debug)]
+    pub enum ItemOrOther<'a, T> {
+        Item(T),
+        Other(&'a str),
+    }
+
+    pub struct MarkdownItemIterator<'a, T> {
+        source: &'a str,
+        iter: Box<dyn Iterator<Item = (Span, T)> + 'a>,
+    }
+
+    impl<'a, T> MarkdownItemIterator<'a, T> {
+        pub fn new(
+            source: &'a str,
+            iter: impl Iterator<Item = (Span, T)> + 'a,
+        ) -> MarkdownItemIterator<'a, T> {
+            MarkdownItemIterator { source, iter: Box::new(iter) }
+        }
+
+        pub fn complete(self) -> impl Iterator<Item = ItemOrOther<'a, T>>
+        where
+            T: Clone,
+        {
+            use std::iter::once;
+
+            once(None)
+                .chain(self.iter.map(|e| Some(e)))
+                .chain(once(None))
+                .tuple_windows()
+                .flat_map(|(l, r)| match (l, r) {
+                    (None, Some((span, _))) => {
+                        [ItemOrOther::Other(&self.source[0..span.start]), ItemOrOther::Other("")]
+                    }
+                    (Some((span_1, v_1)), Some((span_2, _))) => [
+                        ItemOrOther::Item(v_1),
+                        ItemOrOther::Other(&self.source[span_1.end..span_2.start]),
+                    ],
+                    (Some((span, v)), None) => {
+                        [ItemOrOther::Item(v), ItemOrOther::Other(&self.source[span.end..])]
+                    }
+                    (None, None) => [ItemOrOther::Other(self.source), ItemOrOther::Other("")],
+                })
+                .filter(|e| match e {
+                    ItemOrOther::Other("") => false,
+                    _ => true,
+                })
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use pretty_assertions::assert_eq;
+
+        #[test]
+        fn test_markdown_item_iterator_complete_no_item() {
+            let str = "hello world";
+
+            let mut iter = MarkdownItemIterator::<()>::new(str, std::iter::empty()).complete();
+
+            assert_eq!(iter.next(), Some(ItemOrOther::Other("hello world")));
+            assert_eq!(iter.next(), None);
+        }
+
+        #[test]
+        fn test_markdown_item_iterator_complete_item_start() {
+            let str = "_hello world";
+
+            let items = [(Span::from(0..1), "x")];
+
+            let mut iter = MarkdownItemIterator::new(str, items.into_iter()).complete();
+
+            assert_eq!(iter.next(), Some(ItemOrOther::Item("x")));
+            assert_eq!(iter.next(), Some(ItemOrOther::Other("hello world")));
+            assert_eq!(iter.next(), None);
+        }
+
+        #[test]
+        fn test_markdown_item_iterator_complete_item_end() {
+            let str = "hello world_";
+
+            let items = [(Span::from(11..12), "x")];
+
+            let mut iter = MarkdownItemIterator::new(str, items.into_iter()).complete();
+
+            assert_eq!(iter.next(), Some(ItemOrOther::Other("hello world")));
+            assert_eq!(iter.next(), Some(ItemOrOther::Item("x")));
+            assert_eq!(iter.next(), None);
+        }
+
+        #[test]
+        fn test_markdown_item_iterator_complete_item_middle() {
+            let str = "hello _ world";
+
+            let items = [(Span::from(6..7), "x")];
+
+            let mut iter = MarkdownItemIterator::new(str, items.into_iter()).complete();
+
+            assert_eq!(iter.next(), Some(ItemOrOther::Other("hello ")));
+            assert_eq!(iter.next(), Some(ItemOrOther::Item("x")));
+            assert_eq!(iter.next(), Some(ItemOrOther::Other(" world")));
+            assert_eq!(iter.next(), None);
+        }
+
+        #[test]
+        fn test_markdown_item_iterator_complete_item_multiple() {
+            let str = "hello _ world _ !";
+
+            let items = [(Span::from(6..7), "x"), (Span::from(14..15), "y")];
+
+            let mut iter = MarkdownItemIterator::new(str, items.into_iter()).complete();
+
+            assert_eq!(iter.next(), Some(ItemOrOther::Other("hello ")));
+            assert_eq!(iter.next(), Some(ItemOrOther::Item("x")));
+            assert_eq!(iter.next(), Some(ItemOrOther::Other(" world ")));
+            assert_eq!(iter.next(), Some(ItemOrOther::Item("y")));
+            assert_eq!(iter.next(), Some(ItemOrOther::Other(" !")));
+            assert_eq!(iter.next(), None);
+        }
+
+        #[test]
+        fn test_markdown_item_iterator_complete_consecutive() {
+            let str = "hello __ world!";
+
+            let items = [(Span::from(6..7), "x"), (Span::from(7..8), "y")];
+
+            let mut iter = MarkdownItemIterator::new(str, items.into_iter()).complete();
+
+            assert_eq!(iter.next(), Some(ItemOrOther::Other("hello ")));
+            assert_eq!(iter.next(), Some(ItemOrOther::Item("x")));
+            assert_eq!(iter.next(), Some(ItemOrOther::Item("y")));
+            assert_eq!(iter.next(), Some(ItemOrOther::Other(" world!")));
+            assert_eq!(iter.next(), None);
+        }
     }
 }
