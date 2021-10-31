@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use cargo_rdme::{infer_line_terminator, LineTerminator};
@@ -27,8 +27,8 @@ impl Default for TestOptions {
 }
 
 fn test_dir(test_name: &str) -> PathBuf {
-    let cargo_rdme_dir = std::env::current_dir().unwrap();
-    cargo_rdme_dir.join("tests").join(test_name)
+    let project_dir = std::env::current_dir().unwrap();
+    project_dir.join("tests").join(test_name)
 }
 
 fn test_readme_template(test_name: &str) -> PathBuf {
@@ -39,21 +39,15 @@ fn test_readme_expected(test_name: &str) -> PathBuf {
     test_dir(test_name).join("README-expected.md")
 }
 
+const BIN_PATH: &'static str = env!(concat!("CARGO_BIN_EXE_", env!("CARGO_PKG_NAME")));
+
 fn run_test_with_options(test_name: &str, options: TestOptions) {
-    let cargo_rdme_dir = std::env::current_dir().unwrap();
-
-    let cargo_rdme_bin = {
-        let name = std::env::var("CARGO_PKG_NAME").unwrap();
-
-        // This ensures the tests run in windows as well.
-        [&name, &format!("{}.exe", name)]
-            .iter()
-            .map(|filename| cargo_rdme_dir.join("target").join("debug").join(filename))
-            .find(|bin| bin.is_file())
-            .expect(&format!("{} binary not found", name))
-    };
-
+    let bin_path = Path::new(BIN_PATH);
     let test_dir = test_dir(test_name);
+
+    if !bin_path.is_file() {
+        panic!("Binary not found: {}", bin_path.display());
+    }
 
     if !test_dir.is_dir() {
         panic!("Test directory not found: {}", test_dir.display());
@@ -75,11 +69,11 @@ fn run_test_with_options(test_name: &str, options: TestOptions) {
         std::fs::copy(&template_readme, &readme).unwrap();
     }
 
-    let output = Command::new(&cargo_rdme_bin)
+    let output = Command::new(&bin_path)
         .args(options.args)
         .current_dir(test_dir)
         .output()
-        .expect(&format!("Failed to execute {}", cargo_rdme_bin.display()));
+        .expect(&format!("Failed to execute {}", bin_path.display()));
 
     let stderr = String::from_utf8_lossy(&output.stderr);
 
