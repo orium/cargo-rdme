@@ -155,8 +155,8 @@ pub fn cmd_options() -> CmdOptions {
 pub enum ConfigFileOptionsError {
     #[error("failed to read configuration file: {0}")]
     ErrorReadingConfigFile(PathBuf),
-    #[error("failed to parse toml")]
-    ErrorParsingToml,
+    #[error("failed to parse toml: {0}")]
+    ErrorParsingToml(toml::de::Error),
     #[error("invalid field \"{0}\"")]
     InvalidField(&'static str),
     #[error("invalid entrypoint table")]
@@ -173,7 +173,7 @@ fn config_file_options_from_str(
     config_str: &str,
 ) -> Result<ConfigFileOptions, ConfigFileOptionsError> {
     let config_toml: toml::Value =
-        toml::from_str(config_str).map_err(|_| ConfigFileOptionsError::ErrorParsingToml)?;
+        toml::from_str(config_str).map_err(|e| ConfigFileOptionsError::ErrorParsingToml(e))?;
 
     let line_terminator = config_toml
         .get("line-terminator")
