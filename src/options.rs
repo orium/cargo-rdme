@@ -4,6 +4,7 @@
  */
 
 use cargo_rdme::find_first_file_in_ancestors;
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use thiserror::Error;
@@ -68,6 +69,26 @@ pub struct CmdOptions {
     check: bool,
 }
 
+fn get_cmd_args() -> Vec<OsString> {
+    let mut args: Vec<OsString> = std::env::args_os().collect();
+    let subcommand: &str = {
+        let package_name = env!("CARGO_PKG_NAME");
+
+        debug_assert!(package_name.starts_with("cargo-"));
+
+        &package_name["cargo-".len()..]
+    };
+
+    // When cargo executes an external subcommand it passes the name of the command itself as the
+    // second argument.  Here we remove that so that we can simply run `cargo run` instead of
+    // `cargo run -- rdme` for local development.
+    if args.len() >= 2 && args[1] == subcommand {
+        args.remove(1);
+    }
+
+    args
+}
+
 pub fn cmd_options() -> CmdOptions {
     use clap::{App, Arg};
 
@@ -104,7 +125,7 @@ pub fn cmd_options() -> CmdOptions {
                 .short("c")
                 .help("checks if the README is up to date"),
         )
-        .get_matches();
+        .get_matches_from(get_cmd_args());
 
     let line_terminator: Option<LineTerminatorOpt> = cmd_opts
         .value_of("line-terminator")
