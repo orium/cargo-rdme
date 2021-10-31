@@ -1,5 +1,11 @@
 # Release notes
 
+## 0.2.0
+
+* Rust code blocks starting with `#` are now omitted, just like in `rustdoc`.
+* Support default bin entrypoint paths.
+* Fix command line parsing bug when cargo-rdme was invoked as a cargo subcommand.
+
 ## 0.1.0
 
 * Initial version.
