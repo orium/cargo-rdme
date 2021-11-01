@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -11,8 +12,9 @@ use cargo_rdme::{infer_line_terminator, LineTerminator};
 struct TestOptions {
     readme_filename: &'static str,
     args: &'static [&'static str],
-    exit_status: i32,
+    expected_exit_status: i32,
     check_readme_expected: bool,
+    force: bool,
 }
 
 impl Default for TestOptions {
@@ -20,8 +22,9 @@ impl Default for TestOptions {
         TestOptions {
             readme_filename: "README.md",
             args: &[],
-            exit_status: 0,
+            expected_exit_status: 0,
             check_readme_expected: true,
+            force: true,
         }
     }
 }
@@ -69,18 +72,28 @@ fn run_test_with_options(test_name: &str, options: TestOptions) {
         std::fs::copy(&template_readme, &readme).unwrap();
     }
 
+    let args: Vec<&str> = {
+        let mut args = Vec::from(options.args);
+
+        if options.force {
+            args.insert(0, "--force");
+        }
+
+        args
+    };
+
     let output = Command::new(&bin_path)
-        .args(options.args)
+        .args(args)
         .current_dir(test_dir)
         .output()
         .expect(&format!("Failed to execute {}", bin_path.display()));
 
     let stderr = String::from_utf8_lossy(&output.stderr);
 
-    if output.status.code() != Some(options.exit_status) {
+    if output.status.code() != Some(options.expected_exit_status) {
         panic!(
             "Expected code {} but got code {} instead.\n==== stderr ====\n{}",
-            options.exit_status,
+            options.expected_exit_status,
             output.status.code().map(|c| c.to_string()).unwrap_or("?".to_string()),
             stderr
         );
@@ -218,7 +231,7 @@ fn system_test_option_cmd_check_ok() {
     let option = TestOptions {
         args: &["--check"],
         check_readme_expected: false,
-        exit_status: 0,
+        expected_exit_status: 0,
         ..TestOptions::default()
     };
 
@@ -231,7 +244,7 @@ fn system_test_option_cmd_check_fail() {
     let option = TestOptions {
         args: &["--check"],
         check_readme_expected: false,
-        exit_status: 2,
+        expected_exit_status: 2,
         ..TestOptions::default()
     };
 
@@ -246,7 +259,7 @@ fn system_test_option_cmd_check_fail_line_terminator() {
     let option = TestOptions {
         args: &["--check"],
         check_readme_expected: false,
-        exit_status: 0,
+        expected_exit_status: 0,
         ..TestOptions::default()
     };
 
@@ -255,7 +268,7 @@ fn system_test_option_cmd_check_fail_line_terminator() {
     let option = TestOptions {
         args: &["--check", "--line-terminator", "crlf"],
         check_readme_expected: false,
-        exit_status: 2,
+        expected_exit_status: 2,
         ..TestOptions::default()
     };
 
@@ -322,4 +335,31 @@ fn system_test_marker_inside_doc() {
 #[test]
 fn system_test_rust_code_block_remove_comments() {
     run_test("rust_code_block_remove_comments");
+}
+
+#[test]
+fn system_test_avoid_overwrite_uncommited_readme() {
+    use std::fs::File;
+
+    let test_name = "avoid_overwrite_uncommited_readme";
+    let readme_path = test_dir(test_name).join("README.md");
+
+    let option = TestOptions {
+        check_readme_expected: false,
+        expected_exit_status: 3,
+        force: false,
+        ..TestOptions::default()
+    };
+
+    let mut file = File::create(&readme_path).unwrap();
+    file.write_all("A file!".as_bytes()).unwrap();
+    std::mem::drop(file);
+
+    run_test_with_options(test_name, option);
+
+    let mut file = File::open(&readme_path).unwrap();
+    let mut content = String::new();
+    file.read_to_string(&mut content).unwrap();
+
+    assert_eq!(content, "A file!");
 }

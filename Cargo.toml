@@ -42,6 +42,7 @@ proc-macro2 = { version = "1", features = ["span-locations"] }
 pulldown-cmark = "0.8"
 itertools = "0.10"
 clap = "2"
+git2 = "0.13"
 
 [dev-dependencies]
 pretty_assertions = "1"

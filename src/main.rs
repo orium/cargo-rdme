@@ -50,7 +50,6 @@
 //! Whenever change your crate’s documentation you just need to run `cargo rdme` to update your
 //! README file.
 //!
-//!
 //! ### Automatic transformations
 //!
 //! Cargo rdme will apply some automatic transformations to your documentation when generating the README file:
@@ -100,6 +99,8 @@ mod options;
 const EXIT_CODE_ERROR: i32 = 1;
 /// Exit code when we run in "check mode" and the README is not up to date.
 const EXIT_CODE_CHECK: i32 = 2;
+/// Exit code we don't update the README because we would overwrite uncommited changes.
+const EXIT_CODE_README_NOT_UPDATED_UNCOMMITED_CHANGES: i32 = 3;
 
 #[derive(Error, Debug)]
 enum RunError {
@@ -119,6 +120,8 @@ enum RunError {
     InjectDocError(cargo_rdme::InjectDocError),
     #[error("IO error: {0}")]
     IOError(std::io::Error),
+    #[error("not updating README: it has uncommited changes (use `--force` to bypass this check)")]
+    ReadmeNotUpdatedUncommitedChanges,
 }
 
 impl From<cargo_rdme::ProjectError> for RunError {
@@ -180,6 +183,53 @@ fn entrypoint(project: &Project, entrypoint_opt: EntrypointOpt) -> Option<PathBu
     }
 }
 
+fn line_terminator(
+    line_terminator_opt: LineTerminatorOpt,
+    readme_path: impl AsRef<Path>,
+) -> std::io::Result<LineTerminator> {
+    match line_terminator_opt {
+        LineTerminatorOpt::Auto => infer_line_terminator(readme_path),
+        LineTerminatorOpt::Lf => Ok(LineTerminator::Lf),
+        LineTerminatorOpt::CrLf => Ok(LineTerminator::CrLf),
+    }
+}
+
+fn transform_doc(doc: &Doc) -> Doc {
+    let transform =
+        cargo_rdme::transform::rust_remove_comments::DocTransformRemoveRustComments::new();
+
+    // TODO Use `into_ok()` once it is stable (https://github.com/rust-lang/rust/issues/61695).
+    transform.transform(&doc).unwrap()
+}
+
+/// Check if the `path` has local changes that were not yet commited.
+///
+/// This returns `None` if we were not able to determine that.
+fn git_is_current(path: impl AsRef<Path>) -> Option<bool> {
+    use git2::{Repository, Status};
+
+    let repository = Repository::discover(path.as_ref().parent()?).ok()?;
+    let repository_path = repository.path().parent()?;
+
+    let path_repository_base = path.as_ref().strip_prefix(repository_path).ok()?;
+
+    let status = repository.status_file(path_repository_base).ok()?;
+
+    Some(status == Status::CURRENT)
+}
+
+fn update_readme(
+    new_readme: &Readme,
+    readme_path: impl AsRef<Path>,
+    line_terminator: LineTerminator,
+    ignore_uncommited_changes: bool,
+) -> Result<(), RunError> {
+    match ignore_uncommited_changes || git_is_current(&readme_path).unwrap_or(true) {
+        true => Ok(new_readme.write_to_file(&readme_path, line_terminator)?),
+        false => Err(RunError::ReadmeNotUpdatedUncommitedChanges),
+    }
+}
+
 fn run(current_dir_path: impl AsRef<Path>, options: options::Options) -> Result<(), RunError> {
     let project: Project = Project::from_dir(current_dir_path)?;
     let entryfile: PathBuf =
@@ -189,31 +239,25 @@ fn run(current_dir_path: impl AsRef<Path>, options: options::Options) -> Result<
         Some(doc) => doc,
     };
 
-    let transform =
-        cargo_rdme::transform::rust_remove_comments::DocTransformRemoveRustComments::new();
-    let doc = transform.transform(&doc).unwrap();
+    let doc = transform_doc(&doc);
 
     let readme_path: PathBuf = project.get_readme_path().ok_or(RunError::NoReadmeFile)?;
     let original_readme: Readme = Readme::from_file(&readme_path)?;
     let new_readme: Readme = inject_doc_in_readme(&original_readme, &doc)?;
 
-    let line_terminator = match options.line_terminator {
-        LineTerminatorOpt::Auto => infer_line_terminator(&readme_path)?,
-        LineTerminatorOpt::Lf => LineTerminator::Lf,
-        LineTerminatorOpt::CrLf => LineTerminator::CrLf,
-    };
+    let line_terminator = line_terminator(options.line_terminator, &readme_path)?;
 
     match options.check {
-        false => new_readme.write_to_file(&readme_path, line_terminator)?,
+        false => update_readme(&new_readme, readme_path, line_terminator, options.force),
         true => {
             if !is_readme_up_to_date(&readme_path, &new_readme, line_terminator)? {
                 eprintln!("README is not up to date.");
                 std::process::exit(EXIT_CODE_CHECK);
             }
-        }
-    };
 
-    Ok(())
+            Ok(())
+        }
+    }
 }
 
 fn main() {
@@ -233,7 +277,22 @@ fn main() {
 
             if let Err(e) = run(current_dir, options) {
                 eprintln!("error: {}", e);
-                std::process::exit(EXIT_CODE_ERROR);
+
+                let exit_code = match e {
+                    RunError::ProjectError(_)
+                    | RunError::ExtractDocError(_)
+                    | RunError::ReadmeError(_)
+                    | RunError::NoEntrySourceFile
+                    | RunError::NoReadmeFile
+                    | RunError::NoRustdoc
+                    | RunError::InjectDocError(_)
+                    | RunError::IOError(_) => EXIT_CODE_ERROR,
+                    RunError::ReadmeNotUpdatedUncommitedChanges => {
+                        EXIT_CODE_README_NOT_UPDATED_UNCOMMITED_CHANGES
+                    }
+                };
+
+                std::process::exit(exit_code);
             }
         }
         Err(e) => {

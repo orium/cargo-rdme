@@ -67,6 +67,7 @@ pub struct CmdOptions {
     entrypoint: Option<EntrypointOpt>,
     line_terminator: Option<LineTerminatorOpt>,
     check: bool,
+    force: bool,
 }
 
 fn get_cmd_args() -> Vec<OsString> {
@@ -125,6 +126,12 @@ pub fn cmd_options() -> CmdOptions {
                 .short("c")
                 .help("checks if the README is up to date"),
         )
+        .arg(
+            Arg::with_name("force")
+                .long("force")
+                .short("f")
+                .help("force README update, even when there are uncommited changes"),
+        )
         .get_matches_from(get_cmd_args());
 
     let line_terminator: Option<LineTerminatorOpt> = cmd_opts
@@ -148,7 +155,12 @@ pub fn cmd_options() -> CmdOptions {
         None => None,
     };
 
-    CmdOptions { entrypoint, line_terminator, check: cmd_opts.is_present("check") }
+    CmdOptions {
+        entrypoint,
+        line_terminator,
+        check: cmd_opts.is_present("check"),
+        force: cmd_opts.is_present("force"),
+    }
 }
 
 #[derive(Error, Debug)]
@@ -223,6 +235,7 @@ pub struct Options {
     pub entrypoint: EntrypointOpt,
     pub line_terminator: LineTerminatorOpt,
     pub check: bool,
+    pub force: bool,
 }
 
 #[allow(clippy::needless_pass_by_value)]
@@ -240,6 +253,7 @@ pub fn merge_options(
             .or_else(|| config_file_options.as_ref().and_then(|c| c.line_terminator))
             .unwrap_or_default(),
         check: cmd_options.check,
+        force: cmd_options.force,
     }
 }
 
@@ -276,6 +290,7 @@ mod tests {
             entrypoint: Some(EntrypointOpt::BinDefault),
             line_terminator: Some(LineTerminatorOpt::CrLf),
             check: true,
+            force: true,
         };
         let config_file_options = ConfigFileOptions {
             entrypoint: Some(EntrypointOpt::Lib),
@@ -288,6 +303,7 @@ mod tests {
             entrypoint: EntrypointOpt::BinDefault,
             line_terminator: LineTerminatorOpt::CrLf,
             check: true,
+            force: true,
         };
 
         assert_eq!(options, expected);
