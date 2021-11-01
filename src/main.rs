@@ -52,9 +52,12 @@
 //!
 //! ### Automatic transformations
 //!
-//! Cargo rdme will apply some automatic transformations to your documentation when generating the README file:
+//! Cargo rdme will apply some automatic transformations to your documentation when generating the
+//! README file:
 //!
 //! 1. Rust code blocks starting with `#` will be omitted, just like in `rustdoc`.
+//! 2. Rust code blocks get annotated with the `rust` markdown tag so it gets proper syntax
+//! highlighting.
 //!
 //! ## Config file
 //!
@@ -195,8 +198,15 @@ fn line_terminator(
 }
 
 fn transform_doc(doc: &Doc) -> Doc {
-    let transform =
-        cargo_rdme::transform::rust_remove_comments::DocTransformRustRemoveComments::new();
+    use cargo_rdme::transform::rust_markdown_tag::DocTransformRustMarkdownTag;
+    use cargo_rdme::transform::rust_remove_comments::DocTransformRustRemoveComments;
+
+    let transform = DocTransformRustRemoveComments::new();
+
+    // TODO Use `into_ok()` once it is stable (https://github.com/rust-lang/rust/issues/61695).
+    let doc = transform.transform(&doc).unwrap();
+
+    let transform = DocTransformRustMarkdownTag::new();
 
     // TODO Use `into_ok()` once it is stable (https://github.com/rust-lang/rust/issues/61695).
     transform.transform(&doc).unwrap()

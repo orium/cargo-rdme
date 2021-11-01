@@ -363,3 +363,8 @@ fn system_test_avoid_overwrite_uncommited_readme() {
 
     assert_eq!(content, "A file!");
 }
+
+#[test]
+fn system_test_rust_code_block_add_markdown_tag() {
+    run_test("rust_code_block_add_markdown_tag");
+}

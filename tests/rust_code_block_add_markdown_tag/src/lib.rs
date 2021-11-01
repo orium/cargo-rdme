@@ -2,24 +2,28 @@
 //!
 //! This is a crate that does nothing.
 //!
-//! ```
-//! # comment
-//! println!("One");
-//! ```
+//! First:
 //!
 //! ```rust
-//! # comment
-//! println!("Two");
-//! ```
-//!
-//! ```should_panic
-//! # comment
-//! println!("Three");
-//! ```
-//!
-//! ```text
-//! # comment
 //! println!("One");
 //! ```
+//!
+//! Second:
+//!
+//! ```should_panic
+//! println!("One");
+//! ```
+//!
+//! Third:
+//!
+//! ```text
+//! println!("One");
+//! ```
+//!
+//! Fourth:
+//!
+//!     println!("One");
+//!
+//! End
 
 fn foo() {}

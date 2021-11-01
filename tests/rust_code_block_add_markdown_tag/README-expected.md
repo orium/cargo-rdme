@@ -6,22 +6,31 @@ header
 
 This is a crate that does nothing.
 
+First:
+
 ```rust
 println!("One");
 ```
 
-```rust
-println!("Two");
-```
+Second:
 
 ```rust
-println!("Three");
+println!("One");
 ```
+
+Third:
 
 ```text
-# comment
 println!("One");
 ```
+
+Fourth:
+
+```rust
+println!("One");
+```
+
+End
 
 <!-- cargo-rdme end -->
 

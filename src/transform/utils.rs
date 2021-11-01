@@ -150,6 +150,31 @@ mod tests {
     }
 
     #[test]
+    fn test_rust_code_block_iterator_items_known_code_block_tags() {
+        let tags = [
+            "should_panic",
+            "no_run",
+            "ignore",
+            "allow_fail",
+            "rust",
+            "test_harness",
+            "compile_fail",
+            "edition2018",
+            "ignore-foo",
+        ];
+
+        for tag in tags {
+            let doc_str = format!("Foo:\n```{}\nprintln!(\"There\");\n```\nEnd\n", tag);
+            let expected_str = format!("```{}\nprintln!(\"There\");\n```", tag);
+
+            let mut iter = rust_code_block_iterator(&doc_str).items();
+
+            assert_eq!(iter.next(), Some(expected_str.as_str()));
+            assert_eq!(iter.next(), None);
+        }
+    }
+
+    #[test]
     fn test_markdown_item_iterator_complete_no_item() {
         let str = "hello world";
 

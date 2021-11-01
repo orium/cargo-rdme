@@ -5,12 +5,12 @@
 
 use crate::Doc;
 
+pub mod rust_markdown_tag;
 pub mod rust_remove_comments;
+mod utils;
 
 pub trait DocTransform {
     type E;
 
     fn transform(&self, doc: &Doc) -> Result<Doc, Self::E>;
 }
-
-mod utils;

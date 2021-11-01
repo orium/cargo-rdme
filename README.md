@@ -42,9 +42,12 @@ README file.
 
 ### Automatic transformations
 
-Cargo rdme will apply some automatic transformations to your documentation when generating the README file:
+Cargo rdme will apply some automatic transformations to your documentation when generating the
+README file:
 
 1. Rust code blocks starting with `#` will be omitted, just like in `rustdoc`.
+2. Rust code blocks get annotated with the `rust` markdown tag so it gets proper syntax
+highlighting.
 
 ## Config file
 
