@@ -1,5 +1,10 @@
 # Release notes
 
+## 0.3.0
+
+* Add `rust` markdown tag to rust code blocks.
+* Avoid overwriting README files with uncommited changes.
+
 ## 0.2.0
 
 * Rust code blocks starting with `#` are now omitted, just like in `rustdoc`.
