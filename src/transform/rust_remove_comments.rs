@@ -3,46 +3,18 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use crate::markdown::parsing_utils::*;
+use crate::transform::utils::*;
 use crate::transform::DocTransform;
 use crate::Doc;
 use itertools::Itertools;
 use std::convert::Infallible;
 
-pub struct DocTransformRemoveRustComments;
+pub struct DocTransformRustRemoveComments;
 
-impl DocTransformRemoveRustComments {
-    pub fn new() -> DocTransformRemoveRustComments {
-        DocTransformRemoveRustComments
+impl DocTransformRustRemoveComments {
+    pub fn new() -> DocTransformRustRemoveComments {
+        DocTransformRustRemoveComments
     }
-}
-
-fn is_rust_code_block(tags: &str) -> bool {
-    tags.split(",").all(|tag| match tag {
-        "should_panic" | "no_run" | "ignore" | "allow_fail" | "rust" | "test_harness"
-        | "compile_fail" | "" => true,
-        tag if tag.starts_with("ignore-") => true,
-        tag if tag.starts_with("edition") => true,
-        _ => false,
-    })
-}
-
-fn rust_code_block_iterator(source: &str) -> MarkdownItemIterator<&str> {
-    use pulldown_cmark::*;
-
-    let parser = Parser::new_ext(&source, Options::all());
-
-    let iter = parser.into_offset_iter().filter_map(move |(event, range)| match event {
-        Event::Start(Tag::CodeBlock(CodeBlockKind::Indented)) => {
-            Some((range.clone().into(), &source[range]))
-        }
-        Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(tags))) if is_rust_code_block(&tags) => {
-            Some((range.clone().into(), &source[range]))
-        }
-        _ => None,
-    });
-
-    MarkdownItemIterator::new(source, iter)
 }
 
 fn is_line_commented(line: &str) -> bool {
@@ -79,7 +51,7 @@ fn process_code_block(new_doc_str: &mut String, code_block: &str) {
     }
 }
 
-impl DocTransform for DocTransformRemoveRustComments {
+impl DocTransform for DocTransformRustRemoveComments {
     type E = Infallible;
 
     fn transform(&self, doc: &Doc) -> Result<Doc, Infallible> {
@@ -130,7 +102,7 @@ mod tests {
         let doc = Doc::from_str(doc_str);
         let expected = Doc::from_str(expected_str);
 
-        let transform = DocTransformRemoveRustComments::new();
+        let transform = DocTransformRustRemoveComments::new();
 
         assert_eq!(transform.transform(&doc).unwrap(), expected);
     }
@@ -213,7 +185,7 @@ mod tests {
         let doc = Doc::from_str(doc_str);
         let expected = Doc::from_str(expected_str);
 
-        let transform = DocTransformRemoveRustComments::new();
+        let transform = DocTransformRustRemoveComments::new();
 
         assert_eq!(transform.transform(&doc).unwrap(), expected);
     }
@@ -296,7 +268,7 @@ mod tests {
         let doc = Doc::from_str(doc_str);
         let expected = Doc::from_str(expected_str);
 
-        let transform = DocTransformRemoveRustComments::new();
+        let transform = DocTransformRustRemoveComments::new();
 
         assert_eq!(transform.transform(&doc).unwrap(), expected);
     }
@@ -363,7 +335,7 @@ mod tests {
         let doc = Doc::from_str(doc_str);
         let expected = Doc::from_str(expected_str);
 
-        let transform = DocTransformRemoveRustComments::new();
+        let transform = DocTransformRustRemoveComments::new();
 
         assert_eq!(transform.transform(&doc).unwrap(), expected);
     }
@@ -399,7 +371,7 @@ mod tests {
         let doc = Doc::from_str(doc_str);
         let expected = Doc::from_str(expected_str);
 
-        let transform = DocTransformRemoveRustComments::new();
+        let transform = DocTransformRustRemoveComments::new();
 
         assert_eq!(transform.transform(&doc).unwrap(), expected);
     }
@@ -429,7 +401,7 @@ mod tests {
         let doc = Doc::from_str(doc_str);
         let expected = Doc::from_str(expected_str);
 
-        let transform = DocTransformRemoveRustComments::new();
+        let transform = DocTransformRustRemoveComments::new();
 
         assert_eq!(transform.transform(&doc).unwrap(), expected);
     }
@@ -458,7 +430,7 @@ mod tests {
         let doc = Doc::from_str(doc_str);
         let expected = Doc::from_str(expected_str);
 
-        let transform = DocTransformRemoveRustComments::new();
+        let transform = DocTransformRustRemoveComments::new();
 
         assert_eq!(transform.transform(&doc).unwrap(), expected);
     }
@@ -497,7 +469,7 @@ mod tests {
         let doc = Doc::from_str(doc_str);
         let expected = Doc::from_str(expected_str);
 
-        let transform = DocTransformRemoveRustComments::new();
+        let transform = DocTransformRustRemoveComments::new();
 
         assert_eq!(transform.transform(&doc).unwrap(), expected);
     }
@@ -529,7 +501,7 @@ mod tests {
         let doc = Doc::from_str(doc_str);
         let expected = Doc::from_str(expected_str);
 
-        let transform = DocTransformRemoveRustComments::new();
+        let transform = DocTransformRustRemoveComments::new();
 
         assert_eq!(transform.transform(&doc).unwrap(), expected);
     }
@@ -556,7 +528,7 @@ mod tests {
             let doc = Doc::from_str(doc_str);
             let expected = Doc::from_str(expected_str);
 
-            let transform = DocTransformRemoveRustComments::new();
+            let transform = DocTransformRustRemoveComments::new();
 
             assert_eq!(transform.transform(&doc).unwrap(), expected);
         }
@@ -570,7 +542,7 @@ mod tests {
             let doc_str = format!("```{}\n# This is a comment.\nprintln!(\"#There\");\n```\n", tag);
             let doc = Doc::from_str(doc_str);
 
-            let transform = DocTransformRemoveRustComments::new();
+            let transform = DocTransformRustRemoveComments::new();
 
             assert_eq!(transform.transform(&doc).unwrap(), doc);
         }

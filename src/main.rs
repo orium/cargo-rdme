@@ -196,7 +196,7 @@ fn line_terminator(
 
 fn transform_doc(doc: &Doc) -> Doc {
     let transform =
-        cargo_rdme::transform::rust_remove_comments::DocTransformRemoveRustComments::new();
+        cargo_rdme::transform::rust_remove_comments::DocTransformRustRemoveComments::new();
 
     // TODO Use `into_ok()` once it is stable (https://github.com/rust-lang/rust/issues/61695).
     transform.transform(&doc).unwrap()

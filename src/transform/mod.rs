@@ -12,3 +12,5 @@ pub trait DocTransform {
 
     fn transform(&self, doc: &Doc) -> Result<Doc, Self::E>;
 }
+
+mod utils;
