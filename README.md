@@ -49,7 +49,54 @@ README file:
 2. Rust code blocks get annotated with the `rust` markdown tag so it gets proper syntax
 highlighting.
 
-## Config file
+In the table below you can see an example of these transformations.  The code block now is
+tagged with `rust` and the comments were removed:
+
+<table border="1">
+<col span="1" width="40%">
+<col span="1" width="40%">
+</colgroup>
+<tr>
+<th><center>Crate’s rustdoc</center></th>
+<th><center>README.md</center></th>
+<tr>
+<tr>
+<td>
+
+```rust
+//! To check if a number is prime do:
+//!
+//! ```
+//! # fn main() {
+//! for i in 2.. {
+//!     if is_prime(i) {
+//!         println!("{}", i);
+//!     }
+//! }
+//! # }
+//! ```
+```
+
+</td>
+<td>
+
+````markdown
+To check if a number is prime do:
+
+```rust
+for i in 2.. {
+    if is_prime(i) {
+        println!("{}", i);
+    }
+}
+```
+````
+
+</td>
+</tr>
+</table>
+
+## Configuration file
 
 If the default behavior of `cargo rdme` is not appropriate for your project you can crate a
 configuration file `.cargo-rdme.toml` in the root of your project.  This is how that
