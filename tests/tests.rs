@@ -368,3 +368,8 @@ fn system_test_avoid_overwrite_uncommited_readme() {
 fn system_test_rust_code_block_add_markdown_tag() {
     run_test("rust_code_block_add_markdown_tag");
 }
+
+#[test]
+fn system_test_transform_rust_code_nested_fenced_blocks() {
+    run_test("transform_rust_code_nested_fenced_blocks");
+}

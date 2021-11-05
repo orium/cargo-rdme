@@ -548,4 +548,42 @@ mod tests {
             assert_eq!(transform.transform(&doc).unwrap(), doc);
         }
     }
+
+    #[test]
+    fn test_remove_comments_nested_fenced_block() {
+        let doc_str = indoc! { r#"
+            ````
+            # Comment 1
+            let s = "
+            ```
+            ";
+            # Comment 2
+            println!("Hi");
+            let s = "
+            ```
+            ";
+            ````
+            "#
+        };
+
+        let expected_str = indoc! { r#"
+            ````
+            let s = "
+            ```
+            ";
+            println!("Hi");
+            let s = "
+            ```
+            ";
+            ````
+            "#
+        };
+
+        let doc = Doc::from_str(doc_str);
+        let expected = Doc::from_str(expected_str);
+
+        let transform = DocTransformRustRemoveComments::new();
+
+        assert_eq!(transform.transform(&doc).unwrap(), expected);
+    }
 }

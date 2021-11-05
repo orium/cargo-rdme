@@ -35,7 +35,13 @@ fn process_code_block(new_doc_str: &mut String, code_block: &str) {
         match i {
             0 if fenced => {
                 debug_assert!(line.starts_with("```"));
-                new_doc_str.push_str("```rust");
+
+                // A fence can have more than three backticks.  We need to preserve that, since
+                // it can be used to escape triple fences inside the code block itself.
+                // See https://stackoverflow.com/a/31834381.
+                line.chars().take_while(|c| *c == '`').for_each(|c| new_doc_str.push(c));
+
+                new_doc_str.push_str("rust");
             }
             0 => {
                 new_doc_str.push_str(line);
@@ -270,6 +276,34 @@ mod tests {
             ```
 
             That's all!  Have a nice day!
+            "#
+        };
+
+        let doc = Doc::from_str(doc_str);
+        let expected = Doc::from_str(expected_str);
+
+        let transform = DocTransformRustMarkdownTag::new();
+
+        assert_eq!(transform.transform(&doc).unwrap(), expected);
+    }
+
+    #[test]
+    fn test_markdown_tag_nested_fenced_block() {
+        let doc_str = indoc! { r#"
+            ````
+            ```
+            println!("Hi");
+            ```
+            ````
+            "#
+        };
+
+        let expected_str = indoc! { r#"
+            ````rust
+            ```
+            println!("Hi");
+            ```
+            ````
             "#
         };
 
