@@ -87,6 +87,7 @@
 //! `cargo rdme --check`.  The exit code will be `0` if the README is up to date, or `2` if it’s
 //! not.
 
+use crate::console::print_error;
 use crate::options::{EntrypointOpt, LineTerminatorOpt};
 use cargo_rdme::transform::DocTransform;
 use cargo_rdme::{
@@ -97,6 +98,7 @@ use cargo_rdme::{Doc, ProjectError, Readme};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
+mod console;
 mod options;
 
 const EXIT_CODE_ERROR: i32 = 1;
@@ -261,7 +263,7 @@ fn run(current_dir_path: impl AsRef<Path>, options: options::Options) -> Result<
         false => update_readme(&new_readme, readme_path, line_terminator, options.force),
         true => {
             if !is_readme_up_to_date(&readme_path, &new_readme, line_terminator)? {
-                eprintln!("README is not up to date.");
+                print_error("README is not up to date.");
                 std::process::exit(EXIT_CODE_CHECK);
             }
 
@@ -278,7 +280,7 @@ fn main() {
             let config_file_options = match options::config_file_options(&current_dir) {
                 Ok(opts) => opts,
                 Err(e) => {
-                    eprintln!("error: unable to read config file: {}", e);
+                    print_error(format!("unable to read config file: {}", e));
                     std::process::exit(EXIT_CODE_ERROR);
                 }
             };
@@ -286,7 +288,7 @@ fn main() {
             let options = options::merge_options(cmd_options, config_file_options);
 
             if let Err(e) = run(current_dir, options) {
-                eprintln!("error: {}", e);
+                print_error(&e);
 
                 let exit_code = match e {
                     RunError::ProjectError(_)
@@ -306,7 +308,7 @@ fn main() {
             }
         }
         Err(e) => {
-            eprintln!("error: unable to get current directory: {}", e);
+            print_error(format!("unable to get current directory: {}", e));
             std::process::exit(EXIT_CODE_ERROR);
         }
     }

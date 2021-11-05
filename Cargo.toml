@@ -43,6 +43,8 @@ pulldown-cmark = "0.8"
 itertools = "0.10"
 clap = "2"
 git2 = "0.13"
+atty = "0.2"
+termcolor = "1"
 
 [dev-dependencies]
 pretty_assertions = "1"
