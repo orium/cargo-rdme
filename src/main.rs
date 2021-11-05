@@ -135,9 +135,9 @@
 //! `cargo rdme --check`.  The exit code will be `0` if the README is up to date, or `2` if it’s
 //! not.
 
-use crate::console::print_error;
+use crate::console::{print_error, print_warning};
 use crate::options::{EntrypointOpt, LineTerminatorOpt};
-use cargo_rdme::transform::DocTransform;
+use cargo_rdme::transform::IntralinkError;
 use cargo_rdme::{
     extract_doc_from_source_file, infer_line_terminator, inject_doc_in_readme, LineTerminator,
     Project,
@@ -152,7 +152,7 @@ mod options;
 const EXIT_CODE_ERROR: i32 = 1;
 /// Exit code when we run in "check mode" and the README is not up to date.
 const EXIT_CODE_CHECK: i32 = 2;
-/// Exit code we don't update the README because we would overwrite uncommited changes.
+/// Exit code we don't update the README because we would overwrite uncommitted changes.
 const EXIT_CODE_README_NOT_UPDATED_UNCOMMITED_CHANGES: i32 = 3;
 
 #[derive(Error, Debug)]
@@ -175,6 +175,8 @@ enum RunError {
     IOError(std::io::Error),
     #[error("not updating README: it has uncommited changes (use `--force` to bypass this check)")]
     ReadmeNotUpdatedUncommitedChanges,
+    #[error("failed to transform intralinks: {0}")]
+    TransformIntraLinkError(IntralinkError),
 }
 
 impl From<cargo_rdme::ProjectError> for RunError {
@@ -204,6 +206,18 @@ impl From<cargo_rdme::InjectDocError> for RunError {
 impl From<std::io::Error> for RunError {
     fn from(e: std::io::Error) -> RunError {
         RunError::IOError(e)
+    }
+}
+
+impl From<IntralinkError> for RunError {
+    fn from(e: IntralinkError) -> RunError {
+        RunError::TransformIntraLinkError(e)
+    }
+}
+
+impl From<std::convert::Infallible> for RunError {
+    fn from(_: std::convert::Infallible) -> RunError {
+        unreachable!()
     }
 }
 
@@ -247,19 +261,29 @@ fn line_terminator(
     }
 }
 
-fn transform_doc(doc: &Doc) -> Doc {
-    use cargo_rdme::transform::rust_markdown_tag::DocTransformRustMarkdownTag;
-    use cargo_rdme::transform::rust_remove_comments::DocTransformRustRemoveComments;
+fn transform_doc(
+    doc: &Doc,
+    project: &Project,
+    entrypoint: impl AsRef<Path>,
+) -> Result<Doc, RunError> {
+    use cargo_rdme::transform::{
+        DocTransform, DocTransformIntralinks, DocTransformRustMarkdownTag,
+        DocTransformRustRemoveComments,
+    };
 
     let transform = DocTransformRustRemoveComments::new();
-
     // TODO Use `into_ok()` once it is stable (https://github.com/rust-lang/rust/issues/61695).
-    let doc = transform.transform(doc).unwrap();
+    let doc = transform.transform(doc)?;
 
     let transform = DocTransformRustMarkdownTag::new();
-
     // TODO Use `into_ok()` once it is stable (https://github.com/rust-lang/rust/issues/61695).
-    transform.transform(&doc).unwrap()
+    let doc = transform.transform(&doc)?;
+
+    let transform = DocTransformIntralinks::new(project.get_package_name(), entrypoint, |msg| {
+        print_warning(msg);
+    });
+
+    Ok(transform.transform(&doc)?)
 }
 
 /// Check if the `path` has local changes that were not yet commited.
@@ -294,12 +318,12 @@ fn run(current_dir_path: impl AsRef<Path>, options: options::Options) -> Result<
     let project: Project = Project::from_dir(current_dir_path)?;
     let entryfile: PathBuf =
         entrypoint(&project, options.entrypoint).ok_or(RunError::NoEntrySourceFile)?;
-    let doc: Doc = match extract_doc_from_source_file(entryfile)? {
+    let doc: Doc = match extract_doc_from_source_file(&entryfile)? {
         None => return Err(RunError::NoRustdoc),
         Some(doc) => doc,
     };
 
-    let doc = transform_doc(&doc);
+    let doc = transform_doc(&doc, &project, &entryfile)?;
 
     let readme_path: PathBuf = project.get_readme_path().ok_or(RunError::NoReadmeFile)?;
     let original_readme: Readme = Readme::from_file(&readme_path)?;
@@ -346,6 +370,7 @@ fn main() {
                     | RunError::NoReadmeFile
                     | RunError::NoRustdoc
                     | RunError::InjectDocError(_)
+                    | RunError::TransformIntraLinkError(_)
                     | RunError::IOError(_) => EXIT_CODE_ERROR,
                     RunError::ReadmeNotUpdatedUncommitedChanges => {
                         EXIT_CODE_README_NOT_UPDATED_UNCOMMITED_CHANGES

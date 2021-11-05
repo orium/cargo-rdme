@@ -40,10 +40,13 @@ pub enum ManifestError {
     ErrorReadingManifest(PathBuf),
     #[error("failed to parse toml")]
     ErrorParsingToml,
+    #[error("no package name")]
+    NoPackageName,
 }
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct Manifest {
+    package_name: String,
     lib_path: Option<PathBuf>,
     readme_path: Option<PathBuf>,
     bin_path: HashMap<String, Option<PathBuf>>,
@@ -88,7 +91,10 @@ impl FromStr for Manifest {
 
         toml.get("bin").and_then(toml::Value::as_array).map(|t| t.iter());
 
+        let package_name = get_str_table("package", "name").ok_or(ManifestError::NoPackageName)?;
+
         Ok(Manifest {
+            package_name: package_name.to_owned(),
             lib_path: get_str_table("lib", "path").map(|v| Path::new(v).to_path_buf()),
             readme_path: get_str_table("package", "readme").map(|v| Path::new(v).to_path_buf()),
             bin_path,
@@ -192,11 +198,16 @@ impl Project {
             false => None,
         }
     }
+
+    #[must_use]
+    pub fn get_package_name(&self) -> &str {
+        &self.manifest.package_name
+    }
 }
 
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Clone, Debug)]
 pub struct Doc {
-    markdown: Markdown,
+    pub markdown: Markdown,
 }
 
 impl Doc {
@@ -220,6 +231,12 @@ impl Doc {
 
     pub fn lines(&self) -> impl Iterator<Item = &str> {
         self.markdown.lines()
+    }
+
+    // Return the markdown as a string.  Note that the line terminator will always be a line feed.
+    #[must_use]
+    pub fn as_string(&self) -> &str {
+        self.markdown.as_string()
     }
 }
 
@@ -254,7 +271,7 @@ pub enum LineTerminator {
 }
 
 pub struct Readme {
-    markdown: Markdown,
+    pub markdown: Markdown,
 }
 
 impl Readme {
@@ -291,6 +308,12 @@ impl Readme {
     ) -> Result<(), ReadmeError> {
         Ok(self.markdown.write(writer, line_terminator)?)
     }
+
+    // Return the markdown as a string.  Note that the line terminator will always be a line feed.
+    #[must_use]
+    pub fn as_string(&self) -> &str {
+        self.markdown.as_string()
+    }
 }
 
 pub fn infer_line_terminator(file_path: impl AsRef<Path>) -> std::io::Result<LineTerminator> {
@@ -317,6 +340,7 @@ mod tests {
     fn test_manifest_from_str() {
         let str = indoc! { r#"
             [package]
+            name = "the-crate"
             readme = "README.md"
 
             [lib]
@@ -325,6 +349,7 @@ mod tests {
         };
 
         let expected_manifest = Manifest {
+            package_name: "the-crate".to_owned(),
             lib_path: Some(Path::new("src").join("lib.rs").to_path_buf()),
             readme_path: Some(Path::new("README.md").to_path_buf()),
             bin_path: HashMap::new(),
@@ -337,6 +362,7 @@ mod tests {
     fn test_manifest_from_str_multiple_bin() {
         let str = indoc! { r#"
             [package]
+            name = "the-crate"
 
             [[bin]]
             name = "foo"
@@ -348,6 +374,7 @@ mod tests {
         };
 
         let expected_manifest = Manifest {
+            package_name: "the-crate".to_owned(),
             lib_path: None,
             readme_path: None,
             bin_path: HashMap::from_iter(

@@ -98,7 +98,6 @@ pub fn inject_doc_in_readme(readme: &Readme, doc: &Doc) -> Result<Readme, Inject
 mod tests {
     use super::*;
     use indoc::indoc;
-    use itertools::Itertools;
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -215,7 +214,7 @@ mod tests {
 
         let new_readme = inject_doc_in_readme(&readme, &doc).unwrap();
 
-        assert_eq!(new_readme.lines().join("\n"), expected.lines().join("\n"));
+        assert_eq!(new_readme.markdown.as_string(), expected);
     }
 
     #[test]
@@ -264,6 +263,6 @@ mod tests {
 
         let new_readme = inject_doc_in_readme(&readme, &doc).unwrap();
 
-        assert_eq!(new_readme.lines().join("\n"), expected.lines().join("\n"));
+        assert_eq!(new_readme.markdown.as_string(), expected);
     }
 }

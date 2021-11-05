@@ -6,7 +6,6 @@
 use crate::transform::utils::{rust_code_block_iterator, ItemOrOther};
 use crate::transform::DocTransform;
 use crate::Doc;
-use itertools::Itertools;
 use std::convert::Infallible;
 
 pub struct DocTransformRustMarkdownTag;
@@ -65,10 +64,9 @@ impl DocTransform for DocTransformRustMarkdownTag {
     type E = Infallible;
 
     fn transform(&self, doc: &Doc) -> Result<Doc, Infallible> {
-        let source = doc.lines().join("\n");
         let mut new_doc_str = String::new();
 
-        for item_or_other in rust_code_block_iterator(&source).complete() {
+        for item_or_other in rust_code_block_iterator(&doc.markdown).complete() {
             match item_or_other {
                 ItemOrOther::Item(code_block) => {
                     process_code_block(&mut new_doc_str, code_block);

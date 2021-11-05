@@ -333,11 +333,6 @@ fn system_test_marker_inside_doc() {
 }
 
 #[test]
-fn system_test_rust_code_block_remove_comments() {
-    run_test("rust_code_block_remove_comments");
-}
-
-#[test]
 fn system_test_avoid_overwrite_uncommited_readme() {
     use std::fs::File;
 
@@ -365,11 +360,41 @@ fn system_test_avoid_overwrite_uncommited_readme() {
 }
 
 #[test]
-fn system_test_rust_code_block_add_markdown_tag() {
-    run_test("rust_code_block_add_markdown_tag");
+fn system_test_transform_rust_code_block_remove_comments() {
+    run_test("transform_rust_code_block_remove_comments");
+}
+
+#[test]
+fn system_test_transform_rust_code_block_add_markdown_tag() {
+    run_test("transform_rust_code_block_add_markdown_tag");
 }
 
 #[test]
 fn system_test_transform_rust_code_nested_fenced_blocks() {
     run_test("transform_rust_code_nested_fenced_blocks");
+}
+
+#[test]
+fn system_test_transform_intralinks_simple() {
+    run_test("transform_intralinks_simple");
+}
+
+#[test]
+fn system_test_transform_intralinks_module_walk() {
+    run_test("transform_intralinks_module_walk");
+}
+
+#[test]
+fn system_test_transform_intralinks_ambiguous_module() {
+    run_test("transform_intralinks_ambiguous_module");
+}
+
+#[test]
+fn system_test_transform_intralinks_stdlib_links() {
+    run_test("transform_intralinks_stdlib_links");
+}
+
+#[test]
+fn system_test_transform_intralinks_crate_name_hyphen() {
+    run_test("transform_intralinks_crate_name_hyphen");
 }

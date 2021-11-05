@@ -20,7 +20,7 @@ pub enum MarkdownError {
     ErrorWritingMarkdown,
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, Clone)]
 pub struct Markdown {
     /// Content of the markdown.  The line terminator is always `\n`.
     content: String,
@@ -84,6 +84,11 @@ impl Markdown {
         }
 
         Ok(())
+    }
+
+    // Return the markdown as a string.  Note that the line terminator will always be a line feed.
+    pub fn as_string(&self) -> &str {
+        &self.content
     }
 }
 

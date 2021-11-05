@@ -27,7 +27,9 @@ jobs:
           toolchain: stable
           override: true
           default: true
-          components: rustfmt
+          # We need to install the source of the standard library for the system tests to check that links
+          # to the standard library are correctly generated.
+          components: rust-src, rustfmt
 
       - name: Install cargo plugins
         run: |

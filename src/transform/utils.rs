@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+use crate::markdown::Markdown;
 use itertools::Itertools;
 use std::ops::Range;
 
@@ -16,9 +17,10 @@ pub fn is_rust_code_block(tags: &str) -> bool {
     })
 }
 
-pub fn rust_code_block_iterator(source: &str) -> MarkdownItemIterator<&str> {
+pub fn rust_code_block_iterator(markdown: &Markdown) -> MarkdownItemIterator<&str> {
     use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag};
 
+    let source = markdown.as_string();
     let parser = Parser::new_ext(source, Options::all());
 
     let iter = parser.into_offset_iter().filter_map(move |(event, range)| match event {
@@ -73,6 +75,14 @@ impl<'a, T> MarkdownItemIterator<'a, T> {
         self.iter.map(|(_, item)| item)
     }
 
+    #[allow(dead_code)]
+    pub fn items_with_spans(self) -> impl Iterator<Item = (Span, T)> + 'a
+    where
+        T: 'a,
+    {
+        self.iter
+    }
+
     pub fn complete(self) -> impl Iterator<Item = ItemOrOther<'a, T>>
     where
         T: Clone,
@@ -108,7 +118,7 @@ mod tests {
 
     #[test]
     fn test_rust_code_block_iterator_items() {
-        let doc_str = indoc! { r#"
+        let doc = indoc! { r#"
             # The crate
 
             Look a this code:
@@ -136,8 +146,9 @@ mod tests {
             That's ```all```!  Have a nice `day`!
             "#
         };
+        let doc = Markdown::from_str(doc);
 
-        let mut iter = rust_code_block_iterator(doc_str).items();
+        let mut iter = rust_code_block_iterator(&doc).items();
 
         assert_eq!(iter.next(), Some("```\nprintln!(\"first\");\n```"));
         assert_eq!(iter.next(), Some("```rust\nprintln!(\"second\");\n```"));
@@ -161,10 +172,12 @@ mod tests {
         ];
 
         for tag in tags {
-            let doc_str = format!("Foo:\n```{}\nprintln!(\"There\");\n```\nEnd\n", tag);
+            let doc = format!("Foo:\n```{}\nprintln!(\"There\");\n```\nEnd\n", tag);
             let expected_str = format!("```{}\nprintln!(\"There\");\n```", tag);
 
-            let mut iter = rust_code_block_iterator(&doc_str).items();
+            let doc = Markdown::from_str(doc);
+
+            let mut iter = rust_code_block_iterator(&doc).items();
 
             assert_eq!(iter.next(), Some(expected_str.as_str()));
             assert_eq!(iter.next(), None);

@@ -25,19 +25,37 @@ fn print_color(
     stream.set_color(ColorSpec::new().set_bold(true))?;
     write!(stream, ":")?;
     stream.reset()?;
-    writeln!(stream, " {}", message)
+    writeln!(stream, " {}", message)?;
+    stream.flush()
 }
 
-pub fn print_error(message: impl Display) {
+fn print_nocolor(
+    stream: &mut StandardStream,
+    level: impl Display,
+    message: impl Display,
+) -> std::io::Result<()> {
+    stream.reset()?;
+    write!(stream, "{}: {}", level, message)?;
+    stream.flush()
+}
+
+pub fn print_stderr(level: impl Display, message: impl Display, color: Color) {
     let mut stream = StandardStream::stderr(ColorChoice::Auto);
 
     match is_stderr_terminal() {
         true => {
-            print_color(&mut stream, "error", message, Color::Red)
-                .expect("error writing to stderr");
+            print_color(&mut stream, level, message, color).expect("error writing to stderr");
         }
         false => {
-            eprintln!("error: {}", message);
+            print_nocolor(&mut stream, level, message).expect("error writing to stderr");
         }
     }
+}
+
+pub fn print_error(message: impl Display) {
+    print_stderr("error", message, Color::Red);
+}
+
+pub fn print_warning(message: impl Display) {
+    print_stderr("warning", message, Color::Yellow);
 }
