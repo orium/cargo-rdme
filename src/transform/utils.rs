@@ -7,7 +7,7 @@ use itertools::Itertools;
 use std::ops::Range;
 
 pub fn is_rust_code_block(tags: &str) -> bool {
-    tags.split(",").all(|tag| match tag {
+    tags.split(',').all(|tag| match tag {
         "should_panic" | "no_run" | "ignore" | "allow_fail" | "rust" | "test_harness"
         | "compile_fail" | "" => true,
         tag if tag.starts_with("ignore-") => true,
@@ -17,9 +17,9 @@ pub fn is_rust_code_block(tags: &str) -> bool {
 }
 
 pub fn rust_code_block_iterator(source: &str) -> MarkdownItemIterator<&str> {
-    use pulldown_cmark::*;
+    use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag};
 
-    let parser = Parser::new_ext(&source, Options::all());
+    let parser = Parser::new_ext(source, Options::all());
 
     let iter = parser.into_offset_iter().filter_map(move |(event, range)| match event {
         Event::Start(Tag::CodeBlock(CodeBlockKind::Indented)) => {
@@ -80,7 +80,7 @@ impl<'a, T> MarkdownItemIterator<'a, T> {
         use std::iter::once;
 
         once(None)
-            .chain(self.iter.map(|e| Some(e)))
+            .chain(self.iter.map(Some))
             .chain(once(None))
             .tuple_windows()
             .flat_map(|(l, r)| match (l, r) {
@@ -96,10 +96,7 @@ impl<'a, T> MarkdownItemIterator<'a, T> {
                 }
                 (None, None) => [ItemOrOther::Other(self.source), ItemOrOther::Other("")],
             })
-            .filter(|e| match e {
-                ItemOrOther::Other("") => false,
-                _ => true,
-            })
+            .filter(|e| !matches!(e, ItemOrOther::Other("")))
     }
 }
 

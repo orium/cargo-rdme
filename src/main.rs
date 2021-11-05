@@ -17,6 +17,7 @@
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::non_ascii_literal)]
 #![allow(clippy::enum_variant_names)]
+#![allow(clippy::new_without_default)]
 // Note: If you change this remember to update `README.md`.  To do so run `cargo run`.
 //! # Cargo rdme
 //!
@@ -206,7 +207,7 @@ fn transform_doc(doc: &Doc) -> Doc {
     let transform = DocTransformRustRemoveComments::new();
 
     // TODO Use `into_ok()` once it is stable (https://github.com/rust-lang/rust/issues/61695).
-    let doc = transform.transform(&doc).unwrap();
+    let doc = transform.transform(doc).unwrap();
 
     let transform = DocTransformRustMarkdownTag::new();
 

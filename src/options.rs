@@ -185,7 +185,7 @@ fn config_file_options_from_str(
     config_str: &str,
 ) -> Result<ConfigFileOptions, ConfigFileOptionsError> {
     let config_toml: toml::Value =
-        toml::from_str(config_str).map_err(|e| ConfigFileOptionsError::ErrorParsingToml(e))?;
+        toml::from_str(config_str).map_err(ConfigFileOptionsError::ErrorParsingToml)?;
 
     let line_terminator = config_toml
         .get("line-terminator")

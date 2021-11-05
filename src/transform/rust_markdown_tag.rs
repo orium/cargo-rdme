@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use crate::transform::utils::*;
+use crate::transform::utils::{rust_code_block_iterator, ItemOrOther};
 use crate::transform::DocTransform;
 use crate::Doc;
 use itertools::Itertools;
@@ -12,6 +12,7 @@ use std::convert::Infallible;
 pub struct DocTransformRustMarkdownTag;
 
 impl DocTransformRustMarkdownTag {
+    #[must_use]
     pub fn new() -> DocTransformRustMarkdownTag {
         DocTransformRustMarkdownTag
     }
@@ -22,7 +23,7 @@ fn process_code_block(new_doc_str: &mut String, code_block: &str) {
     let mut base_indent = 0;
 
     if !fenced {
-        while !new_doc_str.ends_with("\n") && !new_doc_str.is_empty() {
+        while !new_doc_str.ends_with('\n') && !new_doc_str.is_empty() {
             new_doc_str.pop();
             base_indent += 1;
         }
@@ -30,7 +31,7 @@ fn process_code_block(new_doc_str: &mut String, code_block: &str) {
         new_doc_str.push_str("```rust\n");
     }
 
-    for (i, line) in code_block.split("\n").enumerate() {
+    for (i, line) in code_block.split('\n').enumerate() {
         match i {
             0 if fenced => {
                 debug_assert!(line.starts_with("```"));

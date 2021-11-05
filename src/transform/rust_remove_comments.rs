@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use crate::transform::utils::*;
+use crate::transform::utils::{rust_code_block_iterator, ItemOrOther};
 use crate::transform::DocTransform;
 use crate::Doc;
 use itertools::Itertools;
@@ -12,6 +12,7 @@ use std::convert::Infallible;
 pub struct DocTransformRustRemoveComments;
 
 impl DocTransformRustRemoveComments {
+    #[must_use]
     pub fn new() -> DocTransformRustRemoveComments {
         DocTransformRustRemoveComments
     }
@@ -24,12 +25,12 @@ fn is_line_commented(line: &str) -> bool {
 fn process_code_block(new_doc_str: &mut String, code_block: &str) {
     let mut first = true;
 
-    for (i, line) in code_block.split("\n").enumerate() {
+    for (i, line) in code_block.split('\n').enumerate() {
         // If we have an indent code block and we start with a comment we need to
         // drop any indent whitespace that started this indent block, since
         // pulldown-cmark doesn't consider it part of the code block.
         if i == 0 && is_line_commented(line) {
-            while !new_doc_str.ends_with("\n") && !new_doc_str.is_empty() {
+            while !new_doc_str.ends_with('\n') && !new_doc_str.is_empty() {
                 new_doc_str.pop();
             }
         }
