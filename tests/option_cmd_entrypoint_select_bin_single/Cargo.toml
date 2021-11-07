@@ -1,0 +1,8 @@
+[package]
+name = "system_test"
+version = "0.1.0"
+edition = "2018"
+
+[[bin]]
+path = "src/my-only-bin.rs"
+name = "foo"

@@ -310,6 +310,14 @@ fn system_test_option_cmd_entrypoint_bin() {
 }
 
 #[test]
+fn system_test_option_cmd_entrypoint_select_bin_single() {
+    let test_name = "option_cmd_entrypoint_select_bin_single";
+    let option = TestOptions { args: &["--entrypoint", "bin"], ..TestOptions::default() };
+
+    run_test_with_options(test_name, option);
+}
+
+#[test]
 fn system_test_option_cmd_entrypoint_select_bin() {
     let test_name = "option_cmd_entrypoint_select_bin";
 

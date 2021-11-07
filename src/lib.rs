@@ -160,13 +160,23 @@ impl Project {
 
     #[must_use]
     pub fn get_bin_default_entryfile_path(&self) -> Option<PathBuf> {
-        let default = || Path::new("src").join("main.rs");
-        let rel_path = self.manifest.lib_path.clone().unwrap_or_else(default);
+        let rel_path = Path::new("src").join("main.rs");
         let path = self.directory.join(rel_path);
 
         match path.is_file() {
             true => Some(path),
-            false => None,
+            false => {
+                // There’s no `src/main.rs`.  If there's only one binary we should select that.
+                match self.manifest.bin_path.len() {
+                    1 => self
+                        .manifest
+                        .bin_path
+                        .keys()
+                        .next()
+                        .and_then(|bin_name| self.get_bin_entryfile_path(&bin_name)),
+                    _ => None,
+                }
+            }
         }
     }
 
