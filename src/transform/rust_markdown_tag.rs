@@ -33,7 +33,10 @@ fn process_code_block(new_doc_str: &mut String, code_block: &str) {
     for (i, line) in code_block.split('\n').enumerate() {
         match i {
             0 if fenced => {
-                debug_assert!(line.starts_with("```"));
+                assert!(
+                    line.starts_with("```"),
+                    "fenced code block does not start with triple backtick"
+                );
 
                 // A fence can have more than three backticks.  We need to preserve that, since
                 // it can be used to escape triple fences inside the code block itself.

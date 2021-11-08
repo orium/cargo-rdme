@@ -6,7 +6,7 @@
 use crate::markdown::Markdown;
 use crate::transform::utils::MarkdownItemIterator;
 use crate::transform::DocTransform;
-use crate::{Doc, Project};
+use crate::Doc;
 use module_walker::walk_module_file;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -564,16 +564,13 @@ fn get_standard_libraries() -> Result<Vec<Crate>, IntralinkError> {
         let lib_entrypoint = project_dir_path.join("src").join("lib.rs");
 
         if cargo_manifest_path.is_file() && lib_entrypoint.is_file() {
-            let crate_name = Project::from_dir(&project_dir_path)
-                .map_err(|e| {
+            let crate_name =
+                crate::project_package_name(&cargo_manifest_path).ok_or_else(|| {
                     IntralinkError::LoadStdLibError(format!(
-                        "failed to load manifest in \"{}\": {}",
-                        cargo_manifest_path.display(),
-                        e
+                        "failed to load manifest in \"{}\"",
+                        cargo_manifest_path.display()
                     ))
-                })?
-                .get_package_name()
-                .to_owned();
+                })?;
             let crate_info = Crate { name: crate_name, entrypoint: lib_entrypoint };
 
             std_libs.push(crate_info);

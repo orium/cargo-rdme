@@ -75,7 +75,7 @@ fn get_cmd_args() -> Vec<OsString> {
     let subcommand: &str = {
         let package_name = env!("CARGO_PKG_NAME");
 
-        debug_assert!(package_name.starts_with("cargo-"));
+        assert!(package_name.starts_with("cargo-"), "package name does not start with `cargo-`");
 
         &package_name["cargo-".len()..]
     };

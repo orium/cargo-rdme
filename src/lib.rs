@@ -22,9 +22,7 @@
 use crate::markdown::{Markdown, MarkdownError};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use thiserror::Error;
-use toml::Value;
 
 mod extract_doc;
 mod inject_doc;
@@ -35,91 +33,17 @@ pub use extract_doc::{extract_doc_from_source_file, ExtractDocError};
 pub use inject_doc::{inject_doc_in_readme, InjectDocError};
 
 #[derive(Error, Debug)]
-pub enum ManifestError {
-    #[error("failed to read manifest \"{0}\"")]
-    ErrorReadingManifest(PathBuf),
-    #[error("failed to parse toml")]
-    ErrorParsingToml,
-    #[error("no package name")]
-    NoPackageName,
-}
-
-#[derive(PartialEq, Eq, Debug)]
-pub struct Manifest {
-    package_name: String,
-    lib_path: Option<PathBuf>,
-    readme_path: Option<PathBuf>,
-    bin_path: HashMap<String, Option<PathBuf>>,
-}
-
-impl Manifest {
-    pub fn from_file(file_path: impl AsRef<Path>) -> Result<Manifest, ManifestError> {
-        let str: String = std::fs::read_to_string(&file_path)
-            .map_err(|_| ManifestError::ErrorReadingManifest(file_path.as_ref().to_path_buf()))?;
-        Manifest::from_str(&str)
-    }
-}
-
-impl FromStr for Manifest {
-    type Err = ManifestError;
-
-    fn from_str(str: &str) -> Result<Manifest, ManifestError> {
-        let toml: toml::Value = toml::from_str(str).map_err(|_| ManifestError::ErrorParsingToml)?;
-
-        let get_str = |value: &Value, field: &str| -> Option<String> {
-            value.get(field).and_then(toml::Value::as_str).map(ToOwned::to_owned)
-        };
-        let get_str_table = |table: &str, field: &str| -> Option<&str> {
-            toml.get(table).and_then(|v| v.get(field)).and_then(toml::Value::as_str)
-        };
-
-        let mut bin_path: HashMap<String, Option<PathBuf>> = HashMap::new();
-
-        if let Some(bin_table) = toml.get("bin").and_then(toml::Value::as_array) {
-            for bin in bin_table {
-                match (get_str(bin, "name"), get_str(bin, "path")) {
-                    (Some(name), Some(path)) => {
-                        bin_path.insert(name, Some(Path::new(&path).to_path_buf()));
-                    }
-                    (Some(name), None) => {
-                        bin_path.insert(name, None);
-                    }
-                    (None, _) => (),
-                };
-            }
-        }
-
-        toml.get("bin").and_then(toml::Value::as_array).map(|t| t.iter());
-
-        let package_name = get_str_table("package", "name").ok_or(ManifestError::NoPackageName)?;
-
-        Ok(Manifest {
-            package_name: package_name.to_owned(),
-            lib_path: get_str_table("lib", "path").map(|v| Path::new(v).to_path_buf()),
-            readme_path: get_str_table("package", "readme").map(|v| Path::new(v).to_path_buf()),
-            bin_path,
-        })
-    }
-}
-
-#[derive(Error, Debug)]
 pub enum ProjectError {
-    #[error("project root not found")]
-    ProjectRootNotFound,
-    #[error("manifest error: {0}")]
-    ManifestError(ManifestError),
+    #[error("failed to get cargo metadata: {0}")]
+    CargoMetadataError(cargo_metadata::Error),
+    #[error("project has no root package")]
+    ProjectHasNoRootPackage,
 }
 
-impl From<ManifestError> for ProjectError {
-    fn from(e: ManifestError) -> ProjectError {
-        ProjectError::ManifestError(e)
+impl From<cargo_metadata::Error> for ProjectError {
+    fn from(e: cargo_metadata::Error) -> ProjectError {
+        ProjectError::CargoMetadataError(e)
     }
-}
-
-#[derive(PartialEq, Eq, Debug)]
-pub struct Project {
-    manifest: Manifest,
-    directory: PathBuf,
 }
 
 pub fn find_first_file_in_ancestors(dir_path: impl AsRef<Path>, filename: &str) -> Option<PathBuf> {
@@ -133,86 +57,114 @@ pub fn find_first_file_in_ancestors(dir_path: impl AsRef<Path>, filename: &str) 
     None
 }
 
+#[derive(PartialEq, Eq, Debug)]
+pub struct Project {
+    package_name: String,
+    readme_path: Option<PathBuf>,
+    lib_path: Option<PathBuf>,
+    bin_path: HashMap<String, PathBuf>,
+    directory: PathBuf,
+}
+
 impl Project {
-    /// Creates a [`Project`] from a path.  It will ancestor paths until it finds the root of the
-    /// project.
+    /// Creates a [`Project`] the current directory.  It will search ancestor paths until it finds
+    /// the root of the project.
+    pub fn from_current_dir() -> Result<Project, ProjectError> {
+        let cmd = cargo_metadata::MetadataCommand::new();
+
+        Project::from_cargo_metadata_command(&cmd)
+    }
+
     pub fn from_dir(dir_path: impl AsRef<Path>) -> Result<Project, ProjectError> {
-        match find_first_file_in_ancestors(dir_path, "Cargo.toml") {
-            None => Err(ProjectError::ProjectRootNotFound),
-            Some(manifest_file) => Ok(Project {
-                manifest: Manifest::from_file(&manifest_file)?,
-                directory: manifest_file.parent().expect("this should never happen").to_path_buf(),
-            }),
+        let mut cmd = cargo_metadata::MetadataCommand::new();
+
+        cmd.current_dir(dir_path.as_ref());
+
+        Project::from_cargo_metadata_command(&cmd)
+    }
+
+    fn from_cargo_metadata_command(
+        metadata_cmd: &cargo_metadata::MetadataCommand,
+    ) -> Result<Project, ProjectError> {
+        let metadata = metadata_cmd.exec()?;
+        let package = metadata.root_package().ok_or(ProjectError::ProjectHasNoRootPackage)?;
+
+        let lib_packages: Vec<&cargo_metadata::Target> = package
+            .targets
+            .iter()
+            .filter(|target| target.kind.contains(&"lib".to_owned()))
+            .collect();
+
+        assert!(lib_packages.len() <= 1, "more than one lib target");
+
+        let lib_package = lib_packages.first();
+
+        let bin_packages =
+            package.targets.iter().filter(|target| target.kind.contains(&"bin".to_owned()));
+
+        let directory = package
+            .manifest_path
+            .clone()
+            .into_std_path_buf()
+            .parent()
+            .expect("error getting the parent path of the manifest file")
+            .to_path_buf();
+
+        Ok(Project {
+            package_name: package.name.to_owned(),
+            readme_path: package.readme.as_ref().map(|p| p.clone().into_std_path_buf()),
+            lib_path: lib_package.map(|t| t.src_path.clone().into_std_path_buf()),
+            bin_path: bin_packages
+                .map(|t| (t.name.to_owned(), t.src_path.clone().into_std_path_buf()))
+                .collect(),
+            directory,
+        })
+    }
+
+    #[must_use]
+    pub fn get_lib_entryfile_path(&self) -> Option<&Path> {
+        self.lib_path.as_ref().filter(|p| p.is_file()).map(|p| p.as_path())
+    }
+
+    #[must_use]
+    pub fn get_bin_default_entryfile_path(&self) -> Option<&Path> {
+        match self.bin_path.len() {
+            1 => self
+                .bin_path
+                .keys()
+                .next()
+                .and_then(|bin_name| self.get_bin_entryfile_path(&bin_name)),
+            _ => None,
         }
     }
 
     #[must_use]
-    pub fn get_lib_entryfile_path(&self) -> Option<PathBuf> {
-        let default = || Path::new("src").join("lib.rs");
-        let rel_path = self.manifest.lib_path.clone().unwrap_or_else(default);
-        let path = self.directory.join(rel_path);
-
-        match path.is_file() {
-            true => Some(path),
-            false => None,
-        }
-    }
-
-    #[must_use]
-    pub fn get_bin_default_entryfile_path(&self) -> Option<PathBuf> {
-        let rel_path = Path::new("src").join("main.rs");
-        let path = self.directory.join(rel_path);
-
-        match path.is_file() {
-            true => Some(path),
-            false => {
-                // There’s no `src/main.rs`.  If there's only one binary we should select that.
-                match self.manifest.bin_path.len() {
-                    1 => self
-                        .manifest
-                        .bin_path
-                        .keys()
-                        .next()
-                        .and_then(|bin_name| self.get_bin_entryfile_path(&bin_name)),
-                    _ => None,
-                }
-            }
-        }
-    }
-
-    #[must_use]
-    pub fn get_bin_entryfile_path(&self, name: &str) -> Option<PathBuf> {
-        match self.manifest.bin_path.get(name) {
-            Some(maybe_rel_path) => {
-                let default = || Path::new("src").join("bin").join(format!("{}.rs", name));
-                let rel_path = maybe_rel_path.clone().unwrap_or_else(default);
-                let path = self.directory.join(rel_path);
-
-                match path.is_file() {
-                    true => Some(path),
-                    false => None,
-                }
-            }
-            None => None,
-        }
+    pub fn get_bin_entryfile_path(&self, name: &str) -> Option<&Path> {
+        self.bin_path.get(name).filter(|p| p.is_file()).map(|p| p.as_path())
     }
 
     #[must_use]
     pub fn get_readme_path(&self) -> Option<PathBuf> {
-        let default = || Path::new("README.md").to_path_buf();
-        let rel_path = self.manifest.readme_path.clone().unwrap_or_else(default);
-        let path = self.directory.join(rel_path);
-
-        match path.is_file() {
-            true => Some(path),
-            false => None,
-        }
+        self.readme_path
+            .clone()
+            .or_else(|| Some(Path::new("README.md").to_path_buf()))
+            .map(|p| self.directory.join(p))
+            .filter(|p| p.is_file())
     }
 
     #[must_use]
     pub fn get_package_name(&self) -> &str {
-        &self.manifest.package_name
+        &self.package_name
     }
+}
+
+fn project_package_name(manifest_path: impl AsRef<Path>) -> Option<String> {
+    let str: String = std::fs::read_to_string(&manifest_path).ok()?;
+    let toml: toml::Value = toml::from_str(&str).ok()?;
+    let package_name =
+        toml.get("package").and_then(|v| v.get("name")).and_then(toml::Value::as_str)?;
+
+    Some(package_name.to_owned())
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]
@@ -336,66 +288,5 @@ pub fn infer_line_terminator(file_path: impl AsRef<Path>) -> std::io::Result<Lin
         Ok(LineTerminator::CrLf)
     } else {
         Ok(LineTerminator::Lf)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use indoc::indoc;
-    use pretty_assertions::assert_eq;
-    use std::iter::FromIterator;
-
-    #[test]
-    fn test_manifest_from_str() {
-        let str = indoc! { r#"
-            [package]
-            name = "the-crate"
-            readme = "README.md"
-
-            [lib]
-            path = "src/lib.rs"
-            "#
-        };
-
-        let expected_manifest = Manifest {
-            package_name: "the-crate".to_owned(),
-            lib_path: Some(Path::new("src").join("lib.rs").to_path_buf()),
-            readme_path: Some(Path::new("README.md").to_path_buf()),
-            bin_path: HashMap::new(),
-        };
-
-        assert_eq!(Manifest::from_str(str).unwrap(), expected_manifest);
-    }
-
-    #[test]
-    fn test_manifest_from_str_multiple_bin() {
-        let str = indoc! { r#"
-            [package]
-            name = "the-crate"
-
-            [[bin]]
-            name = "foo"
-
-            [[bin]]
-            name = "bar"
-            path = "src/bar.rs"
-            "#
-        };
-
-        let expected_manifest = Manifest {
-            package_name: "the-crate".to_owned(),
-            lib_path: None,
-            readme_path: None,
-            bin_path: HashMap::from_iter(
-                [
-                    ("foo".to_owned(), None),
-                    ("bar".to_owned(), Some(Path::new("src").join("bar.rs"))),
-                ]
-                .into_iter(),
-            ),
-        };
-
-        assert_eq!(Manifest::from_str(str).unwrap(), expected_manifest);
     }
 }

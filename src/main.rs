@@ -239,7 +239,7 @@ fn is_readme_up_to_date(
     Ok(current_readme_raw.as_bytes() == new_readme_raw.as_slice())
 }
 
-fn entrypoint(project: &Project, entrypoint_opt: EntrypointOpt) -> Option<PathBuf> {
+fn entrypoint(project: &Project, entrypoint_opt: EntrypointOpt) -> Option<&Path> {
     match entrypoint_opt {
         EntrypointOpt::Auto => {
             project.get_lib_entryfile_path().or_else(|| project.get_bin_default_entryfile_path())
@@ -314,9 +314,9 @@ fn update_readme(
     }
 }
 
-fn run(current_dir_path: impl AsRef<Path>, options: options::Options) -> Result<(), RunError> {
-    let project: Project = Project::from_dir(current_dir_path)?;
-    let entryfile: PathBuf =
+fn run(options: options::Options) -> Result<(), RunError> {
+    let project: Project = Project::from_current_dir()?;
+    let entryfile: &Path =
         entrypoint(&project, options.entrypoint).ok_or(RunError::NoEntrySourceFile)?;
     let doc: Doc = match extract_doc_from_source_file(&entryfile)? {
         None => return Err(RunError::NoRustdoc),
@@ -359,7 +359,7 @@ fn main() {
 
             let options = options::merge_options(cmd_options, config_file_options);
 
-            if let Err(e) = run(current_dir, options) {
+            if let Err(e) = run(options) {
                 print_error(&e);
 
                 let exit_code = match e {
