@@ -336,6 +336,15 @@ fn system_test_option_cmd_entrypoint_select_bin_custom_path() {
 }
 
 #[test]
+fn system_test_separate_bin_and_lib() {
+    let test_name = "separate_bin_and_lib";
+
+    let option = TestOptions { args: &["--entrypoint", "bin"], ..TestOptions::default() };
+
+    run_test_with_options(test_name, option);
+}
+
+#[test]
 fn system_test_marker_inside_doc() {
     run_test("marker_inside_doc");
 }

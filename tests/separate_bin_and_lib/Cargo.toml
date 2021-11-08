@@ -1,0 +1,12 @@
+[package]
+name = "system_test"
+version = "0.1.0"
+edition = "2018"
+
+[lib]
+name = "thelib"
+path = "src/lib/lib.rs"
+
+[[bin]]
+name = "thebin"
+path = "src/bin/the-binary/main.rs"
