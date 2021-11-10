@@ -163,8 +163,13 @@ configuration file can look like:
 # in the project’s `Cargo.toml`.
 readme-path = "MY-README.md"
 
-# What line terminator to use when updating the README file.  This can be "lf" or "crlf".
+# What line terminator to use when generating the README file.  This can be "lf" or "crlf".
 line-terminator = "lf"
+
+# If you are using a workspace to hold multiple projects, use this to select the project from
+# which to extract the documentation from.  It can be useful to also set `readme-path` to create
+# the README file in the root of the project.
+workspace-project = "subproject"
 
 # The default entrypoint will be `src/lib.rs`.  You can change that in the `entrypoint` table.
 [entrypoint]

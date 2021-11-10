@@ -38,6 +38,8 @@ pub enum ProjectError {
     CargoMetadataError(cargo_metadata::Error),
     #[error("project has no root package")]
     ProjectHasNoRootPackage,
+    #[error("project has no package \"{0}\"")]
+    ProjectHasNoPackage(String),
 }
 
 impl From<cargo_metadata::Error> for ProjectError {
@@ -71,24 +73,36 @@ impl Project {
     /// the root of the project.
     pub fn from_current_dir() -> Result<Project, ProjectError> {
         let cmd = cargo_metadata::MetadataCommand::new();
-
-        Project::from_cargo_metadata_command(&cmd)
-    }
-
-    pub fn from_dir(dir_path: impl AsRef<Path>) -> Result<Project, ProjectError> {
-        let mut cmd = cargo_metadata::MetadataCommand::new();
-
-        cmd.current_dir(dir_path.as_ref());
-
-        Project::from_cargo_metadata_command(&cmd)
-    }
-
-    fn from_cargo_metadata_command(
-        metadata_cmd: &cargo_metadata::MetadataCommand,
-    ) -> Result<Project, ProjectError> {
-        let metadata = metadata_cmd.exec()?;
+        let metadata = cmd.exec()?;
         let package = metadata.root_package().ok_or(ProjectError::ProjectHasNoRootPackage)?;
 
+        Project::from_package(package)
+    }
+
+    fn select_package<'a>(
+        metadata: &'a cargo_metadata::Metadata,
+        package_name: &str,
+    ) -> Option<&'a cargo_metadata::Package> {
+        let package = metadata.packages.iter().find(|package| package.name == package_name)?;
+
+        // We need to make sure the package we found is actually a project of the workspace.
+        match metadata.workspace_members.contains(&package.id) {
+            false => None,
+            true => Some(package),
+        }
+    }
+
+    pub fn from_current_dir_workspace_project(project_name: &str) -> Result<Project, ProjectError> {
+        let cmd = cargo_metadata::MetadataCommand::new();
+        let metadata = cmd.exec()?;
+
+        let package = Project::select_package(&metadata, project_name)
+            .ok_or_else(|| ProjectError::ProjectHasNoPackage(project_name.to_owned()))?;
+
+        Ok(Project::from_package(&package)?)
+    }
+
+    fn from_package(package: &cargo_metadata::Package) -> Result<Project, ProjectError> {
         let lib_packages: Vec<&cargo_metadata::Target> = package
             .targets
             .iter()

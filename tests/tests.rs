@@ -437,3 +437,20 @@ fn system_test_transform_intralinks_stdlib_links() {
 fn system_test_transform_intralinks_crate_name_hyphen() {
     run_test("transform_intralinks_crate_name_hyphen");
 }
+
+#[test]
+fn system_test_option_conf_file_workspace() {
+    run_test("option_conf_file_workspace");
+}
+
+#[test]
+fn system_test_option_cmd_workspace() {
+    let test_name = "option_cmd_workspace";
+
+    let option = TestOptions {
+        args: &["--workspace-project", "otherproj", "--readme-path", "README.md"],
+        ..TestOptions::default()
+    };
+
+    run_test_with_options(test_name, option);
+}

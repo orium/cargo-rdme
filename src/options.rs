@@ -64,6 +64,7 @@ impl Default for EntrypointOpt {
 
 #[derive(Debug)]
 pub struct CmdOptions {
+    workspace_project: Option<String>,
     entrypoint: Option<EntrypointOpt>,
     line_terminator: Option<LineTerminatorOpt>,
     check: bool,
@@ -129,6 +130,13 @@ pub fn cmd_options() -> CmdOptions {
                 .takes_value(true),
         )
         .arg(
+            Arg::with_name("workspace-project")
+                .long("workspace-project")
+                .short("w")
+                .help("project to get the documentation from if your are using workspaces")
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name("check")
                 .long("check")
                 .short("c")
@@ -141,6 +149,8 @@ pub fn cmd_options() -> CmdOptions {
                 .help("force README update, even when there are uncommitted changes"),
         )
         .get_matches_from(get_cmd_args());
+
+    let workspace_project = cmd_opts.value_of("workspace-project").map(ToOwned::to_owned);
 
     let line_terminator: Option<LineTerminatorOpt> = cmd_opts
         .value_of("line-terminator")
@@ -166,6 +176,7 @@ pub fn cmd_options() -> CmdOptions {
     let readme_path = cmd_opts.value_of("readme-path").map(PathBuf::from);
 
     CmdOptions {
+        workspace_project,
         entrypoint,
         line_terminator,
         check: cmd_opts.is_present("check"),
@@ -188,6 +199,7 @@ pub enum ConfigFileOptionsError {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ConfigFileOptions {
+    workspace_project: Option<String>,
     entrypoint: Option<EntrypointOpt>,
     line_terminator: Option<LineTerminatorOpt>,
     readme_path: Option<PathBuf>,
@@ -198,6 +210,9 @@ fn config_file_options_from_str(
 ) -> Result<ConfigFileOptions, ConfigFileOptionsError> {
     let config_toml: toml::Value =
         toml::from_str(config_str).map_err(ConfigFileOptionsError::ErrorParsingToml)?;
+
+    let workspace_project =
+        config_toml.get("workspace-project").and_then(|v| v.as_str()).map(ToOwned::to_owned);
 
     let line_terminator = config_toml
         .get("line-terminator")
@@ -228,7 +243,7 @@ fn config_file_options_from_str(
 
     let readme_path = config_toml.get("readme-path").and_then(|v| v.as_str()).map(PathBuf::from);
 
-    Ok(ConfigFileOptions { entrypoint, line_terminator, readme_path })
+    Ok(ConfigFileOptions { workspace_project, readme_path, line_terminator, entrypoint })
 }
 
 pub fn config_file_options(
@@ -246,6 +261,7 @@ pub fn config_file_options(
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct Options {
+    pub workspace_project: Option<String>,
     pub entrypoint: EntrypointOpt,
     pub line_terminator: LineTerminatorOpt,
     pub check: bool,
@@ -261,6 +277,9 @@ pub fn merge_options(
     let mut config_file_options = config_file_options;
 
     Options {
+        workspace_project: cmd_options
+            .workspace_project
+            .or_else(|| config_file_options.as_mut().and_then(|c| c.workspace_project.take())),
         entrypoint: cmd_options
             .entrypoint
             .or_else(|| config_file_options.as_mut().and_then(|c| c.entrypoint.take()))
@@ -287,7 +306,7 @@ mod tests {
     fn test_config_file_options_from_str() {
         let str = indoc! { r#"
             readme-path = "ReAdMe.md"
-
+            workspace-project = "myproj"
             line-terminator = "crlf"
 
             [entrypoint]
@@ -299,6 +318,7 @@ mod tests {
         let config_file_opts = config_file_options_from_str(str).unwrap();
 
         let expected = ConfigFileOptions {
+            workspace_project: Some("myproj".to_owned()),
             entrypoint: Some(EntrypointOpt::BinName("baz".to_owned())),
             line_terminator: Some(LineTerminatorOpt::CrLf),
             readme_path: Some(PathBuf::from("ReAdMe.md")),
@@ -310,6 +330,7 @@ mod tests {
     #[test]
     fn test_merge_cmd_wins_over_config_file() {
         let cmd_options = CmdOptions {
+            workspace_project: Some("myproj".to_owned()),
             entrypoint: Some(EntrypointOpt::BinDefault),
             line_terminator: Some(LineTerminatorOpt::CrLf),
             check: true,
@@ -317,6 +338,7 @@ mod tests {
             readme_path: Some(PathBuf::from("rEaDmE.md")),
         };
         let config_file_options = ConfigFileOptions {
+            workspace_project: Some("aproj".to_owned()),
             entrypoint: Some(EntrypointOpt::Lib),
             line_terminator: Some(LineTerminatorOpt::Lf),
             readme_path: Some(PathBuf::from("ReAdMe.md")),
@@ -325,6 +347,7 @@ mod tests {
         let options = merge_options(cmd_options, Some(config_file_options));
 
         let expected = Options {
+            workspace_project: Some("myproj".to_owned()),
             entrypoint: EntrypointOpt::BinDefault,
             line_terminator: LineTerminatorOpt::CrLf,
             check: true,

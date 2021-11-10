@@ -174,8 +174,13 @@
 //! # in the project’s `Cargo.toml`.
 //! readme-path = "MY-README.md"
 //!
-//! # What line terminator to use when updating the README file.  This can be "lf" or "crlf".
+//! # What line terminator to use when generating the README file.  This can be "lf" or "crlf".
 //! line-terminator = "lf"
+//!
+//! # If you are using a workspace to hold multiple projects, use this to select the project from
+//! # which to extract the documentation from.  It can be useful to also set `readme-path` to create
+//! # the README file in the root of the project.
+//! workspace-project = "subproject"
 //!
 //! # The default entrypoint will be `src/lib.rs`.  You can change that in the `entrypoint` table.
 //! [entrypoint]
@@ -225,9 +230,9 @@ enum RunError {
     ReadmeError(cargo_rdme::ReadmeError),
     #[error("failed get crate's entry source file")]
     NoEntrySourceFile,
-    #[error("no crate's README file")]
+    #[error("crate's README file not found")]
     NoReadmeFile,
-    #[error("no crate-level rustdoc found")]
+    #[error("crate-level rustdoc not found")]
     NoRustdoc,
     #[error("failed to inject the documentation in the README: {0}")]
     InjectDocError(cargo_rdme::InjectDocError),
@@ -377,7 +382,10 @@ fn update_readme(
 }
 
 fn run(options: options::Options) -> Result<(), RunError> {
-    let project: Project = Project::from_current_dir()?;
+    let project: Project = match options.workspace_project {
+        None => Project::from_current_dir()?,
+        Some(project) => Project::from_current_dir_workspace_project(&project)?,
+    };
     let entryfile: &Path =
         entrypoint(&project, options.entrypoint).ok_or(RunError::NoEntrySourceFile)?;
     let doc: Doc = match extract_doc_from_source_file(&entryfile)? {
