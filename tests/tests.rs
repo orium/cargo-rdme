@@ -174,6 +174,19 @@ fn system_test_multiline_doc() {
 }
 
 #[test]
+fn system_test_option_cmd_override_readme_path() {
+    let test_name = "option_cmd_override_readme_path";
+
+    let option = TestOptions {
+        args: &["--readme-path", "r.md"],
+        readme_filename: "r.md",
+        ..TestOptions::default()
+    };
+
+    run_test_with_options(test_name, option);
+}
+
+#[test]
 fn system_test_option_cmd_line_terminator_lf() {
     let test_name = "option_cmd_line_terminator_lf";
     let readme_template = test_readme_template(test_name);
@@ -197,6 +210,15 @@ fn system_test_option_cmd_line_terminator_crlf() {
     assert_eq!(infer_line_terminator(readme_expected).unwrap(), LineTerminator::CrLf);
 
     let option = TestOptions { args: &["--line-terminator", "crlf"], ..TestOptions::default() };
+
+    run_test_with_options(test_name, option);
+}
+
+#[test]
+fn system_test_option_conf_file_override_readme_path() {
+    let test_name = "option_conf_file_override_readme_path";
+
+    let option = TestOptions { readme_filename: "r.md", ..TestOptions::default() };
 
     run_test_with_options(test_name, option);
 }

@@ -159,6 +159,10 @@ configuration file `.cargo-rdme.toml` in the root of your project.  This is how 
 configuration file can look like:
 
 ```toml
+# Override the README file path.  When this is not set cargo rdme will use the file path defined
+# in the project’s `Cargo.toml`.
+readme-path = "MY-README.md"
+
 # What line terminator to use when updating the README file.  This can be "lf" or "crlf".
 line-terminator = "lf"
 

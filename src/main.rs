@@ -170,6 +170,10 @@
 //! configuration file can look like:
 //!
 //! ```toml
+//! # Override the README file path.  When this is not set cargo rdme will use the file path defined
+//! # in the project’s `Cargo.toml`.
+//! readme-path = "MY-README.md"
+//!
 //! # What line terminator to use when updating the README file.  This can be "lf" or "crlf".
 //! line-terminator = "lf"
 //!
@@ -221,7 +225,7 @@ enum RunError {
     ReadmeError(cargo_rdme::ReadmeError),
     #[error("failed get crate's entry source file")]
     NoEntrySourceFile,
-    #[error("failed get crate's README file")]
+    #[error("no crate's README file")]
     NoReadmeFile,
     #[error("no crate-level rustdoc found")]
     NoRustdoc,
@@ -383,7 +387,15 @@ fn run(options: options::Options) -> Result<(), RunError> {
 
     let doc = transform_doc(&doc, &project, &entryfile)?;
 
-    let readme_path: PathBuf = project.get_readme_path().ok_or(RunError::NoReadmeFile)?;
+    let readme_path: PathBuf = match options.readme_path {
+        None => project.get_readme_path().ok_or(RunError::NoReadmeFile)?,
+        Some(path) => {
+            if !path.is_file() {
+                return Err(RunError::NoReadmeFile);
+            }
+            path
+        }
+    };
     let original_readme: Readme = Readme::from_file(&readme_path)?;
     let new_readme: Readme = inject_doc_in_readme(&original_readme, &doc)?;
 

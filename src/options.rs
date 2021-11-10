@@ -68,6 +68,7 @@ pub struct CmdOptions {
     line_terminator: Option<LineTerminatorOpt>,
     check: bool,
     force: bool,
+    readme_path: Option<PathBuf>,
 }
 
 fn get_cmd_args() -> Vec<OsString> {
@@ -121,6 +122,13 @@ pub fn cmd_options() -> CmdOptions {
                 .possible_values(LineTerminatorOpt::VALUES),
         )
         .arg(
+            Arg::with_name("readme-path")
+                .long("readme-path")
+                .short("r")
+                .help("README file path to use (overrides of what is specified in the project `Cargo.toml`)")
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name("check")
                 .long("check")
                 .short("c")
@@ -155,11 +163,14 @@ pub fn cmd_options() -> CmdOptions {
         None => None,
     };
 
+    let readme_path = cmd_opts.value_of("readme-path").map(PathBuf::from);
+
     CmdOptions {
         entrypoint,
         line_terminator,
         check: cmd_opts.is_present("check"),
         force: cmd_opts.is_present("force"),
+        readme_path,
     }
 }
 
@@ -179,6 +190,7 @@ pub enum ConfigFileOptionsError {
 pub struct ConfigFileOptions {
     entrypoint: Option<EntrypointOpt>,
     line_terminator: Option<LineTerminatorOpt>,
+    readme_path: Option<PathBuf>,
 }
 
 fn config_file_options_from_str(
@@ -214,7 +226,9 @@ fn config_file_options_from_str(
         _ => return Err(ConfigFileOptionsError::InvalidEntrypointTable),
     };
 
-    Ok(ConfigFileOptions { entrypoint, line_terminator })
+    let readme_path = config_toml.get("readme-path").and_then(|v| v.as_str()).map(PathBuf::from);
+
+    Ok(ConfigFileOptions { entrypoint, line_terminator, readme_path })
 }
 
 pub fn config_file_options(
@@ -236,6 +250,7 @@ pub struct Options {
     pub line_terminator: LineTerminatorOpt,
     pub check: bool,
     pub force: bool,
+    pub readme_path: Option<PathBuf>,
 }
 
 #[allow(clippy::needless_pass_by_value)]
@@ -243,10 +258,12 @@ pub fn merge_options(
     cmd_options: CmdOptions,
     config_file_options: Option<ConfigFileOptions>,
 ) -> Options {
+    let mut config_file_options = config_file_options;
+
     Options {
         entrypoint: cmd_options
             .entrypoint
-            .or_else(|| config_file_options.as_ref().and_then(|c| c.entrypoint.clone()))
+            .or_else(|| config_file_options.as_mut().and_then(|c| c.entrypoint.take()))
             .unwrap_or_default(),
         line_terminator: cmd_options
             .line_terminator
@@ -254,6 +271,9 @@ pub fn merge_options(
             .unwrap_or_default(),
         check: cmd_options.check,
         force: cmd_options.force,
+        readme_path: cmd_options
+            .readme_path
+            .or_else(|| config_file_options.as_mut().and_then(|c| c.readme_path.take())),
     }
 }
 
@@ -266,6 +286,8 @@ mod tests {
     #[test]
     fn test_config_file_options_from_str() {
         let str = indoc! { r#"
+            readme-path = "ReAdMe.md"
+
             line-terminator = "crlf"
 
             [entrypoint]
@@ -279,6 +301,7 @@ mod tests {
         let expected = ConfigFileOptions {
             entrypoint: Some(EntrypointOpt::BinName("baz".to_owned())),
             line_terminator: Some(LineTerminatorOpt::CrLf),
+            readme_path: Some(PathBuf::from("ReAdMe.md")),
         };
 
         assert_eq!(config_file_opts, expected);
@@ -291,10 +314,12 @@ mod tests {
             line_terminator: Some(LineTerminatorOpt::CrLf),
             check: true,
             force: true,
+            readme_path: Some(PathBuf::from("rEaDmE.md")),
         };
         let config_file_options = ConfigFileOptions {
             entrypoint: Some(EntrypointOpt::Lib),
             line_terminator: Some(LineTerminatorOpt::Lf),
+            readme_path: Some(PathBuf::from("ReAdMe.md")),
         };
 
         let options = merge_options(cmd_options, Some(config_file_options));
@@ -304,6 +329,7 @@ mod tests {
             line_terminator: LineTerminatorOpt::CrLf,
             check: true,
             force: true,
+            readme_path: Some(PathBuf::from("rEaDmE.md")),
         };
 
         assert_eq!(options, expected);
