@@ -130,7 +130,7 @@ pub fn cmd_options() -> CmdOptions {
             Arg::with_name("force")
                 .long("force")
                 .short("f")
-                .help("force README update, even when there are uncommited changes"),
+                .help("force README update, even when there are uncommitted changes"),
         )
         .get_matches_from(get_cmd_args());
 

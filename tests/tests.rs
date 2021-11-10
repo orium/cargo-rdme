@@ -350,10 +350,10 @@ fn system_test_marker_inside_doc() {
 }
 
 #[test]
-fn system_test_avoid_overwrite_uncommited_readme() {
+fn system_test_avoid_overwrite_uncommitted_readme() {
     use std::fs::File;
 
-    let test_name = "avoid_overwrite_uncommited_readme";
+    let test_name = "avoid_overwrite_uncommitted_readme";
     let readme_path = test_dir(test_name).join("README.md");
 
     let option = TestOptions {

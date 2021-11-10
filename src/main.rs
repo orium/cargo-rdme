@@ -209,7 +209,7 @@ const EXIT_CODE_ERROR: i32 = 1;
 /// Exit code when we run in "check mode" and the README is not up to date.
 const EXIT_CODE_CHECK: i32 = 2;
 /// Exit code we don't update the README because we would overwrite uncommitted changes.
-const EXIT_CODE_README_NOT_UPDATED_UNCOMMITED_CHANGES: i32 = 3;
+const EXIT_CODE_README_NOT_UPDATED_UNCOMMITTED_CHANGES: i32 = 3;
 
 #[derive(Error, Debug)]
 enum RunError {
@@ -229,8 +229,10 @@ enum RunError {
     InjectDocError(cargo_rdme::InjectDocError),
     #[error("IO error: {0}")]
     IOError(std::io::Error),
-    #[error("not updating README: it has uncommited changes (use `--force` to bypass this check)")]
-    ReadmeNotUpdatedUncommitedChanges,
+    #[error(
+        "not updating README: it has uncommitted changes (use `--force` to bypass this check)"
+    )]
+    ReadmeNotUpdatedUncommittedChanges,
     #[error("failed to transform intralinks: {0}")]
     TransformIntraLinkError(IntralinkError),
 }
@@ -362,11 +364,11 @@ fn update_readme(
     new_readme: &Readme,
     readme_path: impl AsRef<Path>,
     line_terminator: LineTerminator,
-    ignore_uncommited_changes: bool,
+    ignore_uncommitted_changes: bool,
 ) -> Result<(), RunError> {
-    match ignore_uncommited_changes || git_is_current(&readme_path).unwrap_or(true) {
+    match ignore_uncommitted_changes || git_is_current(&readme_path).unwrap_or(true) {
         true => Ok(new_readme.write_to_file(&readme_path, line_terminator)?),
-        false => Err(RunError::ReadmeNotUpdatedUncommitedChanges),
+        false => Err(RunError::ReadmeNotUpdatedUncommittedChanges),
     }
 }
 
@@ -428,8 +430,8 @@ fn main() {
                     | RunError::InjectDocError(_)
                     | RunError::TransformIntraLinkError(_)
                     | RunError::IOError(_) => EXIT_CODE_ERROR,
-                    RunError::ReadmeNotUpdatedUncommitedChanges => {
-                        EXIT_CODE_README_NOT_UPDATED_UNCOMMITED_CHANGES
+                    RunError::ReadmeNotUpdatedUncommittedChanges => {
+                        EXIT_CODE_README_NOT_UPDATED_UNCOMMITTED_CHANGES
                     }
                 };
 

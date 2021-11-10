@@ -3,7 +3,7 @@
 ## 0.3.0
 
 * Add `rust` markdown tag to rust code blocks.
-* Avoid overwriting README files with uncommited changes.
+* Avoid overwriting README files with uncommitted changes.
 
 ## 0.2.0
 
