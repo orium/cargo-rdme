@@ -199,9 +199,9 @@ pub enum ConfigFileOptionsError {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ConfigFileOptions {
+    line_terminator: Option<LineTerminatorOpt>,
     workspace_project: Option<String>,
     entrypoint: Option<EntrypointOpt>,
-    line_terminator: Option<LineTerminatorOpt>,
     readme_path: Option<PathBuf>,
 }
 
@@ -212,7 +212,7 @@ fn config_file_options_from_str(
         toml::from_str(config_str).map_err(ConfigFileOptionsError::ErrorParsingToml)?;
 
     let workspace_project =
-        config_toml.get("workspace-project").and_then(|v| v.as_str()).map(ToOwned::to_owned);
+        config_toml.get("workspace-project").and_then(toml::Value::as_str).map(ToOwned::to_owned);
 
     let line_terminator = config_toml
         .get("line-terminator")
@@ -241,9 +241,10 @@ fn config_file_options_from_str(
         _ => return Err(ConfigFileOptionsError::InvalidEntrypointTable),
     };
 
-    let readme_path = config_toml.get("readme-path").and_then(|v| v.as_str()).map(PathBuf::from);
+    let readme_path =
+        config_toml.get("readme-path").and_then(toml::Value::as_str).map(PathBuf::from);
 
-    Ok(ConfigFileOptions { workspace_project, readme_path, line_terminator, entrypoint })
+    Ok(ConfigFileOptions { line_terminator, workspace_project, entrypoint, readme_path })
 }
 
 pub fn config_file_options(

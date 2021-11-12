@@ -76,7 +76,7 @@ impl Project {
         let metadata = cmd.exec()?;
         let package = metadata.root_package().ok_or(ProjectError::ProjectHasNoRootPackage)?;
 
-        Project::from_package(package)
+        Ok(Project::from_package(package))
     }
 
     fn select_package<'a>(
@@ -99,10 +99,10 @@ impl Project {
         let package = Project::select_package(&metadata, project_name)
             .ok_or_else(|| ProjectError::ProjectHasNoPackage(project_name.to_owned()))?;
 
-        Ok(Project::from_package(&package)?)
+        Ok(Project::from_package(package))
     }
 
-    fn from_package(package: &cargo_metadata::Package) -> Result<Project, ProjectError> {
+    fn from_package(package: &cargo_metadata::Package) -> Project {
         let lib_packages: Vec<&cargo_metadata::Target> = package
             .targets
             .iter()
@@ -124,20 +124,20 @@ impl Project {
             .expect("error getting the parent path of the manifest file")
             .to_path_buf();
 
-        Ok(Project {
-            package_name: package.name.to_owned(),
+        Project {
+            package_name: package.name.clone(),
             readme_path: package.readme.as_ref().map(|p| p.clone().into_std_path_buf()),
             lib_path: lib_package.map(|t| t.src_path.clone().into_std_path_buf()),
             bin_path: bin_packages
-                .map(|t| (t.name.to_owned(), t.src_path.clone().into_std_path_buf()))
+                .map(|t| (t.name.clone(), t.src_path.clone().into_std_path_buf()))
                 .collect(),
             directory,
-        })
+        }
     }
 
     #[must_use]
     pub fn get_lib_entryfile_path(&self) -> Option<&Path> {
-        self.lib_path.as_ref().filter(|p| p.is_file()).map(|p| p.as_path())
+        self.lib_path.as_ref().filter(|p| p.is_file()).map(PathBuf::as_path)
     }
 
     #[must_use]
@@ -147,14 +147,14 @@ impl Project {
                 .bin_path
                 .keys()
                 .next()
-                .and_then(|bin_name| self.get_bin_entryfile_path(&bin_name)),
+                .and_then(|bin_name| self.get_bin_entryfile_path(bin_name)),
             _ => None,
         }
     }
 
     #[must_use]
     pub fn get_bin_entryfile_path(&self, name: &str) -> Option<&Path> {
-        self.bin_path.get(name).filter(|p| p.is_file()).map(|p| p.as_path())
+        self.bin_path.get(name).filter(|p| p.is_file()).map(PathBuf::as_path)
     }
 
     #[must_use]
