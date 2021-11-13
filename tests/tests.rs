@@ -3,16 +3,15 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+use cargo_rdme::{infer_line_terminator, LineTerminator};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use cargo_rdme::{infer_line_terminator, LineTerminator};
-
 struct TestOptions {
     readme_filename: &'static str,
     args: &'static [&'static str],
-    expected_exit_status: i32,
+    expected_exit_code: i32,
     check_readme_expected: bool,
     force: bool,
 }
@@ -22,7 +21,7 @@ impl Default for TestOptions {
         TestOptions {
             readme_filename: "README.md",
             args: &[],
-            expected_exit_status: 0,
+            expected_exit_code: 0,
             check_readme_expected: true,
             force: true,
         }
@@ -40,6 +39,107 @@ fn test_readme_template(test_name: &str) -> PathBuf {
 
 fn test_readme_expected(test_name: &str) -> PathBuf {
     test_dir(test_name).join("README-expected.md")
+}
+
+fn is_stderr_terminal() -> bool {
+    atty::is(atty::Stream::Stderr)
+}
+
+fn print_framed(stream: &mut termcolor::Buffer, text: &str) {
+    for line in text.lines() {
+        write!(stream, "┃ {}\n", line).unwrap();
+    }
+}
+
+fn print_stderr_framed(stream: &mut termcolor::Buffer, stderr: &str) {
+    use termcolor::{ColorSpec, WriteColor};
+
+    stream.set_color(ColorSpec::new().set_bold(true)).unwrap();
+    write!(stream, "┏━━━ stderr ━━━━━━\n").unwrap();
+    stream.reset().unwrap();
+    print_framed(stream, stderr);
+    write!(stream, "┗━━━━━━━━━━━━━━━━━\n").unwrap();
+}
+
+fn print_failure_readme_mismatch(
+    expected_readme: &str,
+    got_readme: &str,
+    readme_path: impl AsRef<Path>,
+    expected_readme_path: impl AsRef<Path>,
+    stderr: &str,
+) {
+    use termcolor::{Buffer, Color, ColorSpec, WriteColor};
+
+    let in_ci = std::env::var_os("CI").is_some();
+    let mut stream = match is_stderr_terminal() {
+        true => Buffer::ansi(),
+        false => Buffer::no_color(),
+    };
+
+    stream.reset().unwrap();
+
+    stream.set_color(ColorSpec::new().set_bold(true).set_fg(Some(Color::Red))).unwrap();
+    write!(stream, "The README doesn’t what was expected.").unwrap();
+    stream.reset().unwrap();
+    write!(stream, "\n\n").unwrap();
+    stream.set_color(ColorSpec::new().set_bold(true)).unwrap();
+    write!(stream, "┏━━━ Expected ━━━━\n").unwrap();
+    stream.reset().unwrap();
+    print_framed(&mut stream, expected_readme);
+    stream.set_color(ColorSpec::new().set_bold(true)).unwrap();
+    write!(stream, "┠━━━ Got ━━━━━━━━━\n").unwrap();
+    stream.reset().unwrap();
+    print_framed(&mut stream, got_readme);
+    write!(stream, "┗━━━━━━━━━━━━━━━━━\n").unwrap();
+
+    if !in_ci {
+        write!(stream, "\nSee the diff with `").unwrap();
+        stream.set_color(ColorSpec::new().set_bold(true)).unwrap();
+        write!(
+            stream,
+            "diff {} {}",
+            readme_path.as_ref().display(),
+            expected_readme_path.as_ref().display()
+        )
+        .unwrap();
+        stream.reset().unwrap();
+        write!(stream, "`.\n").unwrap()
+    }
+
+    if !stderr.is_empty() {
+        write!(stream, "\n").unwrap();
+        print_stderr_framed(&mut stream, stderr);
+    }
+
+    stream.flush().unwrap();
+
+    eprintln!("{}", std::str::from_utf8(stream.as_slice()).expect("invalid utf-8"));
+}
+
+fn print_failure_status_code_mismatch(expected_exit_code: i32, got_exit_code: i32, stderr: &str) {
+    use termcolor::{Buffer, Color, ColorSpec, WriteColor};
+
+    let mut stream = match is_stderr_terminal() {
+        true => Buffer::ansi(),
+        false => Buffer::no_color(),
+    };
+
+    stream.reset().unwrap();
+
+    stream.set_color(ColorSpec::new().set_bold(true).set_fg(Some(Color::Red))).unwrap();
+    write!(stream, "Expected code {} but got code {} instead.", expected_exit_code, got_exit_code)
+        .unwrap();
+    stream.reset().unwrap();
+    write!(stream, "\n").unwrap();
+
+    if !stderr.is_empty() {
+        write!(stream, "\n").unwrap();
+        print_stderr_framed(&mut stream, stderr);
+    }
+
+    stream.flush().unwrap();
+
+    eprintln!("{}", std::str::from_utf8(stream.as_slice()).expect("invalid utf-8"));
 }
 
 const BIN_PATH: &'static str = env!(concat!("CARGO_BIN_EXE_", env!("CARGO_PKG_NAME")));
@@ -90,13 +190,11 @@ fn run_test_with_options(test_name: &str, options: TestOptions) {
 
     let stderr = String::from_utf8_lossy(&output.stderr);
 
-    if output.status.code() != Some(options.expected_exit_status) {
-        panic!(
-            "Expected code {} but got code {} instead.\n==== stderr ====\n{}",
-            options.expected_exit_status,
-            output.status.code().map(|c| c.to_string()).unwrap_or("?".to_string()),
-            stderr
-        );
+    let exit_code = output.status.code().expect("no exist code");
+
+    if exit_code != options.expected_exit_code {
+        print_failure_status_code_mismatch(options.expected_exit_code, exit_code, &stderr);
+        panic!("Test {} failed.", test_name);
     }
 
     if options.check_readme_expected {
@@ -104,21 +202,8 @@ fn run_test_with_options(test_name: &str, options: TestOptions) {
         let got = std::fs::read_to_string(&readme).unwrap();
 
         if expected != got {
-            let in_ci = std::env::var_os("CI").is_some();
-
-            let diff_msg = match in_ci {
-                true => format!("==== Expected ====\n{}\n==== Got ====\n{}", expected, got),
-                false => format!(
-                    "See the diff with `diff {} {}`.",
-                    readme.display(),
-                    expected_readme.display()
-                ),
-            };
-
-            panic!(
-                "The generated README does not match what was expected.\n\n{}\n==== stderr ====\n{}",
-                diff_msg, stderr
-            );
+            print_failure_readme_mismatch(&expected, &got, readme, expected_readme, &stderr);
+            panic!("Test {} failed.", test_name);
         } else {
             std::fs::remove_file(readme).unwrap();
         }
@@ -253,7 +338,7 @@ fn system_test_option_cmd_check_ok() {
     let option = TestOptions {
         args: &["--check"],
         check_readme_expected: false,
-        expected_exit_status: 0,
+        expected_exit_code: 0,
         ..TestOptions::default()
     };
 
@@ -266,7 +351,7 @@ fn system_test_option_cmd_check_fail() {
     let option = TestOptions {
         args: &["--check"],
         check_readme_expected: false,
-        expected_exit_status: 2,
+        expected_exit_code: 2,
         ..TestOptions::default()
     };
 
@@ -281,7 +366,7 @@ fn system_test_option_cmd_check_fail_line_terminator() {
     let option = TestOptions {
         args: &["--check"],
         check_readme_expected: false,
-        expected_exit_status: 0,
+        expected_exit_code: 0,
         ..TestOptions::default()
     };
 
@@ -290,7 +375,7 @@ fn system_test_option_cmd_check_fail_line_terminator() {
     let option = TestOptions {
         args: &["--check", "--line-terminator", "crlf"],
         check_readme_expected: false,
-        expected_exit_status: 2,
+        expected_exit_code: 2,
         ..TestOptions::default()
     };
 
@@ -380,7 +465,7 @@ fn system_test_avoid_overwrite_uncommitted_readme() {
 
     let option = TestOptions {
         check_readme_expected: false,
-        expected_exit_status: 3,
+        expected_exit_code: 3,
         force: false,
         ..TestOptions::default()
     };
