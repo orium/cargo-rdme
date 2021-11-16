@@ -23,6 +23,10 @@
 //!
 //! Cargo command to create your README from your crate’s documentation.
 //!
+//! ## Installation
+//!
+//! You can install cargo rdme with cargo by running `cargo install cargo-rdme`.
+//!
 //! ## Usage
 //!
 //! Cargo rdme will insert your crate’s documentation in your README file.  To control where the
@@ -148,7 +152,7 @@
 //!
 //! ```markdown
 //! To check if a number is prime use
-//! [`is_prime`](https://docs.rs/prime/latest/prime/fn.is_prime.html)
+//! [`is_prime`](https://docs.rs/prime/latest/prime/fn.is_prime.html).
 //! ```
 //!
 //! </td>
