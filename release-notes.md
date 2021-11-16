@@ -1,5 +1,14 @@
 # Release notes
 
+## 0.4.0
+
+* Add support for intralinks!
+  * Intralinks are not converted to links to docs.rs in your README file.
+* Add support for workspaces.
+* Add option to override the README file path (command line flag and configuration file).
+* Support code blocks with more than three backticks.
+* Use nice color output for errors and warnings.
+
 ## 0.3.0
 
 * Add `rust` markdown tag to rust code blocks.
