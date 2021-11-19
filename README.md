@@ -190,7 +190,7 @@ information.
 ## Integration with CI
 
 To verify that your README is up to date with your crate’s documentation you can run
-`cargo rdme --check`.  The exit code will be `0` if the README is up to date, or `2` if it’s
-not.
+`cargo rdme --check`.  The exit code will be `0` if the README is up to date, `2` if it’s
+not, or `4` if there were warnings.
 
 <!-- cargo-rdme end -->

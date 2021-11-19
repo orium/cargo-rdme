@@ -359,6 +359,19 @@ fn system_test_option_cmd_check_fail() {
 }
 
 #[test]
+fn system_test_option_cmd_check_fail_because_warnings() {
+    let test_name = "option_cmd_check_fail_because_warnings";
+    let option = TestOptions {
+        args: &["--check"],
+        check_readme_expected: false,
+        expected_exit_code: 4,
+        ..TestOptions::default()
+    };
+
+    run_test_with_options(test_name, option);
+}
+
+#[test]
 fn system_test_option_cmd_check_fail_line_terminator() {
     let test_name = "option_cmd_check_fail_line_terminator";
 

@@ -201,8 +201,8 @@
 //! ## Integration with CI
 //!
 //! To verify that your README is up to date with your crate’s documentation you can run
-//! `cargo rdme --check`.  The exit code will be `0` if the README is up to date, or `2` if it’s
-//! not.
+//! `cargo rdme --check`.  The exit code will be `0` if the README is up to date, `2` if it’s
+//! not, or `4` if there were warnings.
 
 use crate::console::{print_error, print_warning};
 use crate::options::{EntrypointOpt, LineTerminatorOpt};
@@ -212,6 +212,7 @@ use cargo_rdme::{
     Project,
 };
 use cargo_rdme::{Doc, ProjectError, Readme};
+use std::cell::Cell;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
@@ -220,7 +221,9 @@ mod options;
 
 const EXIT_CODE_ERROR: i32 = 1;
 /// Exit code when we run in "check mode" and the README is not up to date.
-const EXIT_CODE_CHECK: i32 = 2;
+const EXIT_CODE_CHECK_MISMATCH: i32 = 2;
+/// Exit code when we run in "check mode" and the README is not up to date.
+const EXIT_CODE_CHECK_WARNINGS: i32 = 4;
 /// Exit code we don't update the README because we would overwrite uncommitted changes.
 const EXIT_CODE_README_NOT_UPDATED_UNCOMMITTED_CHANGES: i32 = 3;
 
@@ -332,11 +335,15 @@ fn line_terminator(
     }
 }
 
+struct Warnings {
+    had_warnings: bool,
+}
+
 fn transform_doc(
     doc: &Doc,
     project: &Project,
     entrypoint: impl AsRef<Path>,
-) -> Result<Doc, RunError> {
+) -> Result<(Doc, Warnings), RunError> {
     use cargo_rdme::transform::{
         DocTransform, DocTransformIntralinks, DocTransformRustMarkdownTag,
         DocTransformRustRemoveComments,
@@ -350,11 +357,13 @@ fn transform_doc(
     // TODO Use `into_ok()` once it is stable (https://github.com/rust-lang/rust/issues/61695).
     let doc = transform.transform(&doc)?;
 
+    let had_warnings = Cell::new(false);
     let transform = DocTransformIntralinks::new(project.get_package_name(), entrypoint, |msg| {
         print_warning(msg);
+        had_warnings.set(true);
     });
 
-    Ok(transform.transform(&doc)?)
+    Ok((transform.transform(&doc)?, Warnings { had_warnings: had_warnings.into_inner() }))
 }
 
 /// Check if the `path` has local changes that were not yet commited.
@@ -397,7 +406,7 @@ fn run(options: options::Options) -> Result<(), RunError> {
         Some(doc) => doc,
     };
 
-    let doc = transform_doc(&doc, &project, &entryfile)?;
+    let (doc, warnings) = transform_doc(&doc, &project, &entryfile)?;
 
     let readme_path: PathBuf = match options.readme_path {
         None => project.get_readme_path().ok_or(RunError::NoReadmeFile)?,
@@ -418,7 +427,12 @@ fn run(options: options::Options) -> Result<(), RunError> {
         true => {
             if !is_readme_up_to_date(&readme_path, &new_readme, line_terminator)? {
                 print_error("README is not up to date.");
-                std::process::exit(EXIT_CODE_CHECK);
+                std::process::exit(EXIT_CODE_CHECK_MISMATCH);
+            }
+
+            if warnings.had_warnings {
+                print_error("README is up to date, but warnings were emitted.");
+                std::process::exit(EXIT_CODE_CHECK_WARNINGS);
             }
 
             Ok(())
