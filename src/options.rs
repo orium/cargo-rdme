@@ -68,6 +68,7 @@ pub struct CmdOptions {
     entrypoint: Option<EntrypointOpt>,
     line_terminator: Option<LineTerminatorOpt>,
     check: bool,
+    no_fail_on_warnings: bool,
     force: bool,
     readme_path: Option<PathBuf>,
 }
@@ -143,6 +144,11 @@ pub fn cmd_options() -> CmdOptions {
                 .help("checks if the README is up to date"),
         )
         .arg(
+        Arg::with_name("no-fail-on-warnings")
+            .long("no-fail-on-warnings")
+            .help("do not exit with a error status code when checking if the README is up to date"),
+        )
+        .arg(
             Arg::with_name("force")
                 .long("force")
                 .short("f")
@@ -180,6 +186,7 @@ pub fn cmd_options() -> CmdOptions {
         entrypoint,
         line_terminator,
         check: cmd_opts.is_present("check"),
+        no_fail_on_warnings: cmd_opts.is_present("no-fail-on-warnings"),
         force: cmd_opts.is_present("force"),
         readme_path,
     }
@@ -266,6 +273,7 @@ pub struct Options {
     pub entrypoint: EntrypointOpt,
     pub line_terminator: LineTerminatorOpt,
     pub check: bool,
+    pub no_fail_on_warnings: bool,
     pub force: bool,
     pub readme_path: Option<PathBuf>,
 }
@@ -290,6 +298,7 @@ pub fn merge_options(
             .or_else(|| config_file_options.as_ref().and_then(|c| c.line_terminator))
             .unwrap_or_default(),
         check: cmd_options.check,
+        no_fail_on_warnings: cmd_options.no_fail_on_warnings,
         force: cmd_options.force,
         readme_path: cmd_options
             .readme_path
@@ -335,6 +344,7 @@ mod tests {
             entrypoint: Some(EntrypointOpt::BinDefault),
             line_terminator: Some(LineTerminatorOpt::CrLf),
             check: true,
+            no_fail_on_warnings: true,
             force: true,
             readme_path: Some(PathBuf::from("rEaDmE.md")),
         };
@@ -352,6 +362,7 @@ mod tests {
             entrypoint: EntrypointOpt::BinDefault,
             line_terminator: LineTerminatorOpt::CrLf,
             check: true,
+            no_fail_on_warnings: true,
             force: true,
             readme_path: Some(PathBuf::from("rEaDmE.md")),
         };

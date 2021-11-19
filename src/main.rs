@@ -430,7 +430,7 @@ fn run(options: options::Options) -> Result<(), RunError> {
                 std::process::exit(EXIT_CODE_CHECK_MISMATCH);
             }
 
-            if warnings.had_warnings {
+            if warnings.had_warnings && !options.no_fail_on_warnings {
                 print_error("README is up to date, but warnings were emitted.");
                 std::process::exit(EXIT_CODE_CHECK_WARNINGS);
             }
