@@ -1,5 +1,10 @@
 # Release notes
 
+## 0.5.0
+
+* Fail on `--check` if there were warnings.
+  * Add command line option to not fail on warnigs.
+
 ## 0.4.0
 
 * Add support for intralinks!
