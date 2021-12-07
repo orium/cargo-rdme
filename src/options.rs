@@ -13,10 +13,7 @@ const PROJECT_NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug)]
-pub struct InvalidOptValue {
-    got: String,
-    expected: &'static [&'static str],
-}
+pub struct InvalidOptValue;
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum LineTerminatorOpt {
@@ -43,7 +40,7 @@ impl FromStr for LineTerminatorOpt {
             "auto" => Ok(LineTerminatorOpt::Auto),
             "lf" => Ok(LineTerminatorOpt::Lf),
             "crlf" => Ok(LineTerminatorOpt::CrLf),
-            _ => Err(InvalidOptValue { got: s.to_owned(), expected: LineTerminatorOpt::VALUES }),
+            _ => Err(InvalidOptValue),
         }
     }
 }
