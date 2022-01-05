@@ -93,9 +93,8 @@ fn get_cmd_args() -> Vec<OsString> {
 pub fn cmd_options() -> CmdOptions {
     use clap::{App, Arg};
 
-    #[allow(clippy::needless_pass_by_value)]
-    fn validator_entrypoint(value: String) -> Result<(), String> {
-        match value.as_str() {
+    fn validator_entrypoint(value: &str) -> Result<(), String> {
+        match value {
             "auto" | "lib" | "bin" => Ok(()),
             v if v.starts_with("bin:") && v.len() > "bin:".len() => Ok(()),
             _ => Err(format!("invalid value \"{}\"", value)),
@@ -105,50 +104,50 @@ pub fn cmd_options() -> CmdOptions {
     let cmd_opts = App::new(PROJECT_NAME)
         .version(VERSION)
         .about("Create the README from your crate’s documentation.")
-        .version_short("v")
+        .mut_arg("version", |a| a.short('v'))
         .arg(
-            Arg::with_name("entrypoint")
+            Arg::new("entrypoint")
                 .long("entrypoint")
                 .help("selects the source code entrypoint of the crate (e.g. auto, lib, bin, bin:<name>)")
                 .takes_value(true)
                 .validator(validator_entrypoint),
         )
         .arg(
-            Arg::with_name("line-terminator")
+            Arg::new("line-terminator")
                 .long("line-terminator")
                 .help("line terminator to use when writing the README file")
                 .takes_value(true)
                 .possible_values(LineTerminatorOpt::VALUES),
         )
         .arg(
-            Arg::with_name("readme-path")
+            Arg::new("readme-path")
                 .long("readme-path")
-                .short("r")
+                .short('r')
                 .help("README file path to use (overrides of what is specified in the project `Cargo.toml`)")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("workspace-project")
+            Arg::new("workspace-project")
                 .long("workspace-project")
-                .short("w")
+                .short('w')
                 .help("project to get the documentation from if your are using workspaces")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("check")
+            Arg::new("check")
                 .long("check")
-                .short("c")
+                .short('c')
                 .help("checks if the README is up to date"),
         )
         .arg(
-        Arg::with_name("no-fail-on-warnings")
+        Arg::new("no-fail-on-warnings")
             .long("no-fail-on-warnings")
             .help("do not exit with a error status code when checking if the README is up to date"),
         )
         .arg(
-            Arg::with_name("force")
+            Arg::new("force")
                 .long("force")
-                .short("f")
+                .short('f')
                 .help("force README update, even when there are uncommitted changes"),
         )
         .get_matches_from(get_cmd_args());
