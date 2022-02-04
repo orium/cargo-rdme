@@ -33,7 +33,7 @@ cargo test  --features fatal-warnings
 echo 'Checking the benchmarks:'
 cargo bench --features fatal-warnings -- --test
 echo 'Checking documentation:'
-cargo doc   --features fatal-warnings
+cargo doc   --features fatal-warnings --no-deps
 
 echo 'Checking links:'
 cargo deadlinks
