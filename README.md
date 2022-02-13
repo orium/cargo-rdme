@@ -182,6 +182,12 @@ type = "bin"
 # When you set type to "bin" the entrypoint default to `src/main.rs`.  If you have binary targets
 # specified in your cargo manifest you can select them by name with `bin-name`.
 bin-name = "my-bin-name"
+
+[intralinks]
+# Defines the base url to use in intralinks urls.  The default value is `https://docs.rs`.
+docs-rs-base-url = "https://mydocs.rs"
+# Defines the version to use in intralinks urls.  The default value is `latest`.
+docs-rs-version = "1.0.0"
 ```
 
 These setting can be overridden with command line flags.  Run `cargo rdme --help` for more

@@ -4,6 +4,7 @@
  */
 
 use cargo_rdme::find_first_file_in_ancestors;
+use cargo_rdme::transform::{IntralinksConfig, IntralinksDocsRsConfig};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -206,6 +207,7 @@ pub struct ConfigFileOptions {
     workspace_project: Option<String>,
     entrypoint: Option<EntrypointOpt>,
     readme_path: Option<PathBuf>,
+    intralinks: Option<IntralinksConfig>,
 }
 
 fn config_file_options_from_str(
@@ -247,7 +249,27 @@ fn config_file_options_from_str(
     let readme_path =
         config_toml.get("readme-path").and_then(toml::Value::as_str).map(PathBuf::from);
 
-    Ok(ConfigFileOptions { line_terminator, workspace_project, entrypoint, readme_path })
+    let intralinks_table = config_toml.get("intralinks").and_then(toml::Value::as_table);
+
+    let intralinks_docs_rs_base_url =
+        intralinks_table.and_then(|t| t.get("docs-rs-base-url")).and_then(toml::Value::as_str);
+    let intralinks_docs_rs_version =
+        intralinks_table.and_then(|t| t.get("docs-rs-version")).and_then(toml::Value::as_str);
+
+    let intralinks = intralinks_table.map(|_| IntralinksConfig {
+        docs_rs: IntralinksDocsRsConfig {
+            docs_rs_base_url: intralinks_docs_rs_base_url.map(ToOwned::to_owned),
+            docs_rs_version: intralinks_docs_rs_version.map(ToOwned::to_owned),
+        },
+    });
+
+    Ok(ConfigFileOptions {
+        line_terminator,
+        workspace_project,
+        entrypoint,
+        readme_path,
+        intralinks,
+    })
 }
 
 pub fn config_file_options(
@@ -272,6 +294,7 @@ pub struct Options {
     pub no_fail_on_warnings: bool,
     pub force: bool,
     pub readme_path: Option<PathBuf>,
+    pub intralinks: Option<IntralinksConfig>,
 }
 
 #[allow(clippy::needless_pass_by_value)]
@@ -299,12 +322,14 @@ pub fn merge_options(
         readme_path: cmd_options
             .readme_path
             .or_else(|| config_file_options.as_mut().and_then(|c| c.readme_path.take())),
+        intralinks: config_file_options.as_mut().and_then(|c| c.intralinks.take()),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cargo_rdme::transform::IntralinksDocsRsConfig;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
 
@@ -318,6 +343,10 @@ mod tests {
             [entrypoint]
             type = "bin"
             bin-name = "baz"
+
+            [intralinks]
+            docs-rs-base-url = "https://internaldocs.rs"
+            docs-rs-version = "1.0.0"
             "#
         };
 
@@ -328,6 +357,12 @@ mod tests {
             entrypoint: Some(EntrypointOpt::BinName("baz".to_owned())),
             line_terminator: Some(LineTerminatorOpt::CrLf),
             readme_path: Some(PathBuf::from("ReAdMe.md")),
+            intralinks: Some(IntralinksConfig {
+                docs_rs: IntralinksDocsRsConfig {
+                    docs_rs_base_url: Some("https://internaldocs.rs".to_owned()),
+                    docs_rs_version: Some("1.0.0".to_owned()),
+                },
+            }),
         };
 
         assert_eq!(config_file_opts, expected);
@@ -349,6 +384,12 @@ mod tests {
             entrypoint: Some(EntrypointOpt::Lib),
             line_terminator: Some(LineTerminatorOpt::Lf),
             readme_path: Some(PathBuf::from("ReAdMe.md")),
+            intralinks: Some(IntralinksConfig {
+                docs_rs: IntralinksDocsRsConfig {
+                    docs_rs_base_url: Some("https://internaldocs.rs".to_owned()),
+                    docs_rs_version: Some("1.0.0".to_owned()),
+                },
+            }),
         };
 
         let options = merge_options(cmd_options, Some(config_file_options));
@@ -361,6 +402,12 @@ mod tests {
             no_fail_on_warnings: true,
             force: true,
             readme_path: Some(PathBuf::from("rEaDmE.md")),
+            intralinks: Some(IntralinksConfig {
+                docs_rs: IntralinksDocsRsConfig {
+                    docs_rs_base_url: Some("https://internaldocs.rs".to_owned()),
+                    docs_rs_version: Some("1.0.0".to_owned()),
+                },
+            }),
         };
 
         assert_eq!(options, expected);

@@ -40,10 +40,22 @@ impl From<module_walker::ModuleWalkError> for IntralinkError {
     }
 }
 
+#[derive(Default, Debug, PartialEq, Eq, Clone)]
+pub struct IntralinksDocsRsConfig {
+    pub docs_rs_base_url: Option<String>,
+    pub docs_rs_version: Option<String>,
+}
+
+#[derive(Default, Debug, PartialEq, Eq, Clone)]
+pub struct IntralinksConfig {
+    pub docs_rs: IntralinksDocsRsConfig,
+}
+
 pub struct DocTransformIntralinks<F> {
     crate_name: String,
     entrypoint: PathBuf,
     emit_warning: F,
+    config: IntralinksConfig,
 }
 
 impl<F> DocTransformIntralinks<F>
@@ -54,11 +66,13 @@ where
         crate_name: impl Into<String>,
         entrypoint: impl AsRef<Path>,
         emit_warning: F,
+        config: Option<IntralinksConfig>,
     ) -> DocTransformIntralinks<F> {
         DocTransformIntralinks {
             crate_name: crate_name.into(),
             entrypoint: entrypoint.as_ref().to_path_buf(),
             emit_warning,
+            config: config.unwrap_or_default(),
         }
     }
 }
@@ -78,8 +92,13 @@ where
         }
 
         let symbols_type = load_symbols_type(&self.entrypoint, &symbols, &self.emit_warning)?;
-        let new_doc =
-            rewrite_markdown_links(doc, &symbols_type, &self.crate_name, &self.emit_warning);
+        let new_doc = rewrite_markdown_links(
+            doc,
+            &symbols_type,
+            &self.crate_name,
+            &self.emit_warning,
+            &self.config,
+        );
 
         Ok(new_doc)
     }
@@ -437,7 +456,12 @@ fn extract_markdown_intralink_symbols(doc: &Doc) -> HashSet<FQIdentifier> {
     symbols
 }
 
-fn documentation_url(symbol: &FQIdentifier, typ: SymbolType, crate_name: &str) -> String {
+fn documentation_url(
+    symbol: &FQIdentifier,
+    typ: SymbolType,
+    crate_name: &str,
+    config: &IntralinksDocsRsConfig,
+) -> String {
     let package_name = crate_name.replace("-", "_");
     let mut path = symbol.path();
 
@@ -448,7 +472,11 @@ fn documentation_url(symbol: &FQIdentifier, typ: SymbolType, crate_name: &str) -
             format!("https://doc.rust-lang.org/stable/{}/", std_crate_name)
         }
         FQIdentifierAnchor::Crate => {
-            format!("https://docs.rs/{}/latest/{}/", crate_name, package_name)
+            let base_url =
+                config.docs_rs_base_url.as_ref().map_or("https://docs.rs", String::as_str);
+            let version = config.docs_rs_version.as_ref().map_or("latest", String::as_str);
+
+            format!("{}/{}/{}/{}/", base_url, crate_name, version, package_name)
         }
     };
 
@@ -485,6 +513,7 @@ fn rewrite_markdown_links(
     symbols_type: &HashMap<FQIdentifier, SymbolType>,
     crate_name: &str,
     emit_warning: &impl Fn(&str),
+    config: &IntralinksConfig,
 ) -> Doc {
     use crate::transform::utils::ItemOrOther;
 
@@ -498,7 +527,7 @@ fn rewrite_markdown_links(
                 match FQIdentifier::from_string(link) {
                     Some(symbol) if symbols_type.contains_key(&symbol) => {
                         let typ = symbols_type[&symbol];
-                        let new_link = documentation_url(&symbol, typ, crate_name);
+                        let new_link = documentation_url(&symbol, typ, crate_name, &config.docs_rs);
 
                         new_doc.push_str(&format!("[{}]({}{})", text, new_link, fragment));
                     }
@@ -928,22 +957,31 @@ mod tests {
 
     #[test]
     fn test_documentation_url() {
-        let link = documentation_url(&identifier("crate"), SymbolType::Crate, "foobini");
+        let config = IntralinksDocsRsConfig::default();
+
+        let link = documentation_url(&identifier("crate"), SymbolType::Crate, "foobini", &config);
         assert_eq!(link, "https://docs.rs/foobini/latest/foobini/");
 
-        let link = documentation_url(&identifier("crate::AStruct"), SymbolType::Struct, "foobini");
+        let link = documentation_url(
+            &identifier("crate::AStruct"),
+            SymbolType::Struct,
+            "foobini",
+            &config,
+        );
         assert_eq!(link, "https://docs.rs/foobini/latest/foobini/struct.AStruct.html");
 
-        let link = documentation_url(&identifier("crate::amodule"), SymbolType::Mod, "foobini");
+        let link =
+            documentation_url(&identifier("crate::amodule"), SymbolType::Mod, "foobini", &config);
         assert_eq!(link, "https://docs.rs/foobini/latest/foobini/amodule/");
 
-        let link = documentation_url(&identifier("::std"), SymbolType::Crate, "foobini");
+        let link = documentation_url(&identifier("::std"), SymbolType::Crate, "foobini", &config);
         assert_eq!(link, "https://doc.rust-lang.org/stable/std/");
 
         let link = documentation_url(
             &identifier("::std::collections::HashMap"),
             SymbolType::Struct,
             "foobini",
+            &config,
         );
         assert_eq!(link, "https://doc.rust-lang.org/stable/std/collections/struct.HashMap.html");
 
@@ -951,8 +989,18 @@ mod tests {
             &FQIdentifier::from_string("crate::amodule").unwrap(),
             SymbolType::Mod,
             "foo-bar-mumble",
+            &config,
         );
         assert_eq!(link, "https://docs.rs/foo-bar-mumble/latest/foo_bar_mumble/amodule/");
+
+        let config = IntralinksDocsRsConfig {
+            docs_rs_base_url: Some("https://docs.company.rs".to_owned()),
+            docs_rs_version: Some("1.0.0".to_owned()),
+        };
+
+        let link =
+            documentation_url(&identifier("crate::Foo"), SymbolType::Struct, "foobini", &config);
+        assert_eq!(link, "https://docs.company.rs/foobini/1.0.0/foobini/struct.Foo.html");
     }
 
     #[test]
@@ -1010,8 +1058,13 @@ mod tests {
         .into_iter()
         .collect();
 
-        let new_readme =
-            rewrite_markdown_links(&Doc::from_str(doc), &symbols_type, "foobini", &mut |_| ());
+        let new_readme = rewrite_markdown_links(
+            &Doc::from_str(doc),
+            &symbols_type,
+            "foobini",
+            &mut |_| (),
+            &IntralinksConfig::default(),
+        );
         let expected = indoc! { r"
             # Foobini
 

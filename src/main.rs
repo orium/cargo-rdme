@@ -193,6 +193,12 @@
 //! # When you set type to "bin" the entrypoint default to `src/main.rs`.  If you have binary targets
 //! # specified in your cargo manifest you can select them by name with `bin-name`.
 //! bin-name = "my-bin-name"
+//!
+//! [intralinks]
+//! # Defines the base url to use in intralinks urls.  The default value is `https://docs.rs`.
+//! docs-rs-base-url = "https://mydocs.rs"
+//! # Defines the version to use in intralinks urls.  The default value is `latest`.
+//! docs-rs-version = "1.0.0"
 //! ```
 //!
 //! These setting can be overridden with command line flags.  Run `cargo rdme --help` for more
@@ -313,14 +319,14 @@ fn is_readme_up_to_date(
     Ok(current_readme_raw.as_bytes() == new_readme_raw.as_slice())
 }
 
-fn entrypoint(project: &Project, entrypoint_opt: EntrypointOpt) -> Option<&Path> {
+fn entrypoint<'a>(project: &'a Project, entrypoint_opt: &EntrypointOpt) -> Option<&'a Path> {
     match entrypoint_opt {
         EntrypointOpt::Auto => {
             project.get_lib_entryfile_path().or_else(|| project.get_bin_default_entryfile_path())
         }
         EntrypointOpt::Lib => project.get_lib_entryfile_path(),
         EntrypointOpt::BinDefault => project.get_bin_default_entryfile_path(),
-        EntrypointOpt::BinName(name) => project.get_bin_entryfile_path(&name),
+        EntrypointOpt::BinName(name) => project.get_bin_entryfile_path(name),
     }
 }
 
@@ -343,6 +349,7 @@ fn transform_doc(
     doc: &Doc,
     project: &Project,
     entrypoint: impl AsRef<Path>,
+    options: &options::Options,
 ) -> Result<(Doc, Warnings), RunError> {
     use cargo_rdme::transform::{
         DocTransform, DocTransformIntralinks, DocTransformRustMarkdownTag,
@@ -358,10 +365,15 @@ fn transform_doc(
     let doc = transform.transform(&doc)?;
 
     let had_warnings = Cell::new(false);
-    let transform = DocTransformIntralinks::new(project.get_package_name(), entrypoint, |msg| {
-        print_warning(msg);
-        had_warnings.set(true);
-    });
+    let transform = DocTransformIntralinks::new(
+        project.get_package_name(),
+        entrypoint,
+        |msg| {
+            print_warning(msg);
+            had_warnings.set(true);
+        },
+        options.intralinks.clone(),
+    );
 
     Ok((transform.transform(&doc)?, Warnings { had_warnings: had_warnings.into_inner() }))
 }
@@ -397,16 +409,16 @@ fn update_readme(
 fn run(options: options::Options) -> Result<(), RunError> {
     let project: Project = match options.workspace_project {
         None => Project::from_current_dir()?,
-        Some(project) => Project::from_current_dir_workspace_project(&project)?,
+        Some(ref project) => Project::from_current_dir_workspace_project(project)?,
     };
     let entryfile: &Path =
-        entrypoint(&project, options.entrypoint).ok_or(RunError::NoEntrySourceFile)?;
+        entrypoint(&project, &options.entrypoint).ok_or(RunError::NoEntrySourceFile)?;
     let doc: Doc = match extract_doc_from_source_file(&entryfile)? {
         None => return Err(RunError::NoRustdoc),
         Some(doc) => doc,
     };
 
-    let (doc, warnings) = transform_doc(&doc, &project, &entryfile)?;
+    let (doc, warnings) = transform_doc(&doc, &project, &entryfile, &options)?;
 
     let readme_path: PathBuf = match options.readme_path {
         None => project.get_readme_path().ok_or(RunError::NoReadmeFile)?,
