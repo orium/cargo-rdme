@@ -35,7 +35,7 @@ fn print_nocolor(
     message: impl Display,
 ) -> std::io::Result<()> {
     stream.reset()?;
-    write!(stream, "{}: {}", level, message)?;
+    writeln!(stream, "{}: {}", level, message)?;
     stream.flush()
 }
 
