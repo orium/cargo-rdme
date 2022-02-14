@@ -1,5 +1,12 @@
 # Release notes
 
+## 0.6.0
+
+* Added option for intralinks to be stripped.
+* Base url and version in intralinks urls can now be configured.
+* Strip intralinks when we cannot generate a correct link.
+* Fix warning and error output when not writing to a tty.
+
 ## 0.5.0
 
 * Fail on `--check` if there were warnings.
