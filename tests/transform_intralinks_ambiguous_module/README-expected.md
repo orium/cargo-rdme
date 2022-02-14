@@ -1,11 +1,11 @@
 <!-- cargo-rdme start -->
 
 [a MyStruct](https://docs.rs/integration_test/latest/integration_test/a/struct.MyStruct.html)
-[skip](crate::a::Skip)
+skip
 [b MyStruct](https://docs.rs/integration_test/latest/integration_test/b/struct.MyStruct.html)
-[skip](crate::b::MyStructTest)
+skip
 [c MyStruct](https://docs.rs/integration_test/latest/integration_test/c/struct.MyStruct.html)
-[skip](crate::c::MyStructTest)
+skip
 [d Same is a trait](https://docs.rs/integration_test/latest/integration_test/d/trait.Same.html)
 
 <!-- cargo-rdme end -->

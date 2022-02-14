@@ -514,6 +514,12 @@ fn documentation_url(
     link
 }
 
+enum MarkdownLinkAction {
+    Link(String),
+    Preserve,
+    Strip,
+}
+
 fn markdown_link(
     link: &str,
     link_fragment: &str,
@@ -522,19 +528,21 @@ fn markdown_link(
     crate_name: &str,
     emit_warning: &impl Fn(&str),
     config: &IntralinksConfig,
-) -> Option<String> {
+) -> MarkdownLinkAction {
     match FQIdentifier::from_string(link) {
         Some(symbol) if symbols_type.contains_key(&symbol) => {
             let typ = symbols_type[&symbol];
             let new_link = documentation_url(&symbol, typ, crate_name, &config.docs_rs);
 
-            Some(format!("[{}]({}{})", link_text, new_link, link_fragment))
+            MarkdownLinkAction::Link(format!("[{}]({}{})", link_text, new_link, link_fragment))
         }
         Some(symbol) => {
             emit_warning(&format!("Could not find definition of `{}`.", symbol));
-            None
+
+            // This was an intralink, but we were not able to generate a link.
+            MarkdownLinkAction::Strip
         }
-        _ => None,
+        _ => MarkdownLinkAction::Preserve,
     }
 }
 
@@ -554,7 +562,7 @@ fn rewrite_markdown_links(
             ItemOrOther::Item(MarkdownInlineLink { text, link }) => {
                 let (link, fragment): (&str, &str) = split_link_fragment(&link);
 
-                let markdown_link: Option<String> = match config.strip_links.unwrap_or(false) {
+                let markdown_link: MarkdownLinkAction = match config.strip_links.unwrap_or(false) {
                     false => markdown_link(
                         link,
                         fragment,
@@ -564,16 +572,21 @@ fn rewrite_markdown_links(
                         emit_warning,
                         config,
                     ),
-                    true => FQIdentifier::from_string(link).map(|_| text.clone()),
+                    true => match FQIdentifier::from_string(link) {
+                        None => MarkdownLinkAction::Preserve,
+                        Some(_) => MarkdownLinkAction::Strip,
+                    },
                 };
 
                 match markdown_link {
-                    None => {
-                        // Keep the original markdown link.
+                    MarkdownLinkAction::Link(markdown_link) => {
+                        new_doc.push_str(&markdown_link);
+                    }
+                    MarkdownLinkAction::Preserve => {
                         new_doc.push_str(&format!("[{}]({}{})", text, link, fragment));
                     }
-                    Some(markdown_link) => {
-                        new_doc.push_str(&markdown_link);
+                    MarkdownLinkAction::Strip => {
+                        new_doc.push_str(&text);
                     }
                 }
             }
@@ -1108,7 +1121,7 @@ mod tests {
             This [beautiful crate](https://docs.rs/foobini/latest/foobini/) is cool because it contains [modules](https://docs.rs/foobini/latest/foobini/amodule/)
             and some other [stuff](https://en.wikipedia.org/wiki/Stuff) as well.
 
-            This link is [broken](crate::broken) and this is [not supported](::foo::bar), but this
+            This link is broken and this is not supported, but this
             should [wor\\k \[fi\]le](f\\i\(n\)e).
 
             Go ahead and check all the [structs in foo](https://docs.rs/foobini/latest/foobini/foo/#structs) specifically

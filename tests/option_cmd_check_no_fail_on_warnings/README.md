@@ -2,6 +2,6 @@
 
 # My crate
 
-This is a crate that does nothing [doesnotexist](crate::doesnotexist).
+This is a crate that does nothing doesnotexist.
 
 <!-- cargo-rdme end -->
