@@ -18,6 +18,7 @@
 #![allow(clippy::non_ascii_literal)]
 #![allow(clippy::enum_variant_names)]
 #![allow(clippy::new_without_default)]
+#![allow(clippy::struct_excessive_bools)]
 // Note: If you change this remember to update `README.md`.  To do so run `cargo run`.
 //! # Cargo rdme
 //!
@@ -199,6 +200,8 @@
 //! docs-rs-base-url = "https://mydocs.rs"
 //! # Defines the version to use in intralinks urls.  The default value is `latest`.
 //! docs-rs-version = "1.0.0"
+//! # If this is set the intralinks will be stripping in the README file.
+//! strip-links = false
 //! ```
 //!
 //! These setting can be overridden with command line flags.  Run `cargo rdme --help` for more

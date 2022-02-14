@@ -49,6 +49,7 @@ pub struct IntralinksDocsRsConfig {
 #[derive(Default, Debug, PartialEq, Eq, Clone)]
 pub struct IntralinksConfig {
     pub docs_rs: IntralinksDocsRsConfig,
+    pub strip_links: Option<bool>,
 }
 
 pub struct DocTransformIntralinks<F> {
@@ -91,7 +92,12 @@ where
             return Ok(doc.clone());
         }
 
-        let symbols_type = load_symbols_type(&self.entrypoint, &symbols, &self.emit_warning)?;
+        // We only load symbols type information when we need them.
+        let symbols_type = match self.config.strip_links.unwrap_or(false) {
+            false => load_symbols_type(&self.entrypoint, &symbols, &self.emit_warning)?,
+            true => HashMap::new(),
+        };
+
         let new_doc = rewrite_markdown_links(
             doc,
             &symbols_type,
@@ -508,6 +514,30 @@ fn documentation_url(
     link
 }
 
+fn markdown_link(
+    link: &str,
+    link_fragment: &str,
+    link_text: &str,
+    symbols_type: &HashMap<FQIdentifier, SymbolType>,
+    crate_name: &str,
+    emit_warning: &impl Fn(&str),
+    config: &IntralinksConfig,
+) -> Option<String> {
+    match FQIdentifier::from_string(link) {
+        Some(symbol) if symbols_type.contains_key(&symbol) => {
+            let typ = symbols_type[&symbol];
+            let new_link = documentation_url(&symbol, typ, crate_name, &config.docs_rs);
+
+            Some(format!("[{}]({}{})", link_text, new_link, link_fragment))
+        }
+        Some(symbol) => {
+            emit_warning(&format!("Could not find definition of `{}`.", symbol));
+            None
+        }
+        _ => None,
+    }
+}
+
 fn rewrite_markdown_links(
     doc: &Doc,
     symbols_type: &HashMap<FQIdentifier, SymbolType>,
@@ -524,20 +554,26 @@ fn rewrite_markdown_links(
             ItemOrOther::Item(MarkdownInlineLink { text, link }) => {
                 let (link, fragment): (&str, &str) = split_link_fragment(&link);
 
-                match FQIdentifier::from_string(link) {
-                    Some(symbol) if symbols_type.contains_key(&symbol) => {
-                        let typ = symbols_type[&symbol];
-                        let new_link = documentation_url(&symbol, typ, crate_name, &config.docs_rs);
+                let markdown_link: Option<String> = match config.strip_links.unwrap_or(false) {
+                    false => markdown_link(
+                        link,
+                        fragment,
+                        &text,
+                        symbols_type,
+                        crate_name,
+                        emit_warning,
+                        config,
+                    ),
+                    true => FQIdentifier::from_string(link).map(|_| text.clone()),
+                };
 
-                        new_doc.push_str(&format!("[{}]({}{})", text, new_link, fragment));
-                    }
-
-                    r => {
-                        if let Some(symbol) = r {
-                            emit_warning(&format!("Could not find definition of `{}`.", symbol));
-                        }
-
+                match markdown_link {
+                    None => {
+                        // Keep the original markdown link.
                         new_doc.push_str(&format!("[{}]({}{})", text, link, fragment));
+                    }
+                    Some(markdown_link) => {
+                        new_doc.push_str(&markdown_link);
                     }
                 }
             }
@@ -1043,7 +1079,7 @@ mod tests {
             should [wor\\k \[fi\]le](f\\i\(n\)e).
 
             Go ahead and check all the [structs in foo](crate::foo#structs) specifically
-            [this one](crate::foo::BestStruct)
+            [this one](crate::foo::BestStruct).  Also, this is a nice function: [copy](::std::fs::copy).
 
             [![BestStruct doc](https://example.com/image.png)](crate::foo::BestStruct)
             "
@@ -1054,6 +1090,7 @@ mod tests {
             (identifier("crate::amodule"), SymbolType::Mod),
             (identifier("crate::foo"), SymbolType::Mod),
             (identifier("crate::foo::BestStruct"), SymbolType::Struct),
+            (identifier("::std::fs::copy"), SymbolType::Fn),
         ]
         .into_iter()
         .collect();
@@ -1075,9 +1112,62 @@ mod tests {
             should [wor\\k \[fi\]le](f\\i\(n\)e).
 
             Go ahead and check all the [structs in foo](https://docs.rs/foobini/latest/foobini/foo/#structs) specifically
-            [this one](https://docs.rs/foobini/latest/foobini/foo/struct.BestStruct.html)
+            [this one](https://docs.rs/foobini/latest/foobini/foo/struct.BestStruct.html).  Also, this is a nice function: [copy](https://doc.rust-lang.org/stable/std/fs/fn.copy.html).
 
             [![BestStruct doc](https://example.com/image.png)](https://docs.rs/foobini/latest/foobini/foo/struct.BestStruct.html)
+            "
+        };
+
+        assert_eq!(new_readme.as_string(), expected);
+    }
+
+    #[test]
+    fn test_rewrite_markdown_links_strip_links() {
+        let doc = indoc! { r"
+            # Foobini
+
+            This [beautiful crate](crate) is cool because it contains [modules](crate::amodule)
+            and some other [stuff](https://en.wikipedia.org/wiki/Stuff) as well.
+
+            This link is [broken](crate::broken) and this is [not supported](::foo::bar), but this
+            should [wor\\k \[fi\]le](f\\i\(n\)e).
+
+            Go ahead and check all the [structs in foo](crate::foo#structs) specifically
+            [this one](crate::foo::BestStruct).  Also, this is a nice function: [copy](::std::fs::copy).
+
+            [![BestStruct doc](https://example.com/image.png)](crate::foo::BestStruct)
+            "
+        };
+
+        let symbols_type: HashMap<FQIdentifier, SymbolType> = [
+            (identifier("crate"), SymbolType::Crate),
+            (identifier("crate::amodule"), SymbolType::Mod),
+            (identifier("crate::foo"), SymbolType::Mod),
+            (identifier("crate::foo::BestStruct"), SymbolType::Struct),
+        ]
+        .into_iter()
+        .collect();
+
+        let new_readme = rewrite_markdown_links(
+            &Doc::from_str(doc),
+            &symbols_type,
+            "foobini",
+            &mut |_| (),
+            &IntralinksConfig { strip_links: Some(true), ..std::default::Default::default() },
+        );
+        let expected = indoc! { r"
+            # Foobini
+
+            This beautiful crate is cool because it contains modules
+            and some other [stuff](https://en.wikipedia.org/wiki/Stuff) as well.
+
+            This link is broken and this is not supported, but this
+            should [wor\\k \[fi\]le](f\\i\(n\)e).
+
+            Go ahead and check all the structs in foo specifically
+            this one.  Also, this is a nice function: copy.
+
+            ![BestStruct doc](https://example.com/image.png)
             "
         };
 

@@ -575,3 +575,17 @@ fn system_test_option_conf_file_intralinks_docs_rs_base_url() {
 fn system_test_option_conf_file_intralinks_docs_rs_version() {
     run_test("option_conf_file_intralinks_docs_rs_version");
 }
+
+#[test]
+fn system_test_option_conf_file_intralinks_strip_links() {
+    run_test("option_conf_file_intralinks_strip_links");
+}
+
+#[test]
+fn system_test_option_cmd_intralinks_strip_links() {
+    let test_name = "option_cmd_intralinks_strip_links";
+
+    let option = TestOptions { args: &["--intralinks-strip-links"], ..TestOptions::default() };
+
+    run_test_with_options(test_name, option);
+}

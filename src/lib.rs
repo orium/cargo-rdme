@@ -18,6 +18,7 @@
 #![allow(clippy::non_ascii_literal)]
 #![allow(clippy::enum_variant_names)]
 #![allow(clippy::new_without_default)]
+#![allow(clippy::struct_excessive_bools)]
 
 use crate::markdown::{Markdown, MarkdownError};
 use std::collections::HashMap;

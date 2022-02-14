@@ -67,6 +67,7 @@ pub struct CmdOptions {
     line_terminator: Option<LineTerminatorOpt>,
     check: bool,
     no_fail_on_warnings: bool,
+    intralinks_strip_links: bool,
     force: bool,
     readme_path: Option<PathBuf>,
 }
@@ -146,6 +147,11 @@ pub fn cmd_options() -> CmdOptions {
             .help("do not exit with a error status code when checking if the README is up to date"),
         )
         .arg(
+        Arg::new("intralinks-strip-links")
+            .long("intralinks-strip-links")
+            .help("remove the intralinks"),
+    )
+        .arg(
             Arg::new("force")
                 .long("force")
                 .short('f')
@@ -184,6 +190,7 @@ pub fn cmd_options() -> CmdOptions {
         line_terminator,
         check: cmd_opts.is_present("check"),
         no_fail_on_warnings: cmd_opts.is_present("no-fail-on-warnings"),
+        intralinks_strip_links: cmd_opts.is_present("intralinks-strip-links"),
         force: cmd_opts.is_present("force"),
         readme_path,
     }
@@ -255,12 +262,15 @@ fn config_file_options_from_str(
         intralinks_table.and_then(|t| t.get("docs-rs-base-url")).and_then(toml::Value::as_str);
     let intralinks_docs_rs_version =
         intralinks_table.and_then(|t| t.get("docs-rs-version")).and_then(toml::Value::as_str);
+    let intralinks_strip_links =
+        intralinks_table.and_then(|t| t.get("strip-links")).and_then(toml::Value::as_bool);
 
     let intralinks = intralinks_table.map(|_| IntralinksConfig {
         docs_rs: IntralinksDocsRsConfig {
             docs_rs_base_url: intralinks_docs_rs_base_url.map(ToOwned::to_owned),
             docs_rs_version: intralinks_docs_rs_version.map(ToOwned::to_owned),
         },
+        strip_links: intralinks_strip_links,
     });
 
     Ok(ConfigFileOptions {
@@ -322,7 +332,25 @@ pub fn merge_options(
         readme_path: cmd_options
             .readme_path
             .or_else(|| config_file_options.as_mut().and_then(|c| c.readme_path.take())),
-        intralinks: config_file_options.as_mut().and_then(|c| c.intralinks.take()),
+        intralinks: Some(IntralinksConfig {
+            docs_rs: IntralinksDocsRsConfig {
+                docs_rs_base_url: config_file_options
+                    .as_mut()
+                    .and_then(|c| c.intralinks.as_mut())
+                    .and_then(|il| il.docs_rs.docs_rs_base_url.take()),
+                docs_rs_version: config_file_options
+                    .as_mut()
+                    .and_then(|c| c.intralinks.as_mut())
+                    .and_then(|il| il.docs_rs.docs_rs_version.take()),
+            },
+            strip_links: match cmd_options.intralinks_strip_links {
+                true => Some(true),
+                false => config_file_options
+                    .as_ref()
+                    .and_then(|c| c.intralinks.as_ref())
+                    .and_then(|il| il.strip_links),
+            },
+        }),
     }
 }
 
@@ -347,6 +375,7 @@ mod tests {
             [intralinks]
             docs-rs-base-url = "https://internaldocs.rs"
             docs-rs-version = "1.0.0"
+            strip-links = true
             "#
         };
 
@@ -362,6 +391,7 @@ mod tests {
                     docs_rs_base_url: Some("https://internaldocs.rs".to_owned()),
                     docs_rs_version: Some("1.0.0".to_owned()),
                 },
+                strip_links: Some(true),
             }),
         };
 
@@ -376,6 +406,7 @@ mod tests {
             line_terminator: Some(LineTerminatorOpt::CrLf),
             check: true,
             no_fail_on_warnings: true,
+            intralinks_strip_links: true,
             force: true,
             readme_path: Some(PathBuf::from("rEaDmE.md")),
         };
@@ -389,6 +420,7 @@ mod tests {
                     docs_rs_base_url: Some("https://internaldocs.rs".to_owned()),
                     docs_rs_version: Some("1.0.0".to_owned()),
                 },
+                strip_links: Some(false),
             }),
         };
 
@@ -407,6 +439,7 @@ mod tests {
                     docs_rs_base_url: Some("https://internaldocs.rs".to_owned()),
                     docs_rs_version: Some("1.0.0".to_owned()),
                 },
+                strip_links: Some(true),
             }),
         };
 

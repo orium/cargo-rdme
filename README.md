@@ -188,6 +188,8 @@ bin-name = "my-bin-name"
 docs-rs-base-url = "https://mydocs.rs"
 # Defines the version to use in intralinks urls.  The default value is `latest`.
 docs-rs-version = "1.0.0"
+# If this is set the intralinks will be stripping in the README file.
+strip-links = false
 ```
 
 These setting can be overridden with command line flags.  Run `cargo rdme --help` for more
