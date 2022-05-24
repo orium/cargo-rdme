@@ -42,7 +42,7 @@ proc-macro2 = { version = "1.0.36", features = ["span-locations"] }
 pulldown-cmark = "0.9.1"
 itertools = "0.10.3"
 clap = "3.0.14"
-git2 = "0.13.25"
+git2 = "0.14.4"
 atty = "0.2.14"
 termcolor = "1.1.2"
 cargo_metadata = "0.14.1"
