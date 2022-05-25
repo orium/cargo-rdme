@@ -93,7 +93,7 @@ fn get_cmd_args() -> Vec<OsString> {
 }
 
 pub fn cmd_options() -> CmdOptions {
-    use clap::{App, Arg};
+    use clap::{Arg, Command};
 
     fn validator_entrypoint(value: &str) -> Result<(), String> {
         match value {
@@ -103,7 +103,7 @@ pub fn cmd_options() -> CmdOptions {
         }
     }
 
-    let cmd_opts = App::new(PROJECT_NAME)
+    let cmd_opts = Command::new(PROJECT_NAME)
         .version(VERSION)
         .about("Create the README from your crate’s documentation.")
         .mut_arg("version", |a| a.short('v'))

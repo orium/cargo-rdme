@@ -468,7 +468,7 @@ fn documentation_url(
     crate_name: &str,
     config: &IntralinksDocsRsConfig,
 ) -> String {
-    let package_name = crate_name.replace("-", "_");
+    let package_name = crate_name.replace('-', "_");
     let mut path = symbol.path();
 
     let mut link = match symbol.anchor {

@@ -42,7 +42,7 @@ fn process_code_block(new_doc_str: &mut String, code_block: &str) {
             // Lines starting with `##` are not comments, that is a way to intentionally start a
             // line with `#`.  See https://github.com/rust-lang/rust/pull/41785.
             match line.trim_start().starts_with("##") {
-                true => new_doc_str.push_str(&line.replacen("#", "", 1)),
+                true => new_doc_str.push_str(&line.replacen('#', "", 1)),
                 false => new_doc_str.push_str(line),
             }
 
