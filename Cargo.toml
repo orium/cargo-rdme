@@ -38,7 +38,7 @@ codecov = { repository = "orium/cargo-rdme", branch = "master", service = "githu
 toml = "0.5.8"
 thiserror = "1.0.30"
 syn = { version = "1.0.86", features = ["full", "extra-traits"] }
-proc-macro2 = { version = "1.0.36", features = ["span-locations"] }
+proc-macro2 = { version = "1.0.40", features = ["span-locations"] }
 pulldown-cmark = "0.9.1"
 itertools = "0.10.3"
 clap = "3.0.14"
