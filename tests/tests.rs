@@ -215,34 +215,34 @@ fn run_test(test_name: &str) {
 }
 
 #[test]
-fn system_test_simple_single_marker() {
+fn integration_test_simple_single_marker() {
     run_test("simple_single_marker");
 }
 
 #[test]
-fn system_test_simple_single_marker_no_footer() {
+fn integration_test_simple_single_marker_no_footer() {
     run_test("simple_single_marker_no_footer");
 }
 
 #[test]
-fn system_test_simple_start_end_marker() {
+fn integration_test_simple_start_end_marker() {
     run_test("simple_start_end_marker");
 }
 
 #[test]
-fn system_test_custom_lib_path() {
+fn integration_test_custom_lib_path() {
     run_test("custom_lib_path");
 }
 
 #[test]
-fn system_test_custom_readme_path() {
+fn integration_test_custom_readme_path() {
     let option = TestOptions { readme_filename: "READ-ME.md", ..TestOptions::default() };
 
     run_test_with_options("custom_readme_path", option);
 }
 
 #[test]
-fn system_test_line_terminator_crlf() {
+fn integration_test_line_terminator_crlf() {
     let test_name = "line_terminator_crlf";
     let readme_template = test_readme_template(test_name);
     let readme_expected = test_readme_expected(test_name);
@@ -254,12 +254,12 @@ fn system_test_line_terminator_crlf() {
 }
 
 #[test]
-fn system_test_multiline_doc() {
+fn integration_test_multiline_doc() {
     run_test("multiline_doc");
 }
 
 #[test]
-fn system_test_option_cmd_override_readme_path() {
+fn integration_test_option_cmd_override_readme_path() {
     let test_name = "option_cmd_override_readme_path";
 
     let option = TestOptions {
@@ -272,7 +272,7 @@ fn system_test_option_cmd_override_readme_path() {
 }
 
 #[test]
-fn system_test_option_cmd_line_terminator_lf() {
+fn integration_test_option_cmd_line_terminator_lf() {
     let test_name = "option_cmd_line_terminator_lf";
     let readme_template = test_readme_template(test_name);
     let readme_expected = test_readme_expected(test_name);
@@ -286,7 +286,7 @@ fn system_test_option_cmd_line_terminator_lf() {
 }
 
 #[test]
-fn system_test_option_cmd_line_terminator_crlf() {
+fn integration_test_option_cmd_line_terminator_crlf() {
     let test_name = "option_cmd_line_terminator_crlf";
     let readme_template = test_readme_template(test_name);
     let readme_expected = test_readme_expected(test_name);
@@ -300,7 +300,7 @@ fn system_test_option_cmd_line_terminator_crlf() {
 }
 
 #[test]
-fn system_test_option_conf_file_override_readme_path() {
+fn integration_test_option_conf_file_override_readme_path() {
     let test_name = "option_conf_file_override_readme_path";
 
     let option = TestOptions { readme_filename: "r.md", ..TestOptions::default() };
@@ -309,7 +309,7 @@ fn system_test_option_conf_file_override_readme_path() {
 }
 
 #[test]
-fn system_test_option_conf_file_line_terminator_lf() {
+fn integration_test_option_conf_file_line_terminator_lf() {
     let test_name = "option_conf_file_line_terminator_lf";
     let readme_template = test_readme_template(test_name);
     let readme_expected = test_readme_expected(test_name);
@@ -321,7 +321,7 @@ fn system_test_option_conf_file_line_terminator_lf() {
 }
 
 #[test]
-fn system_test_option_conf_file_line_terminator_crlf() {
+fn integration_test_option_conf_file_line_terminator_crlf() {
     let test_name = "option_conf_file_line_terminator_crlf";
     let readme_template = test_readme_template(test_name);
     let readme_expected = test_readme_expected(test_name);
@@ -333,7 +333,7 @@ fn system_test_option_conf_file_line_terminator_crlf() {
 }
 
 #[test]
-fn system_test_option_cmd_check_ok() {
+fn integration_test_option_cmd_check_ok() {
     let test_name = "option_cmd_check_ok";
     let option = TestOptions {
         args: &["--check"],
@@ -346,7 +346,7 @@ fn system_test_option_cmd_check_ok() {
 }
 
 #[test]
-fn system_test_option_cmd_check_fail() {
+fn integration_test_option_cmd_check_fail() {
     let test_name = "option_cmd_check_fail";
     let option = TestOptions {
         args: &["--check"],
@@ -359,7 +359,7 @@ fn system_test_option_cmd_check_fail() {
 }
 
 #[test]
-fn system_test_option_cmd_check_fail_because_warnings() {
+fn integration_test_option_cmd_check_fail_because_warnings() {
     let test_name = "option_cmd_check_fail_because_warnings";
     let option = TestOptions {
         args: &["--check"],
@@ -372,7 +372,7 @@ fn system_test_option_cmd_check_fail_because_warnings() {
 }
 
 #[test]
-fn system_test_option_cmd_check_no_fail_on_warnings() {
+fn integration_test_option_cmd_check_no_fail_on_warnings() {
     let test_name = "option_cmd_check_no_fail_on_warnings";
     let option = TestOptions {
         args: &["--check", "--no-fail-on-warnings"],
@@ -385,7 +385,7 @@ fn system_test_option_cmd_check_no_fail_on_warnings() {
 }
 
 #[test]
-fn system_test_option_cmd_check_fail_line_terminator() {
+fn integration_test_option_cmd_check_fail_line_terminator() {
     let test_name = "option_cmd_check_fail_line_terminator";
 
     // First check that the test would pass without the line terminator override.
@@ -409,32 +409,32 @@ fn system_test_option_cmd_check_fail_line_terminator() {
 }
 
 #[test]
-fn system_test_entrypoint_bin_crate() {
+fn integration_test_entrypoint_bin_crate() {
     run_test("entrypoint_bin_crate");
 }
 
 #[test]
-fn system_test_entrypoint_bin_lib_crate_lib_wins() {
+fn integration_test_entrypoint_bin_lib_crate_lib_wins() {
     run_test("entrypoint_bin_lib_crate_lib_wins");
 }
 
 #[test]
-fn system_test_option_conf_file_entrypoint_bin() {
+fn integration_test_option_conf_file_entrypoint_bin() {
     run_test("option_conf_file_entrypoint_bin");
 }
 
 #[test]
-fn system_test_option_conf_file_entrypoint_select_bin() {
+fn integration_test_option_conf_file_entrypoint_select_bin() {
     run_test("option_conf_file_entrypoint_select_bin");
 }
 
 #[test]
-fn system_test_option_conf_file_entrypoint_select_bin_custom_path() {
+fn integration_test_option_conf_file_entrypoint_select_bin_custom_path() {
     run_test("option_conf_file_entrypoint_select_bin_custom_path");
 }
 
 #[test]
-fn system_test_option_cmd_entrypoint_bin() {
+fn integration_test_option_cmd_entrypoint_bin() {
     let test_name = "option_cmd_entrypoint_bin";
 
     let option = TestOptions { args: &["--entrypoint", "bin"], ..TestOptions::default() };
@@ -443,7 +443,7 @@ fn system_test_option_cmd_entrypoint_bin() {
 }
 
 #[test]
-fn system_test_option_cmd_entrypoint_select_bin_single() {
+fn integration_test_option_cmd_entrypoint_select_bin_single() {
     let test_name = "option_cmd_entrypoint_select_bin_single";
     let option = TestOptions { args: &["--entrypoint", "bin"], ..TestOptions::default() };
 
@@ -451,7 +451,7 @@ fn system_test_option_cmd_entrypoint_select_bin_single() {
 }
 
 #[test]
-fn system_test_option_cmd_entrypoint_select_bin() {
+fn integration_test_option_cmd_entrypoint_select_bin() {
     let test_name = "option_cmd_entrypoint_select_bin";
 
     let option = TestOptions { args: &["--entrypoint", "bin:foo"], ..TestOptions::default() };
@@ -460,7 +460,7 @@ fn system_test_option_cmd_entrypoint_select_bin() {
 }
 
 #[test]
-fn system_test_option_cmd_entrypoint_select_bin_custom_path() {
+fn integration_test_option_cmd_entrypoint_select_bin_custom_path() {
     let test_name = "option_cmd_entrypoint_select_bin_custom_path";
 
     let option = TestOptions { args: &["--entrypoint", "bin:foo"], ..TestOptions::default() };
@@ -469,7 +469,7 @@ fn system_test_option_cmd_entrypoint_select_bin_custom_path() {
 }
 
 #[test]
-fn system_test_separate_bin_and_lib() {
+fn integration_test_separate_bin_and_lib() {
     let test_name = "separate_bin_and_lib";
 
     let option = TestOptions { args: &["--entrypoint", "bin"], ..TestOptions::default() };
@@ -478,12 +478,12 @@ fn system_test_separate_bin_and_lib() {
 }
 
 #[test]
-fn system_test_marker_inside_doc() {
+fn integration_test_marker_inside_doc() {
     run_test("marker_inside_doc");
 }
 
 #[test]
-fn system_test_avoid_overwrite_uncommitted_readme() {
+fn integration_test_avoid_overwrite_uncommitted_readme() {
     use std::fs::File;
 
     let test_name = "avoid_overwrite_uncommitted_readme";
@@ -510,52 +510,52 @@ fn system_test_avoid_overwrite_uncommitted_readme() {
 }
 
 #[test]
-fn system_test_transform_rust_code_block_remove_comments() {
+fn integration_test_transform_rust_code_block_remove_comments() {
     run_test("transform_rust_code_block_remove_comments");
 }
 
 #[test]
-fn system_test_transform_rust_code_block_add_markdown_tag() {
+fn integration_test_transform_rust_code_block_add_markdown_tag() {
     run_test("transform_rust_code_block_add_markdown_tag");
 }
 
 #[test]
-fn system_test_transform_rust_code_nested_fenced_blocks() {
+fn integration_test_transform_rust_code_nested_fenced_blocks() {
     run_test("transform_rust_code_nested_fenced_blocks");
 }
 
 #[test]
-fn system_test_transform_intralinks_simple() {
+fn integration_test_transform_intralinks_simple() {
     run_test("transform_intralinks_simple");
 }
 
 #[test]
-fn system_test_transform_intralinks_module_walk() {
+fn integration_test_transform_intralinks_module_walk() {
     run_test("transform_intralinks_module_walk");
 }
 
 #[test]
-fn system_test_transform_intralinks_ambiguous_module() {
+fn integration_test_transform_intralinks_ambiguous_module() {
     run_test("transform_intralinks_ambiguous_module");
 }
 
 #[test]
-fn system_test_transform_intralinks_stdlib_links() {
+fn integration_test_transform_intralinks_stdlib_links() {
     run_test("transform_intralinks_stdlib_links");
 }
 
 #[test]
-fn system_test_transform_intralinks_crate_name_hyphen() {
+fn integration_test_transform_intralinks_crate_name_hyphen() {
     run_test("transform_intralinks_crate_name_hyphen");
 }
 
 #[test]
-fn system_test_option_conf_file_workspace() {
+fn integration_test_option_conf_file_workspace() {
     run_test("option_conf_file_workspace");
 }
 
 #[test]
-fn system_test_option_cmd_workspace() {
+fn integration_test_option_cmd_workspace() {
     let test_name = "option_cmd_workspace";
 
     let option = TestOptions {
@@ -567,22 +567,22 @@ fn system_test_option_cmd_workspace() {
 }
 
 #[test]
-fn system_test_option_conf_file_intralinks_docs_rs_base_url() {
+fn integration_test_option_conf_file_intralinks_docs_rs_base_url() {
     run_test("option_conf_file_intralinks_docs_rs_base_url");
 }
 
 #[test]
-fn system_test_option_conf_file_intralinks_docs_rs_version() {
+fn integration_test_option_conf_file_intralinks_docs_rs_version() {
     run_test("option_conf_file_intralinks_docs_rs_version");
 }
 
 #[test]
-fn system_test_option_conf_file_intralinks_strip_links() {
+fn integration_test_option_conf_file_intralinks_strip_links() {
     run_test("option_conf_file_intralinks_strip_links");
 }
 
 #[test]
-fn system_test_option_cmd_intralinks_strip_links() {
+fn integration_test_option_cmd_intralinks_strip_links() {
     let test_name = "option_cmd_intralinks_strip_links";
 
     let option = TestOptions { args: &["--intralinks-strip-links"], ..TestOptions::default() };
@@ -591,6 +591,6 @@ fn system_test_option_cmd_intralinks_strip_links() {
 }
 
 #[test]
-fn system_test_heading_level_auto_bump() {
+fn integration_test_heading_level_auto_bump() {
     run_test("heading_level_auto_bump");
 }

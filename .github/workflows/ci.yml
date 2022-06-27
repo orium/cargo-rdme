@@ -27,7 +27,7 @@ jobs:
           toolchain: stable
           override: true
           default: true
-          # We need to install the source of the standard library for the system tests to check that links
+          # We need to install the source of the standard library for the integration tests to check that links
           # to the standard library are correctly generated.
           components: rust-src, rustfmt
 
