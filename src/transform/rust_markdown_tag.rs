@@ -3,8 +3,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use crate::transform::utils::{rust_code_block_iterator, ItemOrOther};
+use crate::transform::utils::rust_code_block_iterator;
 use crate::transform::DocTransform;
+use crate::utils::ItemOrOther;
 use crate::Doc;
 use std::convert::Infallible;
 

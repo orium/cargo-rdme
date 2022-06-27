@@ -589,3 +589,8 @@ fn system_test_option_cmd_intralinks_strip_links() {
 
     run_test_with_options(test_name, option);
 }
+
+#[test]
+fn system_test_heading_level_auto_bump() {
+    run_test("heading_level_auto_bump");
+}

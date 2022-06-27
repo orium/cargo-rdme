@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+use crate::utils::{ItemOrOther, MarkdownItemIterator, Span};
 use crate::{Doc, Readme};
 use thiserror::Error;
 
@@ -10,44 +11,88 @@ const MARKER_RDME: &str = "<!-- cargo-rdme -->";
 const MARKER_RDME_START: &str = "<!-- cargo-rdme start -->";
 const MARKER_RDME_END: &str = "<!-- cargo-rdme end -->";
 
-#[derive(PartialEq, Eq, Debug)]
-enum CargoRdmeLine<'a> {
-    Line(&'a str),
-    MarkerCargoRdme,
-    MarkerCargoRdmeStart,
-    MarkerCargoRdmeEnd,
+#[derive(PartialEq, Eq, Clone, Debug)]
+struct Heading<'a> {
+    level: u8,
+    text: &'a str,
 }
 
-fn cargo_rdme_line_iterator(readme: &Readme) -> impl Iterator<Item = CargoRdmeLine<'_>> {
+#[derive(PartialEq, Eq, Clone, Debug)]
+enum ReadmeLine<'a> {
+    Heading(Heading<'a>, Span),
+    MarkerCargoRdme(Span),
+    MarkerCargoRdmeStart(Span),
+    MarkerCargoRdmeEnd(Span),
+}
+
+fn readme_line_iterator(readme: &Readme) -> MarkdownItemIterator<ReadmeLine> {
+    use pulldown_cmark::{Event, Options, Parser, Tag};
+
+    let source = readme.as_string();
+    let parser = Parser::new_ext(source, Options::all());
+
+    let is_line_start =
+        |start| start == 0 || source[0..start].chars().rev().find(|&c| c != ' ') == Some('\n');
     let mut depth = 0;
 
-    readme.lines().map(move |line| {
-        let trimmed_line = line.strip_suffix('\r').unwrap_or(line).trim();
+    let iter = parser.into_offset_iter().filter_map(move |(event, range)| match event {
+        Event::Start(Tag::Heading(level, ..)) => Some((
+            range.clone().into(),
+            ReadmeLine::Heading(
+                Heading { level: level as u8, text: &source[range.start..range.end] },
+                range.into(),
+            ),
+        )),
+        Event::Html(ref html) if is_line_start(range.start) => {
+            let trimmed_line = html.strip_suffix('\r').unwrap_or_else(|| html.as_ref()).trim();
 
-        match trimmed_line {
-            MARKER_RDME if depth == 0 => CargoRdmeLine::MarkerCargoRdme,
-            MARKER_RDME_START if depth == 0 => {
-                depth += 1;
-                CargoRdmeLine::MarkerCargoRdmeStart
+            match trimmed_line {
+                MARKER_RDME if depth == 0 => {
+                    Some((range.clone().into(), ReadmeLine::MarkerCargoRdme(range.into())))
+                }
+                MARKER_RDME_START if depth == 0 => {
+                    depth += 1;
+                    Some((range.clone().into(), ReadmeLine::MarkerCargoRdmeStart(range.into())))
+                }
+                MARKER_RDME_END if depth <= 1 => {
+                    depth -= 1;
+                    Some((range.clone().into(), ReadmeLine::MarkerCargoRdmeEnd(range.into())))
+                }
+                MARKER_RDME_START => {
+                    depth += 1;
+                    None
+                }
+                MARKER_RDME_END => {
+                    depth -= 1;
+                    None
+                }
+                _ => None,
             }
-            MARKER_RDME_END if depth == 1 => {
-                depth -= 1;
-                CargoRdmeLine::MarkerCargoRdmeEnd
-            }
-            MARKER_RDME_START => {
-                depth += 1;
-                CargoRdmeLine::Line(line)
-            }
-            MARKER_RDME_END => {
-                depth -= 1;
-                CargoRdmeLine::Line(line)
-            }
-            _ => CargoRdmeLine::Line(line),
         }
-    })
+        _ => None,
+    });
+
+    MarkdownItemIterator::new(source, iter)
 }
 
-#[derive(Error, Debug)]
+fn doc_heading_iterator(doc: &Doc) -> MarkdownItemIterator<Heading> {
+    use pulldown_cmark::{Event, Options, Parser, Tag};
+
+    let source = doc.as_string();
+    let parser = Parser::new_ext(source, Options::all());
+
+    let iter = parser.into_offset_iter().filter_map(move |(event, range)| match event {
+        Event::Start(Tag::Heading(level, ..)) => Some((
+            range.clone().into(),
+            Heading { level: level as u8, text: &source[range.start..range.end] },
+        )),
+        _ => None,
+    });
+
+    MarkdownItemIterator::new(source, iter)
+}
+
+#[derive(Error, Eq, PartialEq, Debug)]
 pub enum InjectDocError {
     #[error("unexpected end marker at line {line_number}")]
     UnexpectedMarkerCargoRdmeEnd { line_number: usize },
@@ -55,34 +100,67 @@ pub enum InjectDocError {
     UnmatchedMarkerCargoRdmeStart,
 }
 
-pub fn inject_doc_in_readme(readme: &Readme, doc: &Doc) -> Result<Readme, InjectDocError> {
-    fn inject(new_readme: &mut Vec<String>, doc: &Doc) {
-        new_readme.push(MARKER_RDME_START.to_owned());
-        new_readme.push("".to_owned());
-        new_readme.extend(doc.lines().map(ToOwned::to_owned));
-        new_readme.push("".to_owned());
-        new_readme.push(MARKER_RDME_END.to_owned());
+fn bump_heading_level(doc: &Doc, level_bump: u8) -> Doc {
+    let mut new_doc = String::with_capacity(doc.as_string().len() + 256);
+
+    for item in doc_heading_iterator(doc).complete() {
+        match item {
+            ItemOrOther::Item(Heading { text, .. }) => {
+                (0..level_bump).for_each(|_| new_doc.push('#'));
+                new_doc.push_str(text);
+            }
+            ItemOrOther::Other(other) => {
+                new_doc.push_str(other);
+            }
+        }
     }
 
-    let mut new_readme: Vec<String> = Vec::with_capacity(1024);
-    let mut inside_markers = false;
+    Doc::from_str(new_doc)
+}
 
-    for (i, line) in cargo_rdme_line_iterator(readme).enumerate() {
-        match (inside_markers, line) {
-            (true, CargoRdmeLine::MarkerCargoRdmeEnd) => {
+pub fn inject_doc_in_readme(readme: &Readme, doc: &Doc) -> Result<Readme, InjectDocError> {
+    fn inject(new_readme: &mut String, doc: &Doc) {
+        new_readme.push_str(MARKER_RDME_START);
+        new_readme.push_str("\n\n");
+        doc.lines().for_each(|line| {
+            new_readme.push_str(line);
+            new_readme.push('\n');
+        });
+        new_readme.push('\n');
+        new_readme.push_str(MARKER_RDME_END);
+        new_readme.push('\n');
+    }
+
+    let mut new_readme: String =
+        String::with_capacity(readme.as_string().len() + doc.as_string().len() + 1024);
+    let mut inside_markers = false;
+    let mut last_heading_level: u8 = 0;
+
+    for item in readme_line_iterator(readme).complete() {
+        match (inside_markers, item) {
+            (true, ItemOrOther::Item(ReadmeLine::MarkerCargoRdmeEnd(_))) => {
                 inside_markers = false;
             }
             (true, _) => (),
 
-            (false, CargoRdmeLine::MarkerCargoRdmeEnd) => {
-                return Err(InjectDocError::UnexpectedMarkerCargoRdmeEnd { line_number: i + 1 });
+            (false, ItemOrOther::Item(ReadmeLine::MarkerCargoRdmeEnd(span))) => {
+                let line_number =
+                    1 + readme.as_string()[0..span.start].chars().filter(|&c| c == '\n').count();
+
+                return Err(InjectDocError::UnexpectedMarkerCargoRdmeEnd { line_number });
             }
-            (false, CargoRdmeLine::Line(s)) => new_readme.push(s.to_owned()),
-            (false, CargoRdmeLine::MarkerCargoRdme) => {
-                inject(&mut new_readme, doc);
+            (false, ItemOrOther::Item(ReadmeLine::Heading(Heading { level, text }, _))) => {
+                new_readme.push_str(text);
+                last_heading_level = level;
             }
-            (false, CargoRdmeLine::MarkerCargoRdmeStart) => {
-                inject(&mut new_readme, doc);
+            (false, ItemOrOther::Other(other)) => new_readme.push_str(other),
+            (false, ItemOrOther::Item(ReadmeLine::MarkerCargoRdme(_))) => {
+                let doc = bump_heading_level(doc, last_heading_level);
+                inject(&mut new_readme, &doc);
+            }
+            (false, ItemOrOther::Item(ReadmeLine::MarkerCargoRdmeStart(_))) => {
+                let doc = bump_heading_level(doc, last_heading_level);
+                inject(&mut new_readme, &doc);
                 inside_markers = true;
             }
         }
@@ -90,7 +168,7 @@ pub fn inject_doc_in_readme(readme: &Readme, doc: &Doc) -> Result<Readme, Inject
 
     match inside_markers {
         true => Err(InjectDocError::UnmatchedMarkerCargoRdmeStart),
-        false => Ok(Readme::from_lines(&new_readme)),
+        false => Ok(Readme::from_str(new_readme)),
     }
 }
 
@@ -101,7 +179,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     #[test]
-    fn test_cargo_rdme_line_iterator() {
+    fn test_readme_line_iterator() {
         let str = indoc! { "
             marker test <!-- cargo-rdme -->.
              Starting with whitespace.
@@ -119,29 +197,24 @@ mod tests {
         };
 
         let readme = Readme::from_str(str);
-        let mut iter = cargo_rdme_line_iterator(&readme);
+        let mut iter = readme_line_iterator(&readme).items();
 
-        assert_eq!(iter.next(), Some(CargoRdmeLine::Line("marker test <!-- cargo-rdme -->.")));
-        assert_eq!(iter.next(), Some(CargoRdmeLine::Line(" Starting with whitespace.")));
-        assert_eq!(iter.next(), Some(CargoRdmeLine::Line("")));
-        assert_eq!(iter.next(), Some(CargoRdmeLine::MarkerCargoRdmeStart));
-        assert_eq!(iter.next(), Some(CargoRdmeLine::MarkerCargoRdmeEnd));
-        assert_eq!(iter.next(), Some(CargoRdmeLine::MarkerCargoRdme));
-        assert_eq!(
-            iter.next(),
-            Some(CargoRdmeLine::Line("<!-- cargo-rdme end --> <- Does not count."))
-        );
-        assert_eq!(iter.next(), Some(CargoRdmeLine::MarkerCargoRdmeStart));
-        assert_eq!(iter.next(), Some(CargoRdmeLine::MarkerCargoRdmeEnd));
-        assert_eq!(iter.next(), Some(CargoRdmeLine::MarkerCargoRdmeStart));
-        assert_eq!(iter.next(), Some(CargoRdmeLine::MarkerCargoRdmeEnd));
-        assert_eq!(iter.next(), Some(CargoRdmeLine::MarkerCargoRdmeStart));
-        assert_eq!(iter.next(), Some(CargoRdmeLine::MarkerCargoRdmeEnd));
-        assert_eq!(iter.next(), None);
+        // TODO Replace by `assert_matches!()` once https://github.com/rust-lang/rust/issues/82775
+        // stabilizes.
+        assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeStart(_))));
+        assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeEnd(_))));
+        assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdme(_))));
+        assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeStart(_))));
+        assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeEnd(_))));
+        assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeStart(_))));
+        assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeEnd(_))));
+        assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeStart(_))));
+        assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeEnd(_))));
+        assert!(matches!(iter.next(), None));
     }
 
     #[test]
-    fn test_cargo_rdme_line_iterator_nested() {
+    fn test_readme_line_iterator_nested() {
         let str = indoc! { "
             A
             <!-- cargo-rdme start -->
@@ -157,20 +230,13 @@ mod tests {
         };
 
         let readme = Readme::from_str(str);
-        let mut iter = cargo_rdme_line_iterator(&readme);
+        let mut iter = readme_line_iterator(&readme).items();
 
-        assert_eq!(iter.next(), Some(CargoRdmeLine::Line("A")));
-        assert_eq!(iter.next(), Some(CargoRdmeLine::MarkerCargoRdmeStart));
-        assert_eq!(iter.next(), Some(CargoRdmeLine::Line("B")));
-        assert_eq!(iter.next(), Some(CargoRdmeLine::Line("<!-- cargo-rdme -->")));
-        assert_eq!(iter.next(), Some(CargoRdmeLine::Line("C")));
-        assert_eq!(iter.next(), Some(CargoRdmeLine::Line("<!-- cargo-rdme start -->")));
-        assert_eq!(iter.next(), Some(CargoRdmeLine::Line("D")));
-        assert_eq!(iter.next(), Some(CargoRdmeLine::Line("<!-- cargo-rdme end -->")));
-        assert_eq!(iter.next(), Some(CargoRdmeLine::Line("E")));
-        assert_eq!(iter.next(), Some(CargoRdmeLine::MarkerCargoRdmeEnd));
-        assert_eq!(iter.next(), Some(CargoRdmeLine::Line("F")));
-        assert_eq!(iter.next(), None);
+        // TODO Replace by `assert_matches!()` once https://github.com/rust-lang/rust/issues/82775
+        // stabilizes.
+        assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeStart(_))));
+        assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeEnd(_))));
+        assert!(matches!(iter.next(), None));
     }
 
     #[test]
@@ -255,6 +321,261 @@ mod tests {
             <!-- cargo-rdme end -->
 
             Hope you enjoy!
+            "#
+        };
+
+        let readme = Readme::from_str(readme_str);
+        let doc = Doc::from_str(doc_str);
+
+        let new_readme = inject_doc_in_readme(&readme, &doc).unwrap();
+
+        assert_eq!(new_readme.markdown.as_string(), expected);
+    }
+
+    #[test]
+    fn test_inject_doc_unmatched_start_marker() {
+        let readme_str = indoc! { r#"
+            This is a really nice crate.
+
+            <!-- cargo-rdme -->
+
+            <!-- cargo-rdme start -->
+
+            Hope you enjoy!
+            "#
+        };
+        let doc_str = indoc! { r#"
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+            incididunt ut labore et dolore magna aliqua.
+            "#
+        };
+
+        let readme = Readme::from_str(readme_str);
+        let doc = Doc::from_str(doc_str);
+
+        let result = inject_doc_in_readme(&readme, &doc);
+
+        assert_eq!(result.err(), Some(InjectDocError::UnmatchedMarkerCargoRdmeStart));
+    }
+
+    #[test]
+    fn test_inject_doc_unexpected_end_marker() {
+        let readme_str = indoc! { r#"
+            This is a really nice crate.
+
+            <!-- cargo-rdme -->
+
+            <!-- cargo-rdme end -->
+
+            Hope you enjoy!
+            "#
+        };
+        let doc_str = indoc! { r#"
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+            incididunt ut labore et dolore magna aliqua.
+            "#
+        };
+
+        let readme = Readme::from_str(readme_str);
+        let doc = Doc::from_str(doc_str);
+
+        let result = inject_doc_in_readme(&readme, &doc);
+
+        assert_eq!(
+            result.err(),
+            Some(InjectDocError::UnexpectedMarkerCargoRdmeEnd { line_number: 5 })
+        );
+    }
+
+    #[test]
+    fn test_bump_heading_level() {
+        let doc_str = indoc! { r#"
+            # Foo
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+            incididunt ut labore et dolore magna aliqua.
+
+            ## Bar
+            Aenean dictum in nisi eu rutrum. Suspendisse vulputate tristique turpis eu vestibulum.
+            "#
+        };
+        let doc = Doc::from_str(doc_str);
+
+        let new_readme = bump_heading_level(&doc, 0);
+
+        assert_eq!(new_readme.markdown.as_string(), doc_str);
+
+        let expected = indoc! { r#"
+            ### Foo
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+            incididunt ut labore et dolore magna aliqua.
+
+            #### Bar
+            Aenean dictum in nisi eu rutrum. Suspendisse vulputate tristique turpis eu vestibulum.
+            "#
+        };
+
+        let new_readme = bump_heading_level(&doc, 2);
+
+        assert_eq!(new_readme.markdown.as_string(), expected);
+    }
+
+    #[test]
+    fn test_inject_doc_bump_heading_level() {
+        let readme_str = indoc! { r#"
+            # The crate
+
+            This is a really nice crate.
+
+            <!-- cargo-rdme -->
+
+            Hope you enjoy!
+            "#
+        };
+        let doc_str = indoc! { r#"
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+            incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud
+            exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+
+            # Foo
+
+            Aenean dictum in nisi eu rutrum. Suspendisse vulputate tristique turpis eu vestibulum.
+            "#
+        };
+
+        let expected = indoc! { r#"
+            # The crate
+
+            This is a really nice crate.
+
+            <!-- cargo-rdme start -->
+
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+            incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud
+            exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+
+            ## Foo
+
+            Aenean dictum in nisi eu rutrum. Suspendisse vulputate tristique turpis eu vestibulum.
+
+            <!-- cargo-rdme end -->
+
+            Hope you enjoy!
+            "#
+        };
+
+        let readme = Readme::from_str(readme_str);
+        let doc = Doc::from_str(doc_str);
+
+        let new_readme = inject_doc_in_readme(&readme, &doc).unwrap();
+
+        assert_eq!(new_readme.markdown.as_string(), expected);
+    }
+
+    #[test]
+    fn test_inject_doc_bump_heading_level_ignore_within_markers() {
+        let readme_str = indoc! { r#"
+            # The crate
+
+            This is a really nice crate.
+
+            <!-- cargo-rdme start -->
+
+            ### The crate
+
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+            incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud
+            exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+
+            <!-- cargo-rdme end -->
+
+            Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus.
+
+            <!-- cargo-rdme -->
+
+            Hope you enjoy!
+            "#
+        };
+        let doc_str = indoc! { r#"
+            # Foo
+
+            Aenean dictum in nisi eu rutrum. Suspendisse vulputate tristique turpis eu vestibulum.
+            "#
+        };
+
+        let expected = indoc! { r#"
+            # The crate
+
+            This is a really nice crate.
+
+            <!-- cargo-rdme start -->
+
+            ## Foo
+
+            Aenean dictum in nisi eu rutrum. Suspendisse vulputate tristique turpis eu vestibulum.
+
+            <!-- cargo-rdme end -->
+
+            Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus.
+
+            <!-- cargo-rdme start -->
+
+            ## Foo
+
+            Aenean dictum in nisi eu rutrum. Suspendisse vulputate tristique turpis eu vestibulum.
+
+            <!-- cargo-rdme end -->
+
+            Hope you enjoy!
+            "#
+        };
+
+        let readme = Readme::from_str(readme_str);
+        let doc = Doc::from_str(doc_str);
+
+        let new_readme = inject_doc_in_readme(&readme, &doc).unwrap();
+
+        assert_eq!(new_readme.markdown.as_string(), expected);
+    }
+
+    #[test]
+    fn test_inject_doc_bump_heading_level_ignore_code_blocks() {
+        let readme_str = indoc! { r#"
+            # The crate
+
+            This is a really nice crate.
+            You should try it!
+
+            ```
+            ### This is code
+            ```
+
+            <!-- cargo-rdme -->
+            "#
+        };
+        let doc_str = indoc! { r#"
+            # Foo
+
+            Aenean dictum in nisi eu rutrum. Suspendisse vulputate tristique turpis eu vestibulum.
+            "#
+        };
+
+        let expected = indoc! { r#"
+            # The crate
+
+            This is a really nice crate.
+            You should try it!
+
+            ```
+            ### This is code
+            ```
+
+            <!-- cargo-rdme start -->
+
+            ## Foo
+
+            Aenean dictum in nisi eu rutrum. Suspendisse vulputate tristique turpis eu vestibulum.
+
+            <!-- cargo-rdme end -->
             "#
         };
 

@@ -4,8 +4,8 @@
  */
 
 use crate::markdown::Markdown;
-use crate::transform::utils::MarkdownItemIterator;
 use crate::transform::DocTransform;
+use crate::utils::MarkdownItemIterator;
 use crate::Doc;
 use module_walker::walk_module_file;
 use std::collections::{HashMap, HashSet};
@@ -553,7 +553,7 @@ fn rewrite_markdown_links(
     emit_warning: &impl Fn(&str),
     config: &IntralinksConfig,
 ) -> Doc {
-    use crate::transform::utils::ItemOrOther;
+    use crate::utils::ItemOrOther;
 
     let mut new_doc = String::with_capacity(doc.as_string().len());
 
@@ -661,7 +661,7 @@ fn get_standard_libraries() -> Result<Vec<Crate>, IntralinkError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::transform::utils::Span;
+    use crate::utils::Span;
     use indoc::indoc;
     use module_walker::walk_module_items;
     use std::cell::RefCell;
