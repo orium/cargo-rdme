@@ -1,5 +1,9 @@
 # Release notes
 
+## 0.7.0
+
+* Automatically bump the heading level in the injected rustdoc based on the README current heading level.
+
 ## 0.6.0
 
 * Added option for intralinks to be stripped.
