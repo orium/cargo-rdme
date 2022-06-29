@@ -1,2 +1,0 @@
-# This file is in `/tests` so the `/.cargo-rdme.toml` will never be picked up (we search the configuration file in
-# all ancerstor paths).

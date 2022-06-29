@@ -1,4 +1,0 @@
-line-terminator = "lf"
-
-[entrypoint]
-type = "bin"
