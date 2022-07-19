@@ -6,9 +6,9 @@
 [![Github stars](https://img.shields.io/github/stars/orium/cargo-rdme.svg?logo=github)](https://github.com/orium/cargo-rdme/stargazers)
 [![License](https://img.shields.io/crates/l/cargo-rdme.svg)](./LICENSE.md)
 
-<!-- cargo-rdme start -->
-
 # Cargo rdme
+
+<!-- cargo-rdme start -->
 
 Cargo command to create your README from your crate’s documentation.
 

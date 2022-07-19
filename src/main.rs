@@ -20,15 +20,13 @@
 #![allow(clippy::new_without_default)]
 #![allow(clippy::struct_excessive_bools)]
 // Note: If you change this remember to update `README.md`.  To do so run `cargo run`.
-//! # Cargo rdme
-//!
 //! Cargo command to create your README from your crate’s documentation.
 //!
-//! ## Installation
+//! # Installation
 //!
 //! You can install cargo rdme with cargo by running `cargo install cargo-rdme`.
 //!
-//! ## Usage
+//! # Usage
 //!
 //! Cargo rdme will insert your crate’s documentation in your README file.  To control where the
 //! documentation will be inserted you need to insert a marker: `<!-- cargo-rdme -->`.  For example,
@@ -56,7 +54,7 @@
 //! Whenever change your crate’s documentation you just need to run `cargo rdme` to update your
 //! README file.
 //!
-//! ## Automatic transformations
+//! # Automatic transformations
 //!
 //! The documentation of your crate doesn’t always map directly to a good README.  For example,
 //! rust code blocks can have hidden lines.  Those should not be shown in the README file.
@@ -64,7 +62,7 @@
 //! This section covers the transformation cargo rdme automatically apply to generate a better
 //! README.
 //!
-//! ### Rust code block
+//! ## Rust code block
 //!
 //! Rust code block are transformed in two ways by cargo rdme:
 //!
@@ -119,7 +117,7 @@
 //! </tr>
 //! </table>
 //!
-//! ### Intralinks
+//! ## Intralinks
 //!
 //! Rust documentation can contain [links to items defined in the crate](https://doc.rust-lang.org/stable/rustdoc/linking-to-items-by-name.html).
 //! This links would not make sense in your README file, so cargo rdme automatically generate
@@ -168,7 +166,7 @@
 //! to be resolved).  If cargo rdme is unable to generate the link it will still generate the README
 //! file, but a warning will be emitted.
 //!
-//! ## Configuration file
+//! # Configuration file
 //!
 //! If the default behavior of `cargo rdme` is not appropriate for your project you can crate a
 //! configuration file `.cargo-rdme.toml` in the root of your project.  This is how that
@@ -207,7 +205,7 @@
 //! These setting can be overridden with command line flags.  Run `cargo rdme --help` for more
 //! information.
 //!
-//! ## Integration with CI
+//! # Integration with CI
 //!
 //! To verify that your README is up to date with your crate’s documentation you can run
 //! `cargo rdme --check`.  The exit code will be `0` if the README is up to date, `2` if it’s
