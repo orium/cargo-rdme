@@ -1,5 +1,9 @@
 # Release notes
 
+## 0.7.1
+
+* Update dependencies.
+
 ## 0.7.0
 
 * Automatically bump the heading level in the injected rustdoc based on the README current heading level.
