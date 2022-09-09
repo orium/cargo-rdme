@@ -105,10 +105,12 @@ impl Project {
     }
 
     fn from_package(package: &cargo_metadata::Package) -> Project {
+        const LIB_CRATE_KINDS: [&str; 6] =
+            ["lib", "dylib", "staticlib", "cdylib", "rlib", "proc-macro"];
         let lib_packages: Vec<&cargo_metadata::Target> = package
             .targets
             .iter()
-            .filter(|target| target.kind.contains(&"lib".to_owned()))
+            .filter(|target| target.kind.iter().any(|k| LIB_CRATE_KINDS.contains(&k.as_str())))
             .collect();
 
         assert!(lib_packages.len() <= 1, "more than one lib target");

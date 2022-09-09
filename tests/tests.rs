@@ -594,3 +594,8 @@ fn integration_test_option_cmd_intralinks_strip_links() {
 fn integration_test_heading_level_auto_bump() {
     run_test("heading_level_auto_bump");
 }
+
+#[test]
+fn integration_test_crate_procmacro() {
+    run_test("crate_procmacro");
+}
