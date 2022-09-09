@@ -1,5 +1,10 @@
 # Release notes
 
+## 0.7.2
+
+* Support these lib crate types: proc-macro, dylib, staticlib, cdylib, and rlib.
+* Update dependencies.
+
 ## 0.7.1
 
 * Update dependencies.
