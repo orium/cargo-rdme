@@ -40,7 +40,7 @@ thiserror = "1.0.34"
 syn = { version = "1.0.99", features = ["full", "extra-traits"] }
 proc-macro2 = { version = "1.0.43", features = ["span-locations"] }
 pulldown-cmark = "0.9.2"
-itertools = "0.10.3"
+itertools = "0.10.5"
 clap = "3.2.20"
 git2 = "0.15.0"
 atty = "0.2.14"
