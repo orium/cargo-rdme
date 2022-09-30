@@ -185,6 +185,7 @@ fn run_test_with_options(test_name: &str, options: TestOptions) {
     let output = Command::new(&bin_path)
         .args(args)
         .current_dir(test_dir)
+        .env("RUST_BACKTRACE", "1")
         .output()
         .expect(&format!("Failed to execute {}", bin_path.display()));
 

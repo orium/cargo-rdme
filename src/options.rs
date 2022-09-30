@@ -5,7 +5,10 @@
 
 use cargo_rdme::find_first_file_in_ancestors;
 use cargo_rdme::transform::{IntralinksConfig, IntralinksDocsRsConfig};
+use clap::{value_parser, ArgAction};
+use std::error::Error;
 use std::ffi::OsString;
+use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use thiserror::Error;
@@ -14,7 +17,17 @@ const PROJECT_NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug)]
-pub struct InvalidOptValue;
+pub struct InvalidOptValue {
+    value: String,
+}
+
+impl Display for InvalidOptValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("invalid value \"{}\"", self.value))
+    }
+}
+
+impl Error for InvalidOptValue {}
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum LineTerminatorOpt {
@@ -29,10 +42,6 @@ impl Default for LineTerminatorOpt {
     }
 }
 
-impl LineTerminatorOpt {
-    const VALUES: &'static [&'static str] = &["auto", "lf", "crlf"];
-}
-
 impl FromStr for LineTerminatorOpt {
     type Err = InvalidOptValue;
 
@@ -41,7 +50,7 @@ impl FromStr for LineTerminatorOpt {
             "auto" => Ok(LineTerminatorOpt::Auto),
             "lf" => Ok(LineTerminatorOpt::Lf),
             "crlf" => Ok(LineTerminatorOpt::CrLf),
-            _ => Err(InvalidOptValue),
+            v => Err(InvalidOptValue { value: v.to_owned() }),
         }
     }
 }
@@ -57,6 +66,23 @@ pub enum EntrypointOpt {
 impl Default for EntrypointOpt {
     fn default() -> EntrypointOpt {
         EntrypointOpt::Auto
+    }
+}
+
+impl FromStr for EntrypointOpt {
+    type Err = InvalidOptValue;
+
+    fn from_str(s: &str) -> Result<EntrypointOpt, InvalidOptValue> {
+        match s {
+            "auto" => Ok(EntrypointOpt::Auto),
+            "lib" => Ok(EntrypointOpt::Lib),
+            "bin" => Ok(EntrypointOpt::BinDefault),
+            v if v.starts_with("bin:") && v.len() > "bin:".len() => {
+                let name = v["bin:".len()..].to_owned();
+                Ok(EntrypointOpt::BinName(name))
+            }
+            v => Err(InvalidOptValue { value: v.to_owned() }),
+        }
     }
 }
 
@@ -95,103 +121,80 @@ fn get_cmd_args() -> Vec<OsString> {
 pub fn cmd_options() -> CmdOptions {
     use clap::{Arg, Command};
 
-    fn validator_entrypoint(value: &str) -> Result<(), String> {
-        match value {
-            "auto" | "lib" | "bin" => Ok(()),
-            v if v.starts_with("bin:") && v.len() > "bin:".len() => Ok(()),
-            _ => Err(format!("invalid value \"{}\"", value)),
-        }
-    }
-
     let cmd_opts = Command::new(PROJECT_NAME)
         .version(VERSION)
         .about("Create the README from your crate’s documentation.")
-        .mut_arg("version", |a| a.short('v'))
+        // WIP! .mut_arg("version", |a| a.short('v'))
         .arg(
             Arg::new("entrypoint")
                 .long("entrypoint")
                 .help("selects the source code entrypoint of the crate (e.g. auto, lib, bin, bin:<name>)")
-                .takes_value(true)
-                .validator(validator_entrypoint),
+                .value_parser(EntrypointOpt::from_str),
         )
         .arg(
             Arg::new("line-terminator")
                 .long("line-terminator")
                 .help("line terminator to use when writing the README file")
-                .takes_value(true)
-                .possible_values(LineTerminatorOpt::VALUES),
+                .value_parser(LineTerminatorOpt::from_str),
         )
         .arg(
             Arg::new("readme-path")
                 .long("readme-path")
                 .short('r')
                 .help("README file path to use (overrides of what is specified in the project `Cargo.toml`)")
-                .takes_value(true),
+                .value_parser(value_parser!(PathBuf)),
         )
         .arg(
             Arg::new("workspace-project")
                 .long("workspace-project")
                 .short('w')
-                .help("project to get the documentation from if your are using workspaces")
-                .takes_value(true),
+                .help("project to get the documentation from if your are using workspaces"),
         )
         .arg(
             Arg::new("check")
                 .long("check")
                 .short('c')
-                .help("checks if the README is up to date"),
+                .help("checks if the README is up to date")
+                .action(ArgAction::SetTrue),
         )
         .arg(
         Arg::new("no-fail-on-warnings")
             .long("no-fail-on-warnings")
-            .help("do not exit with a error status code when checking if the README is up to date"),
+            .help("do not exit with a error status code when checking if the README is up to date")
+            .action(ArgAction::SetTrue),
         )
         .arg(
         Arg::new("intralinks-strip-links")
             .long("intralinks-strip-links")
-            .help("remove the intralinks"),
+            .help("remove the intralinks")
+            .action(ArgAction::SetTrue),
     )
         .arg(
             Arg::new("force")
                 .long("force")
                 .short('f')
-                .help("force README update, even when there are uncommitted changes"),
+                .help("force README update, even when there are uncommitted changes")
+                .action(ArgAction::SetTrue),
         )
         .get_matches_from(get_cmd_args());
 
-    let workspace_project = cmd_opts.value_of("workspace-project").map(ToOwned::to_owned);
+    let workspace_project = cmd_opts.get_one::<String>("workspace-project").cloned();
 
-    let line_terminator: Option<LineTerminatorOpt> = cmd_opts
-        .value_of("line-terminator")
-        .map(LineTerminatorOpt::from_str)
-        .map(|r| r.unwrap_or_else(|e| panic!("this should never happen: {:?}", e)));
+    let line_terminator: Option<LineTerminatorOpt> =
+        cmd_opts.get_one::<LineTerminatorOpt>("line-terminator").copied();
 
-    let entrypoint = match cmd_opts.value_of("entrypoint") {
-        Some("auto") => Some(EntrypointOpt::Auto),
-        Some("lib") => Some(EntrypointOpt::Lib),
-        Some("bin") => Some(EntrypointOpt::BinDefault),
-        Some(bin_name) => {
-            assert!(bin_name.starts_with("bin:"), "clap should validate this");
+    let entrypoint = cmd_opts.get_one::<EntrypointOpt>("entrypoint").cloned();
 
-            let name = bin_name["bin:".len()..].to_owned();
-
-            assert!(!name.is_empty(), "clap should validate this");
-
-            Some(EntrypointOpt::BinName(name))
-        }
-        None => None,
-    };
-
-    let readme_path = cmd_opts.value_of("readme-path").map(PathBuf::from);
+    let readme_path = cmd_opts.get_one::<PathBuf>("readme-path").cloned();
 
     CmdOptions {
         workspace_project,
         entrypoint,
         line_terminator,
-        check: cmd_opts.is_present("check"),
-        no_fail_on_warnings: cmd_opts.is_present("no-fail-on-warnings"),
-        intralinks_strip_links: cmd_opts.is_present("intralinks-strip-links"),
-        force: cmd_opts.is_present("force"),
+        check: cmd_opts.get_flag("check"),
+        no_fail_on_warnings: cmd_opts.get_flag("no-fail-on-warnings"),
+        intralinks_strip_links: cmd_opts.get_flag("intralinks-strip-links"),
+        force: cmd_opts.get_flag("force"),
         readme_path,
     }
 }
