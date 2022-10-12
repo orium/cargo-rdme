@@ -2,7 +2,8 @@
 [![Code Coverage](https://codecov.io/gh/orium/cargo-rdme/branch/master/graph/badge.svg)](https://codecov.io/gh/orium/cargo-rdme)
 [![Dependency status](https://deps.rs/repo/github/orium/cargo-rdme/status.svg)](https://deps.rs/repo/github/orium/cargo-rdme)
 [![crates.io](https://img.shields.io/crates/v/cargo-rdme.svg)](https://crates.io/crates/cargo-rdme)
-[![Downloads](https://img.shields.io/crates/d/cargo-rdme.svg)](https://crates.io/crates/cargo-rdme)
+[![Downloads crates.io](https://img.shields.io/crates/d/cargo-rdme.svg?label=crates.io%20downloads)](https://crates.io/crates/cargo-rdme)
+[![Downloads github](https://img.shields.io/github/downloads/orium/cargo-rdme/total.svg?label=github%20downloads)](https://github.com/orium/cargo-rdme/releases)
 [![Github stars](https://img.shields.io/github/stars/orium/cargo-rdme.svg?logo=github)](https://github.com/orium/cargo-rdme/stargazers)
 [![License](https://img.shields.io/crates/l/cargo-rdme.svg)](./LICENSE.md)
 
