@@ -13,14 +13,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [ x86_64-unknown-linux-musl,  x86_64-pc-windows-gnu ]
+        include:
+          - target: x86_64-unknown-linux-musl
+            archive: tar.zst tar.bz2
+          - target: x86_64-apple-darwin
+            archive: tar.zst zip
+          - target: x86_64-pc-windows-gnu
+            archive: tar.zst zip
 
     steps:
       - uses: actions/checkout@master
       - name: Build release binary
-        uses: rust-build/rust-build.action@v1.3.2
+        uses: orium/rust-build.action@6304c2d9fa438f5f12d22a436a5b0278ab82dc92
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           RUSTTARGET: ${{ matrix.target }}
+          ARCHIVE_TYPES: ${{ matrix.archive }}
           EXTRA_FILES: "README.md LICENSE.md"

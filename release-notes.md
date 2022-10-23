@@ -1,5 +1,9 @@
 # Release notes
 
+## 0.7.3
+
+* Update dependencies, in particular we are now using clap 4.
+
 ## 0.7.2
 
 * Support these lib crate types: proc-macro, dylib, staticlib, cdylib, and rlib.
