@@ -45,7 +45,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-rdme"
-version = "0.7.3-pre"
+version = "0.7.3"
 dependencies = [
  "atty",
  "cargo_metadata",
