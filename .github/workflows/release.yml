@@ -24,10 +24,11 @@ jobs:
     steps:
       - uses: actions/checkout@master
       - name: Build release binary
-        uses: orium/rust-build.action@6304c2d9fa438f5f12d22a436a5b0278ab82dc92
+        uses: rust-build/rust-build.action@v1.4.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          TOOLCHAIN_VERSION: stable
           RUSTTARGET: ${{ matrix.target }}
           ARCHIVE_TYPES: ${{ matrix.archive }}
           EXTRA_FILES: "README.md LICENSE.md"
