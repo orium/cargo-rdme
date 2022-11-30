@@ -41,7 +41,7 @@ syn = { version = "1.0.101", features = ["full", "extra-traits"] }
 proc-macro2 = { version = "1.0.46", features = ["span-locations"] }
 pulldown-cmark = "0.9.2"
 itertools = "0.10.5"
-clap = "4.0.6"
+clap = "4.0.29"
 git2 = "0.15.0"
 atty = "0.2.14"
 termcolor = "1.1.3"
