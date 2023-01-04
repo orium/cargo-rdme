@@ -39,7 +39,7 @@ pub fn extract_doc_from_source_str(source: &str) -> Result<Option<Doc>, ExtractD
                 let string = &lstr.value();
 
                 match string.lines().count() {
-                    0 => lines.push("".to_owned()),
+                    0 => lines.push(String::new()),
                     1 => {
                         let line = string.strip_prefix(' ').unwrap_or(string);
                         lines.push(line.to_owned());

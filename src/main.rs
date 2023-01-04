@@ -229,7 +229,7 @@ mod options;
 const EXIT_CODE_ERROR: i32 = 1;
 /// Exit code when we run in "check mode" and the README is not up to date.
 const EXIT_CODE_CHECK_MISMATCH: i32 = 2;
-/// Exit code when we run in "check mode" and the README is not up to date.
+/// Exit code when we run in "check mode" and there were warnings.
 const EXIT_CODE_CHECK_WARNINGS: i32 = 4;
 /// Exit code we don't update the README because we would overwrite uncommitted changes.
 const EXIT_CODE_README_NOT_UPDATED_UNCOMMITTED_CHANGES: i32 = 3;
@@ -237,7 +237,7 @@ const EXIT_CODE_README_NOT_UPDATED_UNCOMMITTED_CHANGES: i32 = 3;
 #[derive(Error, Debug)]
 enum RunError {
     #[error("failed to get project info: {0}")]
-    ProjectError(cargo_rdme::ProjectError),
+    ProjectError(ProjectError),
     #[error("failed to extract rust doc: {0}")]
     ExtractDocError(cargo_rdme::ExtractDocError),
     #[error("failed to process README: {0}")]
@@ -414,12 +414,12 @@ fn run(options: options::Options) -> Result<(), RunError> {
     };
     let entryfile: &Path =
         entrypoint(&project, &options.entrypoint).ok_or(RunError::NoEntrySourceFile)?;
-    let doc: Doc = match extract_doc_from_source_file(&entryfile)? {
+    let doc: Doc = match extract_doc_from_source_file(entryfile)? {
         None => return Err(RunError::NoRustdoc),
         Some(doc) => doc,
     };
 
-    let (doc, warnings) = transform_doc(&doc, &project, &entryfile, &options)?;
+    let (doc, warnings) = transform_doc(&doc, &project, entryfile, &options)?;
 
     let readme_path: PathBuf = match options.readme_path {
         None => project.get_readme_path().ok_or(RunError::NoReadmeFile)?,
@@ -458,7 +458,7 @@ fn main() {
 
     match std::env::current_dir() {
         Ok(current_dir) => {
-            let config_file_options = match options::config_file_options(&current_dir) {
+            let config_file_options = match options::config_file_options(current_dir) {
                 Ok(opts) => opts,
                 Err(e) => {
                     print_error(format!("unable to read config file: {}", e));

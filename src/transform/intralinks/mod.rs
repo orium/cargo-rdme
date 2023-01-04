@@ -603,7 +603,7 @@ fn get_rustc_sysroot_libraries_dir() -> Result<PathBuf, IntralinkError> {
     use std::process::Command;
 
     let output = Command::new("rustc")
-        .args(&["--print=sysroot"])
+        .args(["--print=sysroot"])
         .output()
         .map_err(|e| IntralinkError::LoadStdLibError(format!("failed to run rustc: {}", e)))?;
 
@@ -635,7 +635,7 @@ fn get_standard_libraries() -> Result<Vec<Crate>, IntralinkError> {
     let libraries_dir = get_rustc_sysroot_libraries_dir()?;
     let mut std_libs = Vec::with_capacity(64);
 
-    for entry in std::fs::read_dir(&libraries_dir)? {
+    for entry in std::fs::read_dir(libraries_dir)? {
         let entry = entry?;
         let project_dir_path = entry.path();
         let cargo_manifest_path = project_dir_path.join("Cargo.toml");
