@@ -1,5 +1,12 @@
 # Release notes
 
+## 1.0.0
+
+* Change the status code for the "check mode" (flag `--check`):
+  * Exit code `3` means the README does not match the documentation.  In previous releases the exit code was `4`.
+  * Exit code `4` means warnings were emitted.  In previous releases the exit code was `3`.
+* Update dependencies.
+
 ## 0.7.3
 
 * Update dependencies, in particular we are now using clap 4.
