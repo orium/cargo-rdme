@@ -352,7 +352,7 @@ fn integration_test_option_cmd_check_fail() {
     let option = TestOptions {
         args: &["--check"],
         check_readme_expected: false,
-        expected_exit_code: 2,
+        expected_exit_code: 3,
         ..TestOptions::default()
     };
 
@@ -402,7 +402,7 @@ fn integration_test_option_cmd_check_fail_line_terminator() {
     let option = TestOptions {
         args: &["--check", "--line-terminator", "crlf"],
         check_readme_expected: false,
-        expected_exit_code: 2,
+        expected_exit_code: 3,
         ..TestOptions::default()
     };
 
@@ -492,7 +492,7 @@ fn integration_test_avoid_overwrite_uncommitted_readme() {
 
     let option = TestOptions {
         check_readme_expected: false,
-        expected_exit_code: 3,
+        expected_exit_code: 2,
         force: false,
         ..TestOptions::default()
     };

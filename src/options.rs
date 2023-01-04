@@ -154,7 +154,7 @@ pub fn cmd_options() -> CmdOptions {
             Arg::new("check")
                 .long("check")
                 .short('c')
-                .help("checks if the README is up to date")
+                .help("checks if the README is up to date (exit code 3 if there’s a mismatch, 4 if warnings were emitted)")
                 .action(ArgAction::SetTrue),
         )
         .arg(

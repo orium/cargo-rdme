@@ -208,7 +208,7 @@
 //! # Integration with CI
 //!
 //! To verify that your README is up to date with your crate’s documentation you can run
-//! `cargo rdme --check`.  The exit code will be `0` if the README is up to date, `2` if it’s
+//! `cargo rdme --check`.  The exit code will be `0` if the README is up to date, `3` if it’s
 //! not, or `4` if there were warnings.
 
 use crate::console::{print_error, print_warning};
@@ -226,13 +226,37 @@ use thiserror::Error;
 mod console;
 mod options;
 
-const EXIT_CODE_ERROR: i32 = 1;
-/// Exit code when we run in "check mode" and the README is not up to date.
-const EXIT_CODE_CHECK_MISMATCH: i32 = 2;
-/// Exit code when we run in "check mode" and there were warnings.
-const EXIT_CODE_CHECK_WARNINGS: i32 = 4;
-/// Exit code we don't update the README because we would overwrite uncommitted changes.
-const EXIT_CODE_README_NOT_UPDATED_UNCOMMITTED_CHANGES: i32 = 3;
+enum ExitCode {
+    Ok = 0,
+    Error = 1,
+    /// Exit code we don't update the README because we would overwrite uncommitted changes.
+    ReadmeNotUpdatedUncommittedChanges = 2,
+    /// Exit code when we run in "check mode" and the README is not up to date.
+    CheckMismatch = 3,
+    /// Exit code when we run in "check mode" and there were warnings.
+    CheckHasWarnings = 4,
+}
+
+impl From<RunError> for ExitCode {
+    fn from(value: RunError) -> ExitCode {
+        match value {
+            RunError::ProjectError(_)
+            | RunError::ExtractDocError(_)
+            | RunError::ReadmeError(_)
+            | RunError::NoEntrySourceFile
+            | RunError::NoReadmeFile
+            | RunError::NoRustdoc
+            | RunError::InjectDocError(_)
+            | RunError::TransformIntraLinkError(_)
+            | RunError::IOError(_) => ExitCode::Error,
+            RunError::ReadmeNotUpdatedUncommittedChanges => {
+                ExitCode::ReadmeNotUpdatedUncommittedChanges
+            }
+            RunError::CheckReadmeMismatch => ExitCode::CheckMismatch,
+            RunError::CheckHasWarnings => ExitCode::CheckHasWarnings,
+        }
+    }
+}
 
 #[derive(Error, Debug)]
 enum RunError {
@@ -258,9 +282,13 @@ enum RunError {
     ReadmeNotUpdatedUncommittedChanges,
     #[error("failed to transform intralinks: {0}")]
     TransformIntraLinkError(IntralinkError),
+    #[error("README is not up to date")]
+    CheckReadmeMismatch,
+    #[error("README is up to date, but warnings were emitted")]
+    CheckHasWarnings,
 }
 
-impl From<cargo_rdme::ProjectError> for RunError {
+impl From<ProjectError> for RunError {
     fn from(e: ProjectError) -> RunError {
         RunError::ProjectError(e)
     }
@@ -439,13 +467,11 @@ fn run(options: options::Options) -> Result<(), RunError> {
         false => update_readme(&new_readme, readme_path, line_terminator, options.force),
         true => {
             if !is_readme_up_to_date(&readme_path, &new_readme, line_terminator)? {
-                print_error("README is not up to date.");
-                std::process::exit(EXIT_CODE_CHECK_MISMATCH);
+                return Err(RunError::CheckReadmeMismatch);
             }
 
             if warnings.had_warnings && !options.no_fail_on_warnings {
-                print_error("README is up to date, but warnings were emitted.");
-                std::process::exit(EXIT_CODE_CHECK_WARNINGS);
+                return Err(RunError::CheckHasWarnings);
             }
 
             Ok(())
@@ -456,42 +482,29 @@ fn run(options: options::Options) -> Result<(), RunError> {
 fn main() {
     let cmd_options = options::cmd_options();
 
-    match std::env::current_dir() {
-        Ok(current_dir) => {
-            let config_file_options = match options::config_file_options(current_dir) {
-                Ok(opts) => opts,
-                Err(e) => {
-                    print_error(format!("unable to read config file: {}", e));
-                    std::process::exit(EXIT_CODE_ERROR);
-                }
-            };
+    let exit_code: ExitCode = match std::env::current_dir() {
+        Ok(current_dir) => match options::config_file_options(current_dir) {
+            Ok(config_file_options) => {
+                let options = options::merge_options(cmd_options, config_file_options);
 
-            let options = options::merge_options(cmd_options, config_file_options);
-
-            if let Err(e) = run(options) {
-                print_error(&e);
-
-                let exit_code = match e {
-                    RunError::ProjectError(_)
-                    | RunError::ExtractDocError(_)
-                    | RunError::ReadmeError(_)
-                    | RunError::NoEntrySourceFile
-                    | RunError::NoReadmeFile
-                    | RunError::NoRustdoc
-                    | RunError::InjectDocError(_)
-                    | RunError::TransformIntraLinkError(_)
-                    | RunError::IOError(_) => EXIT_CODE_ERROR,
-                    RunError::ReadmeNotUpdatedUncommittedChanges => {
-                        EXIT_CODE_README_NOT_UPDATED_UNCOMMITTED_CHANGES
+                match run(options) {
+                    Ok(_) => ExitCode::Ok,
+                    Err(e) => {
+                        print_error(&e);
+                        e.into()
                     }
-                };
-
-                std::process::exit(exit_code);
+                }
             }
-        }
+            Err(e) => {
+                print_error(format!("unable to read config file: {}", e));
+                ExitCode::Error
+            }
+        },
         Err(e) => {
             print_error(format!("unable to get current directory: {}", e));
-            std::process::exit(EXIT_CODE_ERROR);
+            ExitCode::Error
         }
-    }
+    };
+
+    std::process::exit(exit_code as i32);
 }
