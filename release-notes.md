@@ -1,5 +1,10 @@
 # Release notes
 
+## 1.0.1
+
+* Do not depend on openssl (which was a transitive dependency of git2).  This improves the building speed, but most
+  importantly we don't fail to build if the host system openssl is not supported by rust-openssl.
+
 ## 1.0.0
 
 * Change the status code for the "check mode" (flag `--check`):
@@ -13,7 +18,7 @@
 
 ## 0.7.2
 
-* Support these lib crate types: proc-macro, dylib, staticlib, cdylib, and rlib.
+* Support these lib crate types: `proc-macro`, `dylib`, `staticlib`, `cdylib`, and `rlib`.
 * Update dependencies.
 
 ## 0.7.1
