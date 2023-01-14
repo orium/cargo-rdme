@@ -202,4 +202,13 @@ To verify that your README is up to date with your crate’s documentation you c
 `cargo rdme --check`.  The exit code will be `0` if the README is up to date, `3` if it’s
 not, or `4` if there were warnings.
 
+If you use GitHub Actions you can add this step to verify if the README is up to date:
+
+```yaml
+- name: Check if the README is up to date.
+  run: |
+    cargo install cargo-rdme
+    cargo rdme --check
+```
+
 <!-- cargo-rdme end -->
