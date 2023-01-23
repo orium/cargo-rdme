@@ -135,7 +135,7 @@ mod tests {
             "#
         };
 
-        let doc = extract_doc_from_source_str(&str).unwrap().unwrap();
+        let doc = extract_doc_from_source_str(str).unwrap().unwrap();
         let lines: Vec<&str> = doc.lines().collect();
 
         let expected = vec![

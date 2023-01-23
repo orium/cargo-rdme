@@ -811,9 +811,9 @@ mod tests {
     }
 
     fn explore_crate(
-        ast: &Vec<Item>,
+        ast: &[Item],
         dir: &Path,
-        crate_symbol: FQIdentifier,
+        crate_symbol: &FQIdentifier,
         should_explore_module: impl Fn(&FQIdentifier) -> bool,
         symbols_type: &mut HashMap<FQIdentifier, SymbolType>,
         emit_warning: impl Fn(&str),
@@ -830,7 +830,7 @@ mod tests {
             check_explore_module(&should_explore_module, &mut modules_visited, mod_symbol, mod_item)
         };
 
-        walk_module_items(ast, dir, &crate_symbol, &mut visit, &mut explore_module, &emit_warning)
+        walk_module_items(ast, dir, crate_symbol, &mut visit, &mut explore_module, &emit_warning)
             .ok()
             .unwrap();
     }
@@ -860,9 +860,9 @@ mod tests {
         let warnings = RefCell::new(Vec::new());
 
         explore_crate(
-            &syn::parse_file(&source).unwrap().items,
+            &syn::parse_file(source).unwrap().items,
             &PathBuf::new(),
-            identifier("crate"),
+            &identifier("crate"),
             |m| *m != module_skip,
             &mut symbols_type,
             |msg| warnings.borrow_mut().push(msg.to_owned()),
@@ -880,7 +880,7 @@ mod tests {
         .into_iter()
         .collect();
 
-        assert_eq!(symbols_type, expected)
+        assert_eq!(symbols_type, expected);
     }
 
     #[test]
@@ -912,9 +912,9 @@ mod tests {
         let warnings = RefCell::new(Vec::new());
 
         explore_crate(
-            &syn::parse_file(&source).unwrap().items,
+            &syn::parse_file(source).unwrap().items,
             &PathBuf::new(),
-            identifier("crate"),
+            &identifier("crate"),
             |_| true,
             &mut symbols_type,
             |msg| warnings.borrow_mut().push(msg.to_owned()),
@@ -952,9 +952,9 @@ mod tests {
         let warnings = RefCell::new(Vec::new());
 
         explore_crate(
-            &syn::parse_file(&source).unwrap().items,
+            &syn::parse_file(source).unwrap().items,
             &PathBuf::new(),
-            identifier("crate"),
+            &identifier("crate"),
             |_| true,
             &mut symbols_type,
             |msg| warnings.borrow_mut().push(msg.to_owned()),
@@ -968,7 +968,7 @@ mod tests {
         .into_iter()
         .collect();
 
-        assert_eq!(symbols_type, expected)
+        assert_eq!(symbols_type, expected);
     }
 
     #[test]
@@ -987,9 +987,9 @@ mod tests {
         let warnings = RefCell::new(Vec::new());
 
         explore_crate(
-            &syn::parse_file(&source).unwrap().items,
+            &syn::parse_file(source).unwrap().items,
             &PathBuf::new(),
-            identifier("crate"),
+            &identifier("crate"),
             |module| modules.contains(module),
             &mut symbols_type,
             |msg| warnings.borrow_mut().push(msg.to_owned()),
@@ -1112,7 +1112,7 @@ mod tests {
             &Doc::from_str(doc),
             &symbols_type,
             "foobini",
-            &mut |_| (),
+            &|_| (),
             &IntralinksConfig::default(),
         );
         let expected = indoc! { r"
@@ -1165,7 +1165,7 @@ mod tests {
             &Doc::from_str(doc),
             &symbols_type,
             "foobini",
-            &mut |_| (),
+            &|_| (),
             &IntralinksConfig { strip_links: Some(true), ..std::default::Default::default() },
         );
         let expected = indoc! { r"

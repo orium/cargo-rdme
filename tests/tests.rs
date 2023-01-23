@@ -47,7 +47,7 @@ fn is_stderr_terminal() -> bool {
 
 fn print_framed(stream: &mut termcolor::Buffer, text: &str) {
     for line in text.lines() {
-        write!(stream, "┃ {}\n", line).unwrap();
+        writeln!(stream, "┃ {}", line).unwrap();
     }
 }
 
@@ -55,10 +55,10 @@ fn print_stderr_framed(stream: &mut termcolor::Buffer, stderr: &str) {
     use termcolor::{ColorSpec, WriteColor};
 
     stream.set_color(ColorSpec::new().set_bold(true)).unwrap();
-    write!(stream, "┏━━━ stderr ━━━━━━\n").unwrap();
+    writeln!(stream, "┏━━━ stderr ━━━━━━").unwrap();
     stream.reset().unwrap();
     print_framed(stream, stderr);
-    write!(stream, "┗━━━━━━━━━━━━━━━━━\n").unwrap();
+    writeln!(stream, "┗━━━━━━━━━━━━━━━━━").unwrap();
 }
 
 fn print_failure_readme_mismatch(
@@ -83,14 +83,14 @@ fn print_failure_readme_mismatch(
     stream.reset().unwrap();
     write!(stream, "\n\n").unwrap();
     stream.set_color(ColorSpec::new().set_bold(true)).unwrap();
-    write!(stream, "┏━━━ Expected ━━━━\n").unwrap();
+    writeln!(stream, "┏━━━ Expected ━━━━").unwrap();
     stream.reset().unwrap();
     print_framed(&mut stream, expected_readme);
     stream.set_color(ColorSpec::new().set_bold(true)).unwrap();
-    write!(stream, "┠━━━ Got ━━━━━━━━━\n").unwrap();
+    writeln!(stream, "┠━━━ Got ━━━━━━━━━").unwrap();
     stream.reset().unwrap();
     print_framed(&mut stream, got_readme);
-    write!(stream, "┗━━━━━━━━━━━━━━━━━\n").unwrap();
+    writeln!(stream, "┗━━━━━━━━━━━━━━━━━").unwrap();
 
     if !in_ci {
         write!(stream, "\nSee the diff with `").unwrap();
@@ -103,11 +103,11 @@ fn print_failure_readme_mismatch(
         )
         .unwrap();
         stream.reset().unwrap();
-        write!(stream, "`.\n").unwrap()
+        writeln!(stream, "`.").unwrap()
     }
 
     if !stderr.is_empty() {
-        write!(stream, "\n").unwrap();
+        writeln!(stream).unwrap();
         print_stderr_framed(&mut stream, stderr);
     }
 
@@ -130,10 +130,10 @@ fn print_failure_status_code_mismatch(expected_exit_code: i32, got_exit_code: i3
     write!(stream, "Expected code {} but got code {} instead.", expected_exit_code, got_exit_code)
         .unwrap();
     stream.reset().unwrap();
-    write!(stream, "\n").unwrap();
+    writeln!(stream).unwrap();
 
     if !stderr.is_empty() {
-        write!(stream, "\n").unwrap();
+        writeln!(stream).unwrap();
         print_stderr_framed(&mut stream, stderr);
     }
 
@@ -142,7 +142,7 @@ fn print_failure_status_code_mismatch(expected_exit_code: i32, got_exit_code: i3
     eprintln!("{}", std::str::from_utf8(stream.as_slice()).expect("invalid utf-8"));
 }
 
-const BIN_PATH: &'static str = env!(concat!("CARGO_BIN_EXE_", env!("CARGO_PKG_NAME")));
+const BIN_PATH: &str = env!(concat!("CARGO_BIN_EXE_", env!("CARGO_PKG_NAME")));
 
 fn run_test_with_options(test_name: &str, options: TestOptions) {
     let bin_path = Path::new(BIN_PATH);
@@ -182,12 +182,12 @@ fn run_test_with_options(test_name: &str, options: TestOptions) {
         args
     };
 
-    let output = Command::new(&bin_path)
+    let output = Command::new(bin_path)
         .args(args)
         .current_dir(test_dir)
         .env("RUST_BACKTRACE", "1")
         .output()
-        .expect(&format!("Failed to execute {}", bin_path.display()));
+        .unwrap_or_else(|_| panic!("Failed to execute {}", bin_path.display()));
 
     let stderr = String::from_utf8_lossy(&output.stderr);
 
