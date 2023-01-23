@@ -1,7 +1,11 @@
 # Release notes
 
+## 1.0.2
+
+* Update dependencies.
+
 ## 1.0.1
-c
+
 * Do not depend on openssl (which is a transitive dependency of git2).  This improves the building speed, but most
   importantly we don't fail to build if the host system openssl is not supported by rust-openssl.
 
