@@ -402,17 +402,44 @@ fn all_supermodules<'a>(symbols: impl Iterator<Item = &'a FQIdentifier>) -> Hash
 #[derive(Eq, PartialEq, Clone, Debug)]
 struct MarkdownInlineLink {
     text: String,
-    link: String,
+    raw_link: String,
 }
 
-fn split_link_fragment(link: &str) -> (&str, &str) {
-    match link.find('#') {
-        None => (link, ""),
-        Some(i) => link.split_at(i),
+impl MarkdownInlineLink {
+    fn link_as_identifier(&self) -> Option<FQIdentifier> {
+        let link = self.split_link_fragment().0;
+
+        FQIdentifier::from_string(link)
+    }
+
+    fn split_link_fragment(&self) -> (&str, &str) {
+        fn strip_last_backtick(strip_backtick_end: bool, s: &str) -> &str {
+            match strip_backtick_end {
+                true => s.strip_suffix('`').unwrap_or(s),
+                false => s,
+            }
+        }
+
+        let strip_backtick_end: bool = self.raw_link.starts_with('`');
+        let link = self.raw_link.strip_prefix('`').unwrap_or(&self.raw_link);
+
+        match link.find('#') {
+            None => (strip_last_backtick(strip_backtick_end, link), ""),
+            Some(i) => {
+                let (l, f) = link.split_at(i);
+                (
+                    strip_last_backtick(strip_backtick_end, l),
+                    strip_last_backtick(strip_backtick_end, f),
+                )
+            }
+        }
+    }
+
+    fn link_fragment(&self) -> &str {
+        self.split_link_fragment().1
     }
 }
 
-#[allow(clippy::needless_lifetimes)]
 fn markdown_inline_link_iterator(markdown: &Markdown) -> MarkdownItemIterator<MarkdownInlineLink> {
     use pulldown_cmark::{Event, LinkType, Options, Parser, Tag};
 
@@ -433,9 +460,9 @@ fn markdown_inline_link_iterator(markdown: &Markdown) -> MarkdownItemIterator<Ma
             in_link = false;
 
             let text = source[start_text..end_text].to_owned();
-            let link = source[(end_text + 2)..(range.end - 1)].to_owned();
+            let raw_link = source[(end_text + 2)..(range.end - 1)].to_owned();
 
-            Some((range.into(), MarkdownInlineLink { text, link }))
+            Some((range.into(), MarkdownInlineLink { text, raw_link }))
         }
         _ => {
             if in_link {
@@ -449,17 +476,10 @@ fn markdown_inline_link_iterator(markdown: &Markdown) -> MarkdownItemIterator<Ma
 }
 
 fn extract_markdown_intralink_symbols(doc: &Doc) -> HashSet<FQIdentifier> {
-    let mut symbols = HashSet::new();
-
-    for MarkdownInlineLink { link, .. } in markdown_inline_link_iterator(&doc.markdown).items() {
-        let (link, _) = split_link_fragment(&link);
-
-        if let Some(symbol) = FQIdentifier::from_string(link) {
-            symbols.insert(symbol);
-        }
-    }
-
-    symbols
+    markdown_inline_link_iterator(&doc.markdown)
+        .items()
+        .flat_map(|l| l.link_as_identifier().into_iter())
+        .collect()
 }
 
 fn documentation_url(
@@ -521,20 +541,23 @@ enum MarkdownLinkAction {
 }
 
 fn markdown_link(
-    link: &str,
-    link_fragment: &str,
-    link_text: &str,
+    link: &MarkdownInlineLink,
     symbols_type: &HashMap<FQIdentifier, SymbolType>,
     crate_name: &str,
     emit_warning: &impl Fn(&str),
     config: &IntralinksConfig,
 ) -> MarkdownLinkAction {
-    match FQIdentifier::from_string(link) {
+    match link.link_as_identifier() {
         Some(symbol) if symbols_type.contains_key(&symbol) => {
             let typ = symbols_type[&symbol];
             let new_link = documentation_url(&symbol, typ, crate_name, &config.docs_rs);
 
-            MarkdownLinkAction::Link(format!("[{}]({}{})", link_text, new_link, link_fragment))
+            MarkdownLinkAction::Link(format!(
+                "[{}]({}{})",
+                link.text,
+                new_link,
+                link.link_fragment()
+            ))
         }
         Some(symbol) => {
             emit_warning(&format!("Could not find definition of `{}`.", symbol));
@@ -559,20 +582,12 @@ fn rewrite_markdown_links(
 
     for item_or_other in markdown_inline_link_iterator(&doc.markdown).complete() {
         match item_or_other {
-            ItemOrOther::Item(MarkdownInlineLink { text, link }) => {
-                let (link, fragment): (&str, &str) = split_link_fragment(&link);
+            ItemOrOther::Item(link) => {
+                let strip_links = config.strip_links.unwrap_or(false);
 
-                let markdown_link: MarkdownLinkAction = match config.strip_links.unwrap_or(false) {
-                    false => markdown_link(
-                        link,
-                        fragment,
-                        &text,
-                        symbols_type,
-                        crate_name,
-                        emit_warning,
-                        config,
-                    ),
-                    true => match FQIdentifier::from_string(link) {
+                let markdown_link: MarkdownLinkAction = match strip_links {
+                    false => markdown_link(&link, symbols_type, crate_name, emit_warning, config),
+                    true => match link.link_as_identifier() {
                         None => MarkdownLinkAction::Preserve,
                         Some(_) => MarkdownLinkAction::Strip,
                     },
@@ -583,10 +598,10 @@ fn rewrite_markdown_links(
                         new_doc.push_str(&markdown_link);
                     }
                     MarkdownLinkAction::Preserve => {
-                        new_doc.push_str(&format!("[{}]({}{})", text, link, fragment));
+                        new_doc.push_str(&format!("[{}]({})", link.text, link.raw_link));
                     }
                     MarkdownLinkAction::Strip => {
-                        new_doc.push_str(&text);
+                        new_doc.push_str(&link.text);
                     }
                 }
             }
@@ -710,7 +725,10 @@ mod tests {
         let (Span { start, end }, link) = iter.next().unwrap();
         assert_eq!(
             link,
-            MarkdownInlineLink { text: "another".to_owned(), link: "http://foo.com".to_owned() }
+            MarkdownInlineLink {
+                text: "another".to_owned(),
+                raw_link: "http://foo.com".to_owned()
+            }
         );
         assert_eq!(&markdown.as_string()[start..end], "[another](http://foo.com)");
 
@@ -722,7 +740,10 @@ mod tests {
         let (Span { start, end }, link) = iter.next().unwrap();
         assert_eq!(
             link,
-            MarkdownInlineLink { text: "another".to_owned(), link: "http://foo.com".to_owned() }
+            MarkdownInlineLink {
+                text: "another".to_owned(),
+                raw_link: "http://foo.com".to_owned()
+            }
         );
         assert_eq!(&markdown.as_string()[start..end], "[another](http://foo.com)");
 
@@ -736,7 +757,7 @@ mod tests {
             link,
             MarkdownInlineLink {
                 text: "another [text] (foo)".to_owned(),
-                link: "http://foo.com/foo(bar)".to_owned(),
+                raw_link: "http://foo.com/foo(bar)".to_owned(),
             }
         );
         assert_eq!(
@@ -756,7 +777,7 @@ mod tests {
             link,
             MarkdownInlineLink {
                 text: "another".to_owned(),
-                link: r"http://foo.\(com\)".to_owned(),
+                raw_link: r"http://foo.\(com\)".to_owned(),
             }
         );
         assert_eq!(&markdown.as_string()[start..end], r"[another](http://foo.\(com\))");
@@ -781,7 +802,7 @@ mod tests {
             link,
             MarkdownInlineLink {
                 text: "link with `code`!".to_owned(),
-                link: "http://foo.com".to_owned(),
+                raw_link: "http://foo.com".to_owned(),
             }
         );
         assert_eq!(&markdown.as_string()[start..end], "[link with `code`!](http://foo.com)");
@@ -1149,6 +1170,8 @@ mod tests {
             [this one](crate::foo::BestStruct).  Also, this is a nice function: [copy](::std::fs::copy).
 
             [![BestStruct doc](https://example.com/image.png)](crate::foo::BestStruct)
+
+            And it works with backtricks as well: [modules](`crate::amodule`).
             "
         };
 
@@ -1181,6 +1204,64 @@ mod tests {
             this one.  Also, this is a nice function: copy.
 
             ![BestStruct doc](https://example.com/image.png)
+
+            And it works with backtricks as well: modules.
+            "
+        };
+
+        assert_eq!(new_readme.as_string(), expected);
+    }
+
+    #[test]
+    fn test_rewrite_markdown_links_backticked() {
+        let doc = indoc! { r"
+            # Foobini
+
+            This [beautiful crate](`crate`) is cool because it contains [modules](`crate::amodule`)
+            and some other [stuff](https://en.wikipedia.org/wiki/Stuff) as well.
+
+            This link is [broken](`crate::broken`) and this is [not supported](`::foo::bar`), but this
+            should [wor\\k \[fi\]le](f\\i\(n\)e).
+
+            Go ahead and check all the [structs in foo](`crate::foo#structs`) and
+            [structs in foo](`crate::foo`#structs) specifically [this one](`crate::foo::BestStruct`).
+            Also, this is a nice function: [copy](`::std::fs::copy`).
+
+            [![BestStruct doc](https://example.com/image.png)](`crate::foo::BestStruct`)
+            "
+        };
+
+        let symbols_type: HashMap<FQIdentifier, SymbolType> = [
+            (identifier("crate"), SymbolType::Crate),
+            (identifier("crate::amodule"), SymbolType::Mod),
+            (identifier("crate::foo"), SymbolType::Mod),
+            (identifier("crate::foo::BestStruct"), SymbolType::Struct),
+            (identifier("::std::fs::copy"), SymbolType::Fn),
+        ]
+        .into_iter()
+        .collect();
+
+        let new_readme = rewrite_markdown_links(
+            &Doc::from_str(doc),
+            &symbols_type,
+            "foobini",
+            &|_| (),
+            &IntralinksConfig::default(),
+        );
+        let expected = indoc! { r"
+            # Foobini
+
+            This [beautiful crate](https://docs.rs/foobini/latest/foobini/) is cool because it contains [modules](https://docs.rs/foobini/latest/foobini/amodule/)
+            and some other [stuff](https://en.wikipedia.org/wiki/Stuff) as well.
+
+            This link is broken and this is not supported, but this
+            should [wor\\k \[fi\]le](f\\i\(n\)e).
+
+            Go ahead and check all the [structs in foo](https://docs.rs/foobini/latest/foobini/foo/#structs) and
+            [structs in foo](https://docs.rs/foobini/latest/foobini/foo/#structs) specifically [this one](https://docs.rs/foobini/latest/foobini/foo/struct.BestStruct.html).
+            Also, this is a nice function: [copy](https://doc.rust-lang.org/stable/std/fs/fn.copy.html).
+
+            [![BestStruct doc](https://example.com/image.png)](https://docs.rs/foobini/latest/foobini/foo/struct.BestStruct.html)
             "
         };
 

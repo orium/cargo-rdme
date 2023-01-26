@@ -551,6 +551,11 @@ fn integration_test_transform_intralinks_crate_name_hyphen() {
 }
 
 #[test]
+fn integration_test_transform_intralinks_backticked() {
+    run_test("transform_intralinks_backticked");
+}
+
+#[test]
 fn integration_test_option_conf_file_workspace() {
     run_test("option_conf_file_workspace");
 }
