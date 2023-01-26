@@ -91,7 +91,7 @@
 //! //! # fn main() {
 //! //! for i in 2.. {
 //! //!     if is_prime(i) {
-//! //!         println!("{}", i);
+//! //!         println!("{i}");
 //! //!     }
 //! //! }
 //! //! # }
@@ -107,7 +107,7 @@
 //! ```rust
 //! for i in 2.. {
 //!     if is_prime(i) {
-//!         println!("{}", i);
+//!         println!("{i}");
 //!     }
 //! }
 //! ```
@@ -220,7 +220,6 @@
 //!     cargo rdme --check
 //! ```
 
-use crate::console::{print_error, print_warning};
 use crate::options::{EntrypointOpt, LineTerminatorOpt};
 use cargo_rdme::transform::IntralinkError;
 use cargo_rdme::{
@@ -232,6 +231,7 @@ use std::cell::Cell;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
+#[macro_use]
 mod console;
 mod options;
 
@@ -407,7 +407,7 @@ fn transform_doc(
         project.get_package_name(),
         entrypoint,
         |msg| {
-            print_warning(msg);
+            print_warning!("{}", msg);
             had_warnings.set(true);
         },
         options.intralinks.clone(),
@@ -468,14 +468,28 @@ fn run(options: options::Options) -> Result<(), RunError> {
         }
     };
     let original_readme: Readme = Readme::from_file(&readme_path)?;
-    let new_readme: Readme = inject_doc_in_readme(&original_readme, &doc)?;
+    let new_readme = inject_doc_in_readme(&original_readme, &doc)?;
+
+    if !new_readme.had_marker {
+        let msg = indoc::formatdoc! { "
+            No marker found in the README file ({readme_filepath}).
+
+            cargo-rdme expects a marker in the README where the crate’s documentation will
+            be inserted.  This is the marker you should add to your README:
+
+            {marker}",
+            readme_filepath = readme_path.display(),
+            marker = cargo_rdme::MARKER_RDME,
+        };
+        print_info!("{}", msg);
+    }
 
     let line_terminator = line_terminator(options.line_terminator, &readme_path)?;
 
     match options.check {
-        false => update_readme(&new_readme, readme_path, line_terminator, options.force),
+        false => update_readme(&new_readme.readme, readme_path, line_terminator, options.force),
         true => {
-            if !is_readme_up_to_date(&readme_path, &new_readme, line_terminator)? {
+            if !is_readme_up_to_date(&readme_path, &new_readme.readme, line_terminator)? {
                 return Err(RunError::CheckReadmeMismatch);
             }
 
@@ -499,18 +513,18 @@ fn main() {
                 match run(options) {
                     Ok(_) => ExitCode::Ok,
                     Err(e) => {
-                        print_error(&e);
+                        print_error!("{}", &e);
                         e.into()
                     }
                 }
             }
             Err(e) => {
-                print_error(format!("unable to read config file: {}", e));
+                print_error!("unable to read config file: {}", e);
                 ExitCode::Error
             }
         },
         Err(e) => {
-            print_error(format!("unable to get current directory: {}", e));
+            print_error!("unable to get current directory: {}", e);
             ExitCode::Error
         }
     };

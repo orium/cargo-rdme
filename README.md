@@ -82,7 +82,7 @@ tagged with `rust` and hidden lines were removed:
 //! # fn main() {
 //! for i in 2.. {
 //!     if is_prime(i) {
-//!         println!("{}", i);
+//!         println!("{i}");
 //!     }
 //! }
 //! # }
@@ -98,7 +98,7 @@ To check if a number is prime do:
 ```rust
 for i in 2.. {
     if is_prime(i) {
-        println!("{}", i);
+        println!("{i}");
     }
 }
 ```

@@ -7,7 +7,7 @@ use crate::utils::{ItemOrOther, MarkdownItemIterator, Span};
 use crate::{Doc, Readme};
 use thiserror::Error;
 
-const MARKER_RDME: &str = "<!-- cargo-rdme -->";
+pub const MARKER_RDME: &str = "<!-- cargo-rdme -->";
 const MARKER_RDME_START: &str = "<!-- cargo-rdme start -->";
 const MARKER_RDME_END: &str = "<!-- cargo-rdme end -->";
 
@@ -118,7 +118,13 @@ fn bump_heading_level(doc: &Doc, level_bump: u8) -> Doc {
     Doc::from_str(new_doc)
 }
 
-pub fn inject_doc_in_readme(readme: &Readme, doc: &Doc) -> Result<Readme, InjectDocError> {
+pub struct NewReadme {
+    pub readme: Readme,
+    /// Weather the README had a cargo-rdme marker or not.
+    pub had_marker: bool,
+}
+
+pub fn inject_doc_in_readme(readme: &Readme, doc: &Doc) -> Result<NewReadme, InjectDocError> {
     fn inject(new_readme: &mut String, doc: &Doc) {
         new_readme.push_str(MARKER_RDME_START);
         new_readme.push_str("\n\n");
@@ -135,6 +141,7 @@ pub fn inject_doc_in_readme(readme: &Readme, doc: &Doc) -> Result<Readme, Inject
         String::with_capacity(readme.as_string().len() + doc.as_string().len() + 1024);
     let mut inside_markers = false;
     let mut last_heading_level: u8 = 0;
+    let mut had_marker = false;
 
     for item in readme_line_iterator(readme).complete() {
         match (inside_markers, item) {
@@ -157,18 +164,24 @@ pub fn inject_doc_in_readme(readme: &Readme, doc: &Doc) -> Result<Readme, Inject
             (false, ItemOrOther::Item(ReadmeLine::MarkerCargoRdme(_))) => {
                 let doc = bump_heading_level(doc, last_heading_level);
                 inject(&mut new_readme, &doc);
+                had_marker = true;
             }
             (false, ItemOrOther::Item(ReadmeLine::MarkerCargoRdmeStart(_))) => {
                 let doc = bump_heading_level(doc, last_heading_level);
                 inject(&mut new_readme, &doc);
                 inside_markers = true;
+                had_marker = true;
             }
         }
     }
 
     match inside_markers {
         true => Err(InjectDocError::UnmatchedMarkerCargoRdmeStart),
-        false => Ok(Readme::from_str(new_readme)),
+        false => {
+            let new_readme = NewReadme { readme: Readme::from_str(new_readme), had_marker };
+
+            Ok(new_readme)
+        }
     }
 }
 
@@ -280,7 +293,8 @@ mod tests {
 
         let new_readme = inject_doc_in_readme(&readme, &doc).unwrap();
 
-        assert_eq!(new_readme.markdown.as_string(), expected);
+        assert_eq!(new_readme.readme.markdown.as_string(), expected);
+        assert!(new_readme.had_marker);
     }
 
     #[test]
@@ -329,7 +343,8 @@ mod tests {
 
         let new_readme = inject_doc_in_readme(&readme, &doc).unwrap();
 
-        assert_eq!(new_readme.markdown.as_string(), expected);
+        assert_eq!(new_readme.readme.markdown.as_string(), expected);
+        assert!(new_readme.had_marker);
     }
 
     #[test]
@@ -468,7 +483,8 @@ mod tests {
 
         let new_readme = inject_doc_in_readme(&readme, &doc).unwrap();
 
-        assert_eq!(new_readme.markdown.as_string(), expected);
+        assert_eq!(new_readme.readme.markdown.as_string(), expected);
+        assert!(new_readme.had_marker);
     }
 
     #[test]
@@ -534,7 +550,8 @@ mod tests {
 
         let new_readme = inject_doc_in_readme(&readme, &doc).unwrap();
 
-        assert_eq!(new_readme.markdown.as_string(), expected);
+        assert_eq!(new_readme.readme.markdown.as_string(), expected);
+        assert!(new_readme.had_marker);
     }
 
     #[test]
@@ -584,6 +601,7 @@ mod tests {
 
         let new_readme = inject_doc_in_readme(&readme, &doc).unwrap();
 
-        assert_eq!(new_readme.markdown.as_string(), expected);
+        assert_eq!(new_readme.readme.markdown.as_string(), expected);
+        assert!(new_readme.had_marker);
     }
 }

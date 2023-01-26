@@ -47,10 +47,10 @@ git2 = { version = "0.16.1", default-features = false }
 atty = "0.2.14"
 termcolor = "1.1.3"
 cargo_metadata = "0.15.0"
+indoc = "1.0.8"
 
 [dev-dependencies]
 pretty_assertions = "1.3.0"
-indoc = "1.0.7"
 
 [features]
 fatal-warnings = []

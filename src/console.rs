@@ -7,7 +7,9 @@ use std::fmt::Display;
 use std::io::Write;
 use termcolor::ColorChoice;
 use termcolor::WriteColor;
-use termcolor::{Color, ColorSpec, StandardStream};
+use termcolor::{ColorSpec, StandardStream};
+
+pub use termcolor::Color;
 
 fn is_stderr_terminal() -> bool {
     atty::is(atty::Stream::Stderr)
@@ -52,10 +54,28 @@ pub fn print_stderr(level: impl Display, message: impl Display, color: Color) {
     }
 }
 
-pub fn print_error(message: impl Display) {
-    print_stderr("error", message, Color::Red);
+macro_rules! print_error {
+    ($f:literal, $($arg:tt)*) => {{
+        $crate::console::print_stderr(
+            "error",
+            ::std::format!($f, $($arg)*),
+            $crate::console::Color::Red,
+        );
+    }};
 }
 
-pub fn print_warning(message: impl Display) {
-    print_stderr("warning", message, Color::Yellow);
+macro_rules! print_warning {
+    ($f:literal, $($arg:tt)*) => {{
+        $crate::console::print_stderr(
+            "warning",
+            ::std::format!($f, $($arg)*),
+            $crate::console::Color::Yellow,
+        );
+    }};
+}
+
+macro_rules! print_info {
+    ($f:literal, $($arg:tt)*) => {{
+        println!($f, $($arg)*);
+    }};
 }

@@ -32,7 +32,7 @@ pub mod transform;
 pub mod utils;
 
 pub use extract_doc::{extract_doc_from_source_file, ExtractDocError};
-pub use inject_doc::{inject_doc_in_readme, InjectDocError};
+pub use inject_doc::{inject_doc_in_readme, InjectDocError, MARKER_RDME};
 
 #[derive(Error, Debug)]
 pub enum ProjectError {
