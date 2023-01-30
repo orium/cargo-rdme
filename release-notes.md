@@ -1,5 +1,11 @@
 # Release notes
 
+## 1.1.0
+
+* Support backticked intralinks.
+* Print a helpful message when the README is lacking a cargo-rdme marker.
+* Update dependencies.
+
 ## 1.0.2
 
 * Update dependencies.
