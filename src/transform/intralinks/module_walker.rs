@@ -8,7 +8,7 @@ use syn::Ident;
 use syn::Item;
 use thiserror::Error;
 
-use super::FQIdentifier;
+use super::ItemPath;
 
 #[derive(Error, Debug)]
 pub enum ModuleWalkError {
@@ -56,17 +56,16 @@ fn module_filename(dir: &Path, module: &Ident) -> Option<PathBuf> {
 pub(super) fn walk_module_items(
     ast: &[Item],
     dir: &Path,
-    mod_symbol: &FQIdentifier,
-    visit: &mut impl FnMut(&FQIdentifier, &Item),
-    explore_module: &mut impl FnMut(&FQIdentifier, &syn::ItemMod) -> bool,
+    mod_symbol: &ItemPath,
+    visit: &mut impl FnMut(&ItemPath, &Item),
+    explore_module: &mut impl FnMut(&ItemPath, &syn::ItemMod) -> bool,
     emit_warning: &impl Fn(&str),
 ) -> Result<(), ModuleWalkError> {
     for item in ast.iter() {
         visit(mod_symbol, item);
 
         if let Item::Mod(module) = item {
-            let child_module_symbol: FQIdentifier =
-                mod_symbol.clone().join(&module.ident.to_string());
+            let child_module_symbol: ItemPath = mod_symbol.clone().join(&module.ident.to_string());
 
             if explore_module(&child_module_symbol, module) {
                 match &module.content {
@@ -104,9 +103,9 @@ pub(super) fn walk_module_items(
 
 pub(super) fn walk_module_file<P: AsRef<Path>>(
     file: P,
-    mod_symbol: &FQIdentifier,
-    visit: &mut impl FnMut(&FQIdentifier, &Item),
-    explore_module: &mut impl FnMut(&FQIdentifier, &syn::ItemMod) -> bool,
+    mod_symbol: &ItemPath,
+    visit: &mut impl FnMut(&ItemPath, &Item),
+    explore_module: &mut impl FnMut(&ItemPath, &syn::ItemMod) -> bool,
     emit_warning: &impl Fn(&str),
 ) -> Result<(), ModuleWalkError> {
     let dir: &Path = file
