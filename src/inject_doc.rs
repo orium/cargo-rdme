@@ -124,7 +124,11 @@ pub struct NewReadme {
     pub had_marker: bool,
 }
 
-pub fn inject_doc_in_readme(readme: &Readme, doc: &Doc) -> Result<NewReadme, InjectDocError> {
+pub fn inject_doc_in_readme(
+    readme: &Readme,
+    doc: &Doc,
+    heading_base_level: Option<u8>,
+) -> Result<NewReadme, InjectDocError> {
     fn inject(new_readme: &mut String, doc: &Doc) {
         new_readme.push_str(MARKER_RDME_START);
         new_readme.push_str("\n\n");
@@ -162,12 +166,14 @@ pub fn inject_doc_in_readme(readme: &Readme, doc: &Doc) -> Result<NewReadme, Inj
             }
             (false, ItemOrOther::Other(other)) => new_readme.push_str(other),
             (false, ItemOrOther::Item(ReadmeLine::MarkerCargoRdme(_))) => {
-                let doc = bump_heading_level(doc, last_heading_level);
+                let level_bump = heading_base_level.unwrap_or(last_heading_level);
+                let doc = bump_heading_level(doc, level_bump);
                 inject(&mut new_readme, &doc);
                 had_marker = true;
             }
             (false, ItemOrOther::Item(ReadmeLine::MarkerCargoRdmeStart(_))) => {
-                let doc = bump_heading_level(doc, last_heading_level);
+                let level_bump = heading_base_level.unwrap_or(last_heading_level);
+                let doc = bump_heading_level(doc, level_bump);
                 inject(&mut new_readme, &doc);
                 inside_markers = true;
                 had_marker = true;
@@ -291,7 +297,7 @@ mod tests {
         let readme = Readme::from_str(readme_str);
         let doc = Doc::from_str(doc_str);
 
-        let new_readme = inject_doc_in_readme(&readme, &doc).unwrap();
+        let new_readme = inject_doc_in_readme(&readme, &doc, None).unwrap();
 
         assert_eq!(new_readme.readme.markdown.as_string(), expected);
         assert!(new_readme.had_marker);
@@ -341,7 +347,7 @@ mod tests {
         let readme = Readme::from_str(readme_str);
         let doc = Doc::from_str(doc_str);
 
-        let new_readme = inject_doc_in_readme(&readme, &doc).unwrap();
+        let new_readme = inject_doc_in_readme(&readme, &doc, None).unwrap();
 
         assert_eq!(new_readme.readme.markdown.as_string(), expected);
         assert!(new_readme.had_marker);
@@ -368,7 +374,7 @@ mod tests {
         let readme = Readme::from_str(readme_str);
         let doc = Doc::from_str(doc_str);
 
-        let result = inject_doc_in_readme(&readme, &doc);
+        let result = inject_doc_in_readme(&readme, &doc, None);
 
         assert_eq!(result.err(), Some(InjectDocError::UnmatchedMarkerCargoRdmeStart));
     }
@@ -394,7 +400,7 @@ mod tests {
         let readme = Readme::from_str(readme_str);
         let doc = Doc::from_str(doc_str);
 
-        let result = inject_doc_in_readme(&readme, &doc);
+        let result = inject_doc_in_readme(&readme, &doc, None);
 
         assert_eq!(
             result.err(),
@@ -481,7 +487,7 @@ mod tests {
         let readme = Readme::from_str(readme_str);
         let doc = Doc::from_str(doc_str);
 
-        let new_readme = inject_doc_in_readme(&readme, &doc).unwrap();
+        let new_readme = inject_doc_in_readme(&readme, &doc, None).unwrap();
 
         assert_eq!(new_readme.readme.markdown.as_string(), expected);
         assert!(new_readme.had_marker);
@@ -548,7 +554,7 @@ mod tests {
         let readme = Readme::from_str(readme_str);
         let doc = Doc::from_str(doc_str);
 
-        let new_readme = inject_doc_in_readme(&readme, &doc).unwrap();
+        let new_readme = inject_doc_in_readme(&readme, &doc, None).unwrap();
 
         assert_eq!(new_readme.readme.markdown.as_string(), expected);
         assert!(new_readme.had_marker);
@@ -599,7 +605,60 @@ mod tests {
         let readme = Readme::from_str(readme_str);
         let doc = Doc::from_str(doc_str);
 
-        let new_readme = inject_doc_in_readme(&readme, &doc).unwrap();
+        let new_readme = inject_doc_in_readme(&readme, &doc, None).unwrap();
+
+        assert_eq!(new_readme.readme.markdown.as_string(), expected);
+        assert!(new_readme.had_marker);
+    }
+
+    #[test]
+    fn test_inject_doc_with_zero_heading_base_level() {
+        let readme_str = indoc! { r#"
+            # The crate
+
+            This is a really nice crate.
+
+            <!-- cargo-rdme -->
+
+            Hope you enjoy!
+            "#
+        };
+        let doc_str = indoc! { r#"
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+            incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud
+            exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+
+            # Foo
+
+            Aenean dictum in nisi eu rutrum. Suspendisse vulputate tristique turpis eu vestibulum.
+            "#
+        };
+
+        let expected = indoc! { r#"
+            # The crate
+
+            This is a really nice crate.
+
+            <!-- cargo-rdme start -->
+
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+            incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud
+            exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+
+            # Foo
+
+            Aenean dictum in nisi eu rutrum. Suspendisse vulputate tristique turpis eu vestibulum.
+
+            <!-- cargo-rdme end -->
+
+            Hope you enjoy!
+            "#
+        };
+
+        let readme = Readme::from_str(readme_str);
+        let doc = Doc::from_str(doc_str);
+
+        let new_readme = inject_doc_in_readme(&readme, &doc, Some(0)).unwrap();
 
         assert_eq!(new_readme.readme.markdown.as_string(), expected);
         assert!(new_readme.had_marker);

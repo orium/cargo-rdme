@@ -166,6 +166,13 @@
 //! to be resolved).  If cargo rdme is unable to generate the link it will still generate the README
 //! file, but a warning will be emitted.
 //!
+//! ## Heading levels
+//!
+//! The heading levels in the crate’s documentation will, by default, be nested under the level
+//! of the section of the README where it is inserted into.  This behavior can be changed with
+//! the `--heading-base-level` command line flag, or in the configuration file (see example
+//! below).
+//!
 //! # Configuration file
 //!
 //! If the default behavior of `cargo rdme` is not appropriate for your project you can crate a
@@ -184,6 +191,11 @@
 //! # which to extract the documentation from.  It can be useful to also set `readme-path` to create
 //! # the README file in the root of the project.
 //! workspace-project = "subproject"
+//!
+//! # Defines the base heading level to use when inserting the crate’s documentation in the
+//! # README.  If this is not set the crate’s documentation will be inserted with its sections
+//! # belonging to the README section where the insertion happens.
+//! heading-base-level = 0
 //!
 //! # The default entrypoint will be `src/lib.rs`.  You can change that in the `entrypoint` table.
 //! [entrypoint]
@@ -468,7 +480,7 @@ fn run(options: options::Options) -> Result<(), RunError> {
         }
     };
     let original_readme: Readme = Readme::from_file(&readme_path)?;
-    let new_readme = inject_doc_in_readme(&original_readme, &doc)?;
+    let new_readme = inject_doc_in_readme(&original_readme, &doc, options.heading_base_level)?;
 
     if !new_readme.had_marker {
         let msg = indoc::formatdoc! { "

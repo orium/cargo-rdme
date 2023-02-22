@@ -397,6 +397,20 @@ fn integration_test_heading_level_auto_bump() {
 }
 
 #[test]
+fn integration_test_option_conf_file_heading_base_level() {
+    run_test("option_conf_file_heading_base_level");
+}
+
+#[test]
+fn integration_test_option_cmd_heading_base_level() {
+    let test_name = "option_cmd_heading_base_level";
+
+    let option = TestOptions { args: &["--heading-base-level", "3"], ..TestOptions::default() };
+
+    run_test_with_options(test_name, option);
+}
+
+#[test]
 fn integration_test_crate_procmacro() {
     run_test("crate_procmacro");
 }

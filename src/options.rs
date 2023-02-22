@@ -96,6 +96,7 @@ pub struct CmdOptions {
     intralinks_strip_links: bool,
     force: bool,
     readme_path: Option<PathBuf>,
+    heading_base_level: Option<u8>,
 }
 
 fn get_cmd_args() -> Vec<OsString> {
@@ -167,7 +168,13 @@ pub fn cmd_options() -> CmdOptions {
             .long("intralinks-strip-links")
             .help("remove the intralinks")
             .action(ArgAction::SetTrue),
-    )
+        )
+        .arg(
+            Arg::new("heading-base-level")
+                .long("heading-base-level")
+                .help("heading level to be added to the heading level in the rust documentation")
+                .value_parser(value_parser!(u8)),
+        )
         .arg(
             Arg::new("force")
                 .long("force")
@@ -186,6 +193,8 @@ pub fn cmd_options() -> CmdOptions {
 
     let readme_path = cmd_opts.get_one::<PathBuf>("readme-path").cloned();
 
+    let heading_base_level = cmd_opts.get_one::<u8>("heading-base-level").cloned();
+
     CmdOptions {
         workspace_project,
         entrypoint,
@@ -195,6 +204,7 @@ pub fn cmd_options() -> CmdOptions {
         intralinks_strip_links: cmd_opts.get_flag("intralinks-strip-links"),
         force: cmd_opts.get_flag("force"),
         readme_path,
+        heading_base_level,
     }
 }
 
@@ -217,6 +227,7 @@ pub struct ConfigFileOptions {
     entrypoint: Option<EntrypointOpt>,
     readme_path: Option<PathBuf>,
     intralinks: Option<IntralinksConfig>,
+    heading_base_level: Option<u8>,
 }
 
 fn config_file_options_from_str(
@@ -258,6 +269,16 @@ fn config_file_options_from_str(
     let readme_path =
         config_toml.get("readme-path").and_then(toml::Value::as_str).map(PathBuf::from);
 
+    let heading_base_level: Option<u8> = match config_toml
+        .get("heading-base-level")
+        .and_then(toml::Value::as_integer)
+        .map(|i| i.try_into())
+    {
+        None => None,
+        Some(Ok(l)) => Some(l),
+        Some(Err(_)) => return Err(ConfigFileOptionsError::InvalidField("heading-base-level")),
+    };
+
     let intralinks_table = config_toml.get("intralinks").and_then(toml::Value::as_table);
 
     let intralinks_docs_rs_base_url =
@@ -281,6 +302,7 @@ fn config_file_options_from_str(
         entrypoint,
         readme_path,
         intralinks,
+        heading_base_level,
     })
 }
 
@@ -307,6 +329,7 @@ pub struct Options {
     pub force: bool,
     pub readme_path: Option<PathBuf>,
     pub intralinks: Option<IntralinksConfig>,
+    pub heading_base_level: Option<u8>,
 }
 
 #[allow(clippy::needless_pass_by_value)]
@@ -353,6 +376,9 @@ pub fn merge_options(
                     .and_then(|il| il.strip_links),
             },
         }),
+        heading_base_level: cmd_options
+            .heading_base_level
+            .or_else(|| config_file_options.and_then(|c| c.heading_base_level)),
     }
 }
 
@@ -369,6 +395,7 @@ mod tests {
             readme-path = "ReAdMe.md"
             workspace-project = "myproj"
             line-terminator = "crlf"
+            heading-base-level = 3
 
             [entrypoint]
             type = "bin"
@@ -395,6 +422,7 @@ mod tests {
                 },
                 strip_links: Some(true),
             }),
+            heading_base_level: Some(3),
         };
 
         assert_eq!(config_file_opts, expected);
@@ -411,6 +439,7 @@ mod tests {
             intralinks_strip_links: true,
             force: true,
             readme_path: Some(PathBuf::from("rEaDmE.md")),
+            heading_base_level: Some(4),
         };
         let config_file_options = ConfigFileOptions {
             workspace_project: Some("aproj".to_owned()),
@@ -424,6 +453,7 @@ mod tests {
                 },
                 strip_links: Some(false),
             }),
+            heading_base_level: Some(3),
         };
 
         let options = merge_options(cmd_options, Some(config_file_options));
@@ -443,6 +473,7 @@ mod tests {
                 },
                 strip_links: Some(true),
             }),
+            heading_base_level: Some(4),
         };
 
         assert_eq!(options, expected);
