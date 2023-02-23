@@ -1,5 +1,10 @@
 # Release notes
 
+## 1.2.0
+
+* Allow the heading base level to be configurable.
+* Update dependencies.
+
 ## 1.1.0
 
 * Support backticked intralinks.
