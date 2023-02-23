@@ -6,7 +6,7 @@
 use itertools::Itertools;
 use std::ops::Range;
 
-#[derive(Eq, PartialEq, Debug, Clone)]
+#[derive(Eq, PartialEq, Debug, Clone, Ord, PartialOrd)]
 pub struct Span {
     pub start: usize,
     pub end: usize,

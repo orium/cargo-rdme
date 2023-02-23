@@ -98,7 +98,7 @@ where
             true => HashMap::new(),
         };
 
-        let new_doc = rewrite_markdown_links(
+        let doc_with_new_links = rewrite_markdown_links(
             doc,
             &symbols_type,
             &self.crate_name,
@@ -106,7 +106,15 @@ where
             &self.config,
         );
 
-        Ok(new_doc)
+        let doc_with_new_links_and_ref_defs = rewrite_reference_definitions(
+            &doc_with_new_links,
+            &symbols_type,
+            &self.crate_name,
+            &self.emit_warning,
+            &self.config,
+        );
+
+        Ok(doc_with_new_links_and_ref_defs)
     }
 }
 
@@ -402,10 +410,27 @@ fn all_supermodules<'a>(symbols: impl Iterator<Item = &'a ItemPath>) -> HashSet<
 #[derive(Eq, PartialEq, Clone, Debug)]
 struct MarkdownInlineLink {
     text: String,
+    inner: MarkdownLink,
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+struct MarkdownLink {
     raw_link: String,
 }
 
-impl MarkdownInlineLink {
+impl From<String> for MarkdownLink {
+    fn from(raw_link: String) -> Self {
+        Self { raw_link }
+    }
+}
+
+impl std::fmt::Display for MarkdownLink {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.raw_link.fmt(f)
+    }
+}
+
+impl MarkdownLink {
     fn link_as_item_path(&self) -> Option<ItemPath> {
         let link = self.split_link_fragment().0;
 
@@ -460,9 +485,9 @@ fn markdown_inline_link_iterator(markdown: &Markdown) -> MarkdownItemIterator<Ma
             in_link = false;
 
             let text = source[start_text..end_text].to_owned();
-            let raw_link = source[(end_text + 2)..(range.end - 1)].to_owned();
+            let link = source[(end_text + 2)..(range.end - 1)].to_owned().into();
 
-            Some((range.into(), MarkdownInlineLink { text, raw_link }))
+            Some((range.into(), MarkdownInlineLink { text, inner: link }))
         }
         _ => {
             if in_link {
@@ -478,7 +503,7 @@ fn markdown_inline_link_iterator(markdown: &Markdown) -> MarkdownItemIterator<Ma
 fn extract_markdown_intralink_symbols(doc: &Doc) -> HashSet<ItemPath> {
     markdown_inline_link_iterator(&doc.markdown)
         .items()
-        .flat_map(|l| l.link_as_item_path().into_iter())
+        .flat_map(|l| l.inner.link_as_item_path().into_iter())
         .collect()
 }
 
@@ -541,7 +566,7 @@ enum MarkdownLinkAction {
 }
 
 fn markdown_link(
-    link: &MarkdownInlineLink,
+    link: &MarkdownLink,
     symbols_type: &HashMap<ItemPath, SymbolType>,
     crate_name: &str,
     emit_warning: &impl Fn(&str),
@@ -552,12 +577,7 @@ fn markdown_link(
             let typ = symbols_type[&symbol];
             let new_link = documentation_url(&symbol, typ, crate_name, &config.docs_rs);
 
-            MarkdownLinkAction::Link(format!(
-                "[{}]({}{})",
-                link.text,
-                new_link,
-                link.link_fragment()
-            ))
+            MarkdownLinkAction::Link(format!("{}{}", new_link, link.link_fragment()))
         }
         Some(symbol) => {
             emit_warning(&format!("Could not find definition of `{}`.", symbol));
@@ -586,8 +606,10 @@ fn rewrite_markdown_links(
                 let strip_links = config.strip_links.unwrap_or(false);
 
                 let markdown_link: MarkdownLinkAction = match strip_links {
-                    false => markdown_link(&link, symbols_type, crate_name, emit_warning, config),
-                    true => match link.link_as_item_path() {
+                    false => {
+                        markdown_link(&link.inner, symbols_type, crate_name, emit_warning, config)
+                    }
+                    true => match link.inner.link_as_item_path() {
                         None => MarkdownLinkAction::Preserve,
                         Some(_) => MarkdownLinkAction::Strip,
                     },
@@ -595,13 +617,68 @@ fn rewrite_markdown_links(
 
                 match markdown_link {
                     MarkdownLinkAction::Link(markdown_link) => {
-                        new_doc.push_str(&markdown_link);
+                        new_doc.push_str(&format!("[{}]({})", link.text, markdown_link));
                     }
                     MarkdownLinkAction::Preserve => {
-                        new_doc.push_str(&format!("[{}]({})", link.text, link.raw_link));
+                        new_doc.push_str(&format!("[{}]({})", link.text, link.inner));
                     }
                     MarkdownLinkAction::Strip => {
                         new_doc.push_str(&link.text);
+                    }
+                }
+            }
+            ItemOrOther::Other(other) => {
+                new_doc.push_str(other);
+            }
+        }
+    }
+
+    Doc::from_str(new_doc)
+}
+
+fn rewrite_reference_definitions(
+    doc: &Doc,
+    symbols_type: &HashMap<ItemPath, SymbolType>,
+    crate_name: &str,
+    emit_warning: &impl Fn(&str),
+    config: &IntralinksConfig,
+) -> Doc {
+    use crate::utils::ItemOrOther;
+    use pulldown_cmark::{LinkDef, Options, Parser};
+
+    let source = doc.as_string();
+    let parser = Rc::new(Parser::new_ext(source, Options::all()));
+
+    // It seems `Parser::reference_definitions` need not traverse the definitions in order. But
+    // `MarkdownItemIterator::complete` expects the iterated-over spans to be in order.
+    let btree = parser
+        .reference_definitions()
+        .iter()
+        .map(|ref_def| (crate::utils::Span::from(ref_def.1.span.clone()), ref_def))
+        .collect::<std::collections::BTreeMap<_, _>>();
+
+    let iter = MarkdownItemIterator::new(source, btree.into_iter());
+
+    let mut new_doc = String::with_capacity(doc.as_string().len());
+
+    for item_or_other in iter.complete() {
+        match item_or_other {
+            ItemOrOther::Item((key, LinkDef { dest, title, span })) => {
+                let link = MarkdownLink { raw_link: dest.to_string() };
+                let markdown_link =
+                    markdown_link(&link, symbols_type, crate_name, emit_warning, config);
+
+                match (&markdown_link, title) {
+                    (MarkdownLinkAction::Link(markdown_link), None) => {
+                        new_doc.push_str(&format!("[{key}]: {markdown_link}"));
+                    }
+                    _ => {
+                        if matches!(markdown_link, MarkdownLinkAction::Link(_)) {
+                            emit_warning(
+                                "Rewriting link definitions with titles is not supported.",
+                            );
+                        }
+                        new_doc.push_str(&source[span.clone()]);
                     }
                 }
             }
@@ -727,7 +804,7 @@ mod tests {
             link,
             MarkdownInlineLink {
                 text: "another".to_owned(),
-                raw_link: "http://foo.com".to_owned()
+                inner: "http://foo.com".to_owned().into()
             }
         );
         assert_eq!(&markdown.as_string()[start..end], "[another](http://foo.com)");
@@ -742,7 +819,7 @@ mod tests {
             link,
             MarkdownInlineLink {
                 text: "another".to_owned(),
-                raw_link: "http://foo.com".to_owned()
+                inner: "http://foo.com".to_owned().into()
             }
         );
         assert_eq!(&markdown.as_string()[start..end], "[another](http://foo.com)");
@@ -757,7 +834,7 @@ mod tests {
             link,
             MarkdownInlineLink {
                 text: "another [text] (foo)".to_owned(),
-                raw_link: "http://foo.com/foo(bar)".to_owned(),
+                inner: "http://foo.com/foo(bar)".to_owned().into(),
             }
         );
         assert_eq!(
@@ -777,7 +854,7 @@ mod tests {
             link,
             MarkdownInlineLink {
                 text: "another".to_owned(),
-                raw_link: r"http://foo.\(com\)".to_owned(),
+                inner: r"http://foo.\(com\)".to_owned().into(),
             }
         );
         assert_eq!(&markdown.as_string()[start..end], r"[another](http://foo.\(com\))");
@@ -802,7 +879,7 @@ mod tests {
             link,
             MarkdownInlineLink {
                 text: "link with `code`!".to_owned(),
-                raw_link: "http://foo.com".to_owned(),
+                inner: "http://foo.com".to_owned().into(),
             }
         );
         assert_eq!(&markdown.as_string()[start..end], "[link with `code`!](http://foo.com)");
@@ -1259,6 +1336,86 @@ mod tests {
 
             [![BestStruct doc](https://example.com/image.png)](https://docs.rs/foobini/latest/foobini/foo/struct.BestStruct.html)
             "
+        };
+
+        assert_eq!(new_readme.as_string(), expected);
+    }
+
+    #[test]
+    fn test_markdown_reference_definitions() {
+        let doc = indoc! { r#"
+            # Foobini
+
+            This [beautiful crate] is cool because it contains [modules]
+            and some other [stuff] as well.
+
+            This link is [broken] and this is [not supported], [nor this],
+            but this should [wor\\k \[fi\]le].
+
+            Go ahead and check all the [structs in foo] specifically
+            [this one].  Also, this is a nice function: [copy].
+
+            [![BestStruct doc]][BestStruct]
+
+            [beautiful crate]: crate
+            [modules]: crate::amodule
+            [stuff]: https://en.wikipedia.org/wiki/Stuff
+            [broken]: crate::broken
+            [not supported]: ::foo::bar
+            [nor this]: crate::foo::BestStruct "title"
+            [wor\\k \[fi\]le]: f\\i\(n\)e
+            [structs in foo]: crate::foo#structs
+            [this one]: crate::foo::BestStruct
+            [copy]: ::std::fs::copy
+            [BestStruct doc]: https://example.com/image.png
+            [BestStruct]: crate::foo::BestStruct
+            "#
+        };
+
+        let symbols_type: HashMap<ItemPath, SymbolType> = [
+            (item_path("crate"), SymbolType::Crate),
+            (item_path("crate::amodule"), SymbolType::Mod),
+            (item_path("crate::foo"), SymbolType::Mod),
+            (item_path("crate::foo::BestStruct"), SymbolType::Struct),
+            (item_path("::std::fs::copy"), SymbolType::Fn),
+        ]
+        .into_iter()
+        .collect();
+
+        let new_readme = rewrite_reference_definitions(
+            &Doc::from_str(doc),
+            &symbols_type,
+            "foobini",
+            &|_| (),
+            &IntralinksConfig::default(),
+        );
+        let expected = indoc! { r#"
+            # Foobini
+
+            This [beautiful crate] is cool because it contains [modules]
+            and some other [stuff] as well.
+
+            This link is [broken] and this is [not supported], [nor this],
+            but this should [wor\\k \[fi\]le].
+
+            Go ahead and check all the [structs in foo] specifically
+            [this one].  Also, this is a nice function: [copy].
+
+            [![BestStruct doc]][BestStruct]
+
+            [beautiful crate]: https://docs.rs/foobini/latest/foobini/
+            [modules]: https://docs.rs/foobini/latest/foobini/amodule/
+            [stuff]: https://en.wikipedia.org/wiki/Stuff
+            [broken]: crate::broken
+            [not supported]: ::foo::bar
+            [nor this]: crate::foo::BestStruct "title"
+            [wor\\k \[fi\]le]: f\\i\(n\)e
+            [structs in foo]: https://docs.rs/foobini/latest/foobini/foo/#structs
+            [this one]: https://docs.rs/foobini/latest/foobini/foo/struct.BestStruct.html
+            [copy]: https://doc.rust-lang.org/stable/std/fs/fn.copy.html
+            [BestStruct doc]: https://example.com/image.png
+            [BestStruct]: https://docs.rs/foobini/latest/foobini/foo/struct.BestStruct.html
+        "#
         };
 
         assert_eq!(new_readme.as_string(), expected);
