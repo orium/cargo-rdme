@@ -1,5 +1,10 @@
 # Release notes
 
+## 1.3.0
+
+* Support intralinks in reference-style links.
+* Update dependencies.
+
 ## 1.2.0
 
 * Allow the heading base level to be configurable.
