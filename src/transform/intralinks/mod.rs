@@ -1052,7 +1052,7 @@ mod tests {
             and some other [stuff](https://en.wikipedia.org/wiki/Stuff) as well.
 
             This link is [broken](crate::broken) and this is [not supported](::foo::bar), but this
-            should [wor\\k \[fi\]le](f\\i\(n\)e).
+            should [wor\\k \[fi\]ne](f\\i\(n\)e).
 
             Go ahead and check all the [structs in foo](crate::foo#structs) specifically
             [this one](crate::foo::BestStruct).  Also, this is a nice function: [copy](::std::fs::copy).
@@ -1086,7 +1086,7 @@ mod tests {
             and some other [stuff](https://en.wikipedia.org/wiki/Stuff) as well.
 
             This link is broken and this is not supported, but this
-            should [wor\\k \[fi\]le](f\\i\(n\)e).
+            should [wor\\k \[fi\]ne](f\\i\(n\)e).
 
             Go ahead and check all the [structs in foo](https://docs.rs/foobini/latest/foobini/foo/#structs) specifically
             [this one](https://docs.rs/foobini/latest/foobini/foo/struct.BestStruct.html).  Also, this is a nice function: [copy](https://doc.rust-lang.org/stable/std/fs/fn.copy.html).
@@ -1107,7 +1107,7 @@ mod tests {
             and some other [stuff](https://en.wikipedia.org/wiki/Stuff) as well.
 
             This link is [broken](crate::broken) and this is [not supported](::foo::bar), but this
-            should [wor\\k \[fi\]le](f\\i\(n\)e).
+            should [wor\\k \[fi\]ne](f\\i\(n\)e).
 
             Go ahead and check all the [structs in foo](crate::foo#structs) specifically
             [this one](crate::foo::BestStruct).  Also, this is a nice function: [copy](::std::fs::copy).
@@ -1146,7 +1146,7 @@ mod tests {
             and some other [stuff](https://en.wikipedia.org/wiki/Stuff) as well.
 
             This link is broken and this is not supported, but this
-            should [wor\\k \[fi\]le](f\\i\(n\)e).
+            should [wor\\k \[fi\]ne](f\\i\(n\)e).
 
             Go ahead and check all the structs in foo specifically
             this one.  Also, this is a nice function: copy.
@@ -1172,7 +1172,7 @@ mod tests {
             and some other [stuff](https://en.wikipedia.org/wiki/Stuff) as well.
 
             This link is [broken](`crate::broken`) and this is [not supported](`::foo::bar`), but this
-            should [wor\\k \[fi\]le](f\\i\(n\)e).
+            should [wor\\k \[fi\]ne](f\\i\(n\)e).
 
             Go ahead and check all the [structs in foo](`crate::foo#structs`) and
             [structs in foo](`crate::foo`#structs) specifically [this one](`crate::foo::BestStruct`).
@@ -1207,7 +1207,7 @@ mod tests {
             and some other [stuff](https://en.wikipedia.org/wiki/Stuff) as well.
 
             This link is broken and this is not supported, but this
-            should [wor\\k \[fi\]le](f\\i\(n\)e).
+            should [wor\\k \[fi\]ne](f\\i\(n\)e).
 
             Go ahead and check all the [structs in foo](https://docs.rs/foobini/latest/foobini/foo/#structs) and
             [structs in foo](https://docs.rs/foobini/latest/foobini/foo/#structs) specifically [this one](https://docs.rs/foobini/latest/foobini/foo/struct.BestStruct.html).
@@ -1229,7 +1229,7 @@ mod tests {
             and some other [stuff] as well.
 
             This link is [broken] and this is [not supported],
-            but this should [wor\\k \[fi\]le].
+            but this should [wor\\k \[fi\]ne].
 
             Go ahead and check all the [structs in foo] specifically
             [this one].  Also, this is a nice function: [copy][cp].
@@ -1241,7 +1241,7 @@ mod tests {
             [stuff]: https://en.wikipedia.org/wiki/Stuff
             [broken]: crate::broken
             [not supported]: ::foo::bar
-            [wor\\k \[fi\]le]: f\\i\(n\)e
+            [wor\\k \[fi\]ne]: f\\i\(n\)e
             [structs in foo]: crate::foo#structs
             [this one]: crate::foo::BestStruct
             [cp]: ::std::fs::copy#examples "A title here"
@@ -1274,7 +1274,7 @@ mod tests {
             and some other [stuff] as well.
 
             This link is broken and this is not supported,
-            but this should [wor\\k \[fi\]le].
+            but this should [wor\\k \[fi\]ne].
 
             Go ahead and check all the [structs in foo] specifically
             [this one].  Also, this is a nice function: [copy][cp].
@@ -1284,7 +1284,7 @@ mod tests {
             [beautiful crate]: https://docs.rs/foobini/latest/foobini/
             [modules]: https://docs.rs/foobini/latest/foobini/amodule/
             [stuff]: https://en.wikipedia.org/wiki/Stuff
-            [wor\\k \[fi\]le]: f\\i\(n\)e
+            [wor\\k \[fi\]ne]: f\\i\(n\)e
             [structs in foo]: https://docs.rs/foobini/latest/foobini/foo/#structs
             [this one]: https://docs.rs/foobini/latest/foobini/foo/struct.BestStruct.html
             [cp]: https://doc.rust-lang.org/stable/std/fs/fn.copy.html#examples "A title here"
