@@ -126,7 +126,7 @@
 //! Currently we only support links of the form `[⋯](crate::⋯)`, so be sure to use that format.
 //! Links to the standard library are also supported, and they must be of the form
 //! `[⋯](::<crate>::⋯)`, where `<crate>` is a crate that is part of the standard library, such as
-//! `std`, `core`, or `alloc`.
+//! `std`, `core`, or `alloc`.  Reference-style links are also supported.
 //!
 //! Take a look at the example below:
 //!

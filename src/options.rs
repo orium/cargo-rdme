@@ -193,7 +193,7 @@ pub fn cmd_options() -> CmdOptions {
 
     let readme_path = cmd_opts.get_one::<PathBuf>("readme-path").cloned();
 
-    let heading_base_level = cmd_opts.get_one::<u8>("heading-base-level").cloned();
+    let heading_base_level = cmd_opts.get_one::<u8>("heading-base-level").copied();
 
     CmdOptions {
         workspace_project,
@@ -272,7 +272,7 @@ fn config_file_options_from_str(
     let heading_base_level: Option<u8> = match config_toml
         .get("heading-base-level")
         .and_then(toml::Value::as_integer)
-        .map(|i| i.try_into())
+        .map(TryInto::try_into)
     {
         None => None,
         Some(Ok(l)) => Some(l),

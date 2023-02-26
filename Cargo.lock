@@ -60,6 +60,7 @@ dependencies = [
  "termcolor",
  "thiserror",
  "toml",
+ "unicase",
 ]
 
 [[package]]
