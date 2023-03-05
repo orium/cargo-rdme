@@ -1,5 +1,10 @@
 # Release notes
 
+## 1.4.0
+
+* Support intralinks to methods and other `impl` items.
+* Update dependencies.
+
 ## 1.3.0
 
 * Support intralinks in reference-style links.
