@@ -326,6 +326,11 @@ fn integration_test_transform_intralinks_simple() {
 }
 
 #[test]
+fn integration_test_transform_intralinks_method() {
+    run_test("transform_intralinks_impl_items");
+}
+
+#[test]
 fn integration_test_transform_intralinks_reference_links() {
     run_test("transform_intralinks_reference_links");
 }

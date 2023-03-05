@@ -135,7 +135,9 @@ fn rewrite_links(
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum ItemPathAnchor {
+    /// The anchor of a path starting with `::` such as `::std::fs::read`.
     Root,
+    /// The anchor of a path starting with `crate` such as `crate::foo::is_prime`.
     Crate,
 }
 
@@ -156,7 +158,7 @@ impl ItemPath {
     }
 
     fn root(crate_name: &str) -> ItemPath {
-        ItemPath::new(ItemPathAnchor::Root).join(crate_name)
+        ItemPath::new(ItemPathAnchor::Root).join(&crate_name)
     }
 
     fn from_string(s: &str) -> Option<ItemPath> {
@@ -184,8 +186,8 @@ impl ItemPath {
         Some(ItemPath { anchor, path_end: path.len(), path_shared: path })
     }
 
-    fn path(&self) -> &[String] {
-        &self.path_shared[0..self.path_end]
+    fn path_components(&self) -> impl Iterator<Item = &str> {
+        self.path_shared[0..self.path_end].iter().map(String::as_str)
     }
 
     fn is_toplevel(&self) -> bool {
@@ -205,7 +207,11 @@ impl ItemPath {
         }
     }
 
-    fn join(mut self, s: &str) -> ItemPath {
+    fn name(&self) -> Option<&str> {
+        self.path_end.checked_sub(1).and_then(|i| self.path_shared.get(i)).map(String::as_str)
+    }
+
+    fn join(mut self, s: &impl ToString) -> ItemPath {
         let path = Rc::make_mut(&mut self.path_shared);
         path.truncate(self.path_end);
         path.push(s.to_string());
@@ -222,7 +228,7 @@ impl ItemPath {
 
 impl PartialEq for ItemPath {
     fn eq(&self, other: &Self) -> bool {
-        self.anchor == other.anchor && self.path() == other.path()
+        self.anchor == other.anchor && self.path_components().eq(other.path_components())
     }
 }
 
@@ -231,7 +237,7 @@ impl Eq for ItemPath {}
 impl Hash for ItemPath {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.anchor.hash(state);
-        self.path().hash(state);
+        self.path_components().for_each(|c| c.hash(state));
     }
 }
 
@@ -242,7 +248,7 @@ impl fmt::Display for ItemPath {
             ItemPathAnchor::Crate => f.write_str("crate")?,
         }
 
-        for s in self.path().iter() {
+        for s in self.path_components() {
             f.write_str("::")?;
             f.write_str(s)?;
         }
@@ -258,6 +264,13 @@ impl fmt::Debug for ItemPath {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum ImplSymbolType {
+    Method,
+    Const,
+    Type,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum SymbolType {
     Crate,
     Struct,
@@ -270,28 +283,116 @@ pub enum SymbolType {
     Const,
     Fn,
     Static,
+    ImplItem(ImplSymbolType),
 }
 
-fn symbol_type(module: &ItemPath, item: &Item) -> Option<(ItemPath, SymbolType)> {
-    let (ident, symbol_type) = match item {
-        Item::Enum(e) => (e.ident.to_string(), SymbolType::Enum),
-        Item::Struct(s) => (s.ident.to_string(), SymbolType::Struct),
-        Item::Trait(t) => (t.ident.to_string(), SymbolType::Trait),
-        Item::Union(u) => (u.ident.to_string(), SymbolType::Union),
-        Item::Type(t) => (t.ident.to_string(), SymbolType::Type),
-        Item::Mod(m) => (m.ident.to_string(), SymbolType::Mod),
-        Item::Macro(syn::ItemMacro { ident: Some(ident), .. }) => {
-            (ident.to_string(), SymbolType::Macro)
+impl SymbolType {
+    /// Returns the path of the module where this item is defined.
+    ///
+    /// Importantly, if inse module `crate::amod` we have a `struct Foo` with method `Foo::method()`,
+    /// this will `Foo::method()` return `crate::amod`.
+    fn get_module_path(self, path: &ItemPath) -> Option<ItemPath> {
+        match self {
+            SymbolType::Crate => {
+                assert!(path.is_toplevel(), "a crate should always be in a toplevel path");
+                None
+            }
+            SymbolType::Struct
+            | SymbolType::Trait
+            | SymbolType::Enum
+            | SymbolType::Union
+            | SymbolType::Type
+            | SymbolType::Mod
+            | SymbolType::Macro
+            | SymbolType::Const
+            | SymbolType::Fn
+            | SymbolType::Static => {
+                let p = path.clone().parent().unwrap_or_else(|| {
+                    panic!("item {} of type {:?} should have a parent module", path, self)
+                });
+                Some(p)
+            }
+            SymbolType::ImplItem(_) => {
+                let p = path
+                    .clone()
+                    .parent()
+                    .unwrap_or_else(|| {
+                        panic!("item {} of type {:?} should have a parent type", path, self)
+                    })
+                    .parent()
+                    .unwrap_or_else(|| {
+                        panic!("item {} of type {:?} should have a parent module", path, self)
+                    });
+                Some(p)
+            }
         }
-        Item::Macro2(m) => (m.ident.to_string(), SymbolType::Macro),
-        Item::Const(c) => (c.ident.to_string(), SymbolType::Const),
-        Item::Fn(f) => (f.sig.ident.to_string(), SymbolType::Fn),
-        Item::Static(s) => (s.ident.to_string(), SymbolType::Static),
+    }
+}
 
-        _ => return None,
+fn symbols_type_impl_block(
+    module: &ItemPath,
+    impl_block: &syn::ItemImpl,
+) -> Vec<(ItemPath, SymbolType)> {
+    use syn::{ImplItem, Type, TypePath};
+
+    if let Type::Path(TypePath { qself: None, path }) = &*impl_block.self_ty {
+        if let Some(self_ident) = path.get_ident().map(ToString::to_string) {
+            let self_path = module.clone().join(&self_ident);
+
+            return impl_block
+                .items
+                .iter()
+                .filter_map(|item| match item {
+                    ImplItem::Method(m) => {
+                        let ident = m.sig.ident.to_string();
+
+                        Some((ident, ImplSymbolType::Method))
+                    }
+                    ImplItem::Const(c) => {
+                        let ident = c.ident.to_string();
+
+                        Some((ident, ImplSymbolType::Const))
+                    }
+                    ImplItem::Type(t) => {
+                        let ident = t.ident.to_string();
+
+                        Some((ident, ImplSymbolType::Type))
+                    }
+                    _ => None,
+                })
+                .map(|(ident, tpy)| (self_path.clone().join(&ident), SymbolType::ImplItem(tpy)))
+                .collect();
+        }
+    }
+
+    Vec::new()
+}
+
+fn item_symbols_type(module: &ItemPath, item: &Item) -> Vec<(ItemPath, SymbolType)> {
+    let item_path = |ident: &syn::Ident| module.clone().join(ident);
+
+    let (path, symbol_type) = match item {
+        Item::Enum(e) => (item_path(&e.ident), SymbolType::Enum),
+        Item::Struct(s) => (item_path(&s.ident), SymbolType::Struct),
+        Item::Trait(t) => (item_path(&t.ident), SymbolType::Trait),
+        Item::Union(u) => (item_path(&u.ident), SymbolType::Union),
+        Item::Type(t) => (item_path(&t.ident), SymbolType::Type),
+        Item::Mod(m) => (item_path(&m.ident), SymbolType::Mod),
+        Item::Macro(syn::ItemMacro { ident: Some(ident), .. }) => {
+            (item_path(ident), SymbolType::Macro)
+        }
+        Item::Macro2(m) => (item_path(&m.ident), SymbolType::Macro),
+        Item::Const(c) => (item_path(&c.ident), SymbolType::Const),
+        Item::Fn(f) => (item_path(&f.sig.ident), SymbolType::Fn),
+        Item::Static(s) => (item_path(&s.ident), SymbolType::Static),
+        Item::Impl(impl_block) => {
+            return symbols_type_impl_block(module, impl_block);
+        }
+
+        _ => return Vec::new(),
     };
 
-    Some((module.clone().join(&ident), symbol_type))
+    vec![(path, symbol_type)]
 }
 
 fn is_cfg_test(attribute: &syn::Attribute) -> bool {
@@ -306,7 +407,7 @@ fn visit_module_item(
     module: &ItemPath,
     item: &Item,
 ) {
-    if let Some((symbol, symbol_type)) = symbol_type(module, item) {
+    for (symbol, symbol_type) in item_symbols_type(module, item) {
         if save_symbol(&symbol) {
             symbols_type.insert(symbol, symbol_type);
         }
@@ -353,7 +454,7 @@ fn explore_crate<P: AsRef<Path>>(
     file: P,
     crate_symbol: &ItemPath,
     symbols: &HashSet<ItemPath>,
-    modules_to_explore: &HashSet<ItemPath>,
+    paths_to_explore: &HashSet<ItemPath>,
     symbols_type: &mut HashMap<ItemPath, SymbolType>,
     emit_warning: &impl Fn(&str),
 ) -> Result<(), module_walker::ModuleWalkError> {
@@ -363,12 +464,19 @@ fn explore_crate<P: AsRef<Path>>(
     symbols_type.insert(crate_symbol.clone(), SymbolType::Crate);
 
     let mut visit = |module: &ItemPath, item: &Item| {
-        visit_module_item(|symbol| symbols.contains(symbol), symbols_type, module, item);
+        let save_symbol = |symbol: &ItemPath| {
+            // We also check if it belongs to the paths to explore because of impl items (e.g. a
+            // method `Foo::method` we need to know about `Foo` type.  For instance if `Foo` is a
+            // struct then the link will be `⋯/struct.Foo.html#method.method`.
+            symbols.contains(symbol) || paths_to_explore.contains(symbol)
+        };
+
+        visit_module_item(save_symbol, symbols_type, module, item);
     };
 
     let mut explore_module = |mod_symbol: &ItemPath, mod_item: &ItemMod| -> bool {
         check_explore_module(
-            |mod_symbol| modules_to_explore.contains(mod_symbol),
+            |mod_symbol| paths_to_explore.contains(mod_symbol),
             &mut modules_visited,
             mod_symbol,
             mod_item,
@@ -383,7 +491,7 @@ fn load_symbols_type<P: AsRef<Path>>(
     symbols: &HashSet<ItemPath>,
     emit_warning: &impl Fn(&str),
 ) -> Result<HashMap<ItemPath, SymbolType>, IntralinkError> {
-    let modules_to_explore: HashSet<ItemPath> = all_supermodules(symbols.iter());
+    let paths_to_explore: HashSet<ItemPath> = all_ancestor_paths(symbols.iter());
     let mut symbols_type: HashMap<ItemPath, SymbolType> = HashMap::new();
 
     // Only load standard library information if needed.
@@ -397,7 +505,7 @@ fn load_symbols_type<P: AsRef<Path>>(
             entrypoint,
             &ItemPath::root(&name),
             symbols,
-            &modules_to_explore,
+            &paths_to_explore,
             &mut symbols_type,
             emit_warning,
         )?;
@@ -407,7 +515,7 @@ fn load_symbols_type<P: AsRef<Path>>(
         entry_point,
         &ItemPath::new(ItemPathAnchor::Crate),
         symbols,
-        &modules_to_explore,
+        &paths_to_explore,
         &mut symbols_type,
         emit_warning,
     )?;
@@ -415,10 +523,10 @@ fn load_symbols_type<P: AsRef<Path>>(
     Ok(symbols_type)
 }
 
-/// Create a set with all supermodules in `symbols`.  For instance, if `symbols` is
+/// Create a set with all ancestor paths of `symbols`.  For instance, if `symbols` is
 /// `{crate::foo::bar::baz, crate::baz::mumble}` it will return
 /// `{crate, crate::foo, crate::foo::bar, crate::baz}`.
-fn all_supermodules<'a>(symbols: impl Iterator<Item = &'a ItemPath>) -> HashSet<ItemPath> {
+fn all_ancestor_paths<'a>(symbols: impl Iterator<Item = &'a ItemPath>) -> HashSet<ItemPath> {
     symbols.into_iter().flat_map(ItemPath::all_ancestors).collect()
 }
 
@@ -436,19 +544,23 @@ fn extract_markdown_intralink_symbols(doc: &Doc) -> HashSet<ItemPath> {
     item_paths_inline_links.chain(item_paths_reference_link_def).collect()
 }
 
+/// Returns the url for the item.
+///
+/// This returns `None` if the item type(s) was not successfully resolved.
 fn documentation_url(
-    symbol: &ItemPath,
-    typ: SymbolType,
+    item_path: &ItemPath,
+    symbols_type: &HashMap<ItemPath, SymbolType>,
     crate_name: &str,
+    fragment: Option<&str>,
     config: &IntralinksDocsRsConfig,
-) -> String {
+) -> Option<String> {
     let package_name = crate_name.replace('-', "_");
-    let mut path = symbol.path();
+    let typ = *symbols_type.get(item_path)?;
 
-    let mut link = match symbol.anchor {
+    let mut link = match item_path.anchor {
         ItemPathAnchor::Root => {
-            let std_crate_name = &path[0];
-            path = &path[1..];
+            let std_crate_name =
+                item_path.path_components().next().expect("a root path should not be empty");
             format!("https://doc.rust-lang.org/stable/{}/", std_crate_name)
         }
         ItemPathAnchor::Crate => {
@@ -460,16 +572,24 @@ fn documentation_url(
         }
     };
 
-    if SymbolType::Crate == typ {
-        return link;
+    if typ == SymbolType::Crate {
+        return Some(format!("{}{}", link, fragment.unwrap_or("")));
     }
 
-    for s in path.iter().rev().skip(1).rev() {
+    let skip_components = match item_path.anchor {
+        ItemPathAnchor::Root => 1,
+        ItemPathAnchor::Crate => 0,
+    };
+
+    let module_path = typ.get_module_path(item_path).expect("item should belong to a module");
+
+    for s in module_path.path_components().skip(skip_components) {
         link.push_str(s);
         link.push('/');
     }
 
-    let name = path.last().unwrap_or_else(|| panic!("failed to get last component of {}", symbol));
+    let name =
+        item_path.name().unwrap_or_else(|| panic!("failed to get last component of {}", item_path));
 
     match typ {
         SymbolType::Crate => unreachable!(),
@@ -483,9 +603,32 @@ fn documentation_url(
         SymbolType::Const => link.push_str(&format!("const.{}.html", name)),
         SymbolType::Fn => link.push_str(&format!("fn.{}.html", name)),
         SymbolType::Static => link.push_str(&format!("static.{}.html", name)),
+        SymbolType::ImplItem(typ) => {
+            let parent_path = item_path
+                .clone()
+                .parent()
+                .unwrap_or_else(|| panic!("item {} should always have a parent", item_path));
+
+            let link = documentation_url(
+                &parent_path,
+                symbols_type,
+                crate_name,
+                // We discard the fragment.
+                None,
+                config,
+            )?;
+
+            let impl_item_fragment_str = match typ {
+                ImplSymbolType::Method => "method",
+                ImplSymbolType::Const => "associatedconstant",
+                ImplSymbolType::Type => "associatedtype",
+            };
+
+            return Some(format!("{}#{}.{}", link, impl_item_fragment_str, name));
+        }
     }
 
-    link
+    return Some(format!("{}{}", link, fragment.unwrap_or("")));
 }
 
 enum MarkdownLinkAction {
@@ -502,19 +645,26 @@ fn markdown_link(
     config: &IntralinksConfig,
 ) -> MarkdownLinkAction {
     match link.link_as_item_path() {
-        Some(symbol) if symbols_type.contains_key(&symbol) => {
-            let typ = symbols_type[&symbol];
-            let new_link = documentation_url(&symbol, typ, crate_name, &config.docs_rs);
-
-            MarkdownLinkAction::Link(format!("{}{}", new_link, link.link_fragment()).into())
-        }
         Some(symbol) => {
-            emit_warning(&format!("Could not find definition of `{}`.", symbol));
+            let link = documentation_url(
+                &symbol,
+                symbols_type,
+                crate_name,
+                link.link_fragment(),
+                &config.docs_rs,
+            );
 
-            // This was an intralink, but we were not able to generate a link.
-            MarkdownLinkAction::Strip
+            match link {
+                Some(l) => MarkdownLinkAction::Link(l.into()),
+                None => {
+                    emit_warning(&format!("Could not resolve definition of `{}`.", symbol));
+
+                    // This was an intralink, but we were not able to generate a link.
+                    MarkdownLinkAction::Strip
+                }
+            }
         }
-        _ => MarkdownLinkAction::Preserve,
+        None => MarkdownLinkAction::Preserve,
     }
 }
 
@@ -709,6 +859,7 @@ fn get_standard_libraries() -> Result<Vec<Crate>, IntralinkError> {
     Ok(std_libs)
 }
 
+#[allow(clippy::too_many_lines)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -742,17 +893,17 @@ mod tests {
 
     #[test]
     fn test_item_path_join() {
-        assert_eq!(item_path("crate::foo").join("bar"), item_path("crate::foo::bar"),);
-        assert_eq!(item_path("::std::foo").join("bar"), item_path("::std::foo::bar"),);
+        assert_eq!(item_path("crate::foo").join(&"bar"), item_path("crate::foo::bar"),);
+        assert_eq!(item_path("::std::foo").join(&"bar"), item_path("::std::foo::bar"),);
 
         assert_eq!(
-            item_path("::std::foo::bar").parent().unwrap().join("baz"),
+            item_path("::std::foo::bar").parent().unwrap().join(&"baz"),
             item_path("::std::foo::baz"),
         );
     }
 
     #[test]
-    fn test_all_supermodules() {
+    fn test_all_ancestor_paths() {
         let symbols = [
             item_path("crate::foo::bar::baz"),
             item_path("crate::baz::mumble"),
@@ -769,7 +920,7 @@ mod tests {
         .into_iter()
         .collect();
 
-        assert_eq!(all_supermodules(symbols.iter()), expected);
+        assert_eq!(all_ancestor_paths(symbols.iter()), expected);
     }
 
     fn explore_crate(
@@ -936,7 +1087,7 @@ mod tests {
     #[test]
     fn test_traverse_module_expore_lazily() {
         let symbols: HashSet<ItemPath> = [item_path("crate::module")].into_iter().collect();
-        let modules = all_supermodules(symbols.iter());
+        let modules = all_ancestor_paths(symbols.iter());
 
         let source = indoc! { "
             mod module {
@@ -970,44 +1121,156 @@ mod tests {
     fn test_documentation_url() {
         let config = IntralinksDocsRsConfig::default();
 
-        let link = documentation_url(&item_path("crate"), SymbolType::Crate, "foobini", &config);
-        assert_eq!(link, "https://docs.rs/foobini/latest/foobini/");
+        let symbols_type: HashMap<ItemPath, SymbolType> =
+            [(item_path("crate"), SymbolType::Crate)].into_iter().collect();
 
-        let link =
-            documentation_url(&item_path("crate::AStruct"), SymbolType::Struct, "foobini", &config);
-        assert_eq!(link, "https://docs.rs/foobini/latest/foobini/struct.AStruct.html");
+        let link = documentation_url(&item_path("crate"), &symbols_type, "foobini", None, &config);
+        assert_eq!(link.as_deref(), Some("https://docs.rs/foobini/latest/foobini/"));
 
-        let link =
-            documentation_url(&item_path("crate::amodule"), SymbolType::Mod, "foobini", &config);
-        assert_eq!(link, "https://docs.rs/foobini/latest/foobini/amodule/");
+        let symbols_type: HashMap<ItemPath, SymbolType> =
+            [(item_path("crate::AStruct"), SymbolType::Struct)].into_iter().collect();
 
-        let link = documentation_url(&item_path("::std"), SymbolType::Crate, "foobini", &config);
-        assert_eq!(link, "https://doc.rust-lang.org/stable/std/");
+        let link = documentation_url(
+            &item_path("crate::AStruct"),
+            &symbols_type,
+            "foobini",
+            None,
+            &config,
+        );
+        assert_eq!(
+            link.as_deref(),
+            Some("https://docs.rs/foobini/latest/foobini/struct.AStruct.html")
+        );
+
+        let symbols_type: HashMap<ItemPath, SymbolType> =
+            [(item_path("crate::amodule"), SymbolType::Mod)].into_iter().collect();
+
+        let link = documentation_url(
+            &item_path("crate::amodule"),
+            &symbols_type,
+            "foobini",
+            None,
+            &config,
+        );
+        assert_eq!(link.as_deref(), Some("https://docs.rs/foobini/latest/foobini/amodule/"));
+
+        let symbols_type: HashMap<ItemPath, SymbolType> =
+            [(item_path("::std"), SymbolType::Crate)].into_iter().collect();
+
+        let link = documentation_url(&item_path("::std"), &symbols_type, "foobini", None, &config);
+        assert_eq!(link.as_deref(), Some("https://doc.rust-lang.org/stable/std/"));
+
+        let symbols_type: HashMap<ItemPath, SymbolType> =
+            [(item_path("::std::collections::HashMap"), SymbolType::Struct)].into_iter().collect();
 
         let link = documentation_url(
             &item_path("::std::collections::HashMap"),
-            SymbolType::Struct,
+            &symbols_type,
             "foobini",
+            None,
             &config,
         );
-        assert_eq!(link, "https://doc.rust-lang.org/stable/std/collections/struct.HashMap.html");
+        assert_eq!(
+            link.as_deref(),
+            Some("https://doc.rust-lang.org/stable/std/collections/struct.HashMap.html")
+        );
+
+        let symbols_type: HashMap<ItemPath, SymbolType> =
+            [(item_path("crate::amodule"), SymbolType::Mod)].into_iter().collect();
 
         let link = documentation_url(
             &ItemPath::from_string("crate::amodule").unwrap(),
-            SymbolType::Mod,
+            &symbols_type,
             "foo-bar-mumble",
+            None,
             &config,
         );
-        assert_eq!(link, "https://docs.rs/foo-bar-mumble/latest/foo_bar_mumble/amodule/");
+        assert_eq!(
+            link.as_deref(),
+            Some("https://docs.rs/foo-bar-mumble/latest/foo_bar_mumble/amodule/")
+        );
+
+        let symbols_type: HashMap<ItemPath, SymbolType> =
+            [(item_path("crate"), SymbolType::Crate)].into_iter().collect();
+
+        let link = documentation_url(
+            &ItemPath::from_string("crate").unwrap(),
+            &symbols_type,
+            "foo-bar-mumble",
+            Some("#enums"),
+            &config,
+        );
+        assert_eq!(
+            link.as_deref(),
+            Some("https://docs.rs/foo-bar-mumble/latest/foo_bar_mumble/#enums")
+        );
+
+        let symbols_type: HashMap<ItemPath, SymbolType> =
+            [(item_path("crate::amod"), SymbolType::Mod)].into_iter().collect();
+
+        let link = documentation_url(
+            &ItemPath::from_string("crate::amod").unwrap(),
+            &symbols_type,
+            "foo-bar-mumble",
+            Some("#structs"),
+            &config,
+        );
+        assert_eq!(
+            link.as_deref(),
+            Some("https://docs.rs/foo-bar-mumble/latest/foo_bar_mumble/amod/#structs")
+        );
+
+        let symbols_type: HashMap<ItemPath, SymbolType> =
+            [(item_path("crate::MyStruct"), SymbolType::Struct)].into_iter().collect();
+
+        let link = documentation_url(
+            &ItemPath::from_string("crate::MyStruct").unwrap(),
+            &symbols_type,
+            "foo-bar-mumble",
+            Some("#implementations"),
+            &config,
+        );
+        assert_eq!(
+            link.as_deref(),
+            Some("https://docs.rs/foo-bar-mumble/latest/foo_bar_mumble/struct.MyStruct.html#implementations")
+        );
+
+        let symbols_type: HashMap<ItemPath, SymbolType> = [
+            (item_path("crate::mymod::MyStruct"), SymbolType::Struct),
+            (
+                item_path("crate::mymod::MyStruct::a_method"),
+                SymbolType::ImplItem(ImplSymbolType::Method),
+            ),
+        ]
+        .into_iter()
+        .collect();
+
+        let link = documentation_url(
+            &ItemPath::from_string("crate::mymod::MyStruct::a_method").unwrap(),
+            &symbols_type,
+            "foo-bar-mumble",
+            Some("#thiswillbedropped"),
+            &config,
+        );
+        assert_eq!(
+            link.as_deref(),
+            Some("https://docs.rs/foo-bar-mumble/latest/foo_bar_mumble/mymod/struct.MyStruct.html#method.a_method")
+        );
 
         let config = IntralinksDocsRsConfig {
             docs_rs_base_url: Some("https://docs.company.rs".to_owned()),
             docs_rs_version: Some("1.0.0".to_owned()),
         };
 
+        let symbols_type: HashMap<ItemPath, SymbolType> =
+            [(item_path("crate::Foo"), SymbolType::Struct)].into_iter().collect();
+
         let link =
-            documentation_url(&item_path("crate::Foo"), SymbolType::Struct, "foobini", &config);
-        assert_eq!(link, "https://docs.company.rs/foobini/1.0.0/foobini/struct.Foo.html");
+            documentation_url(&item_path("crate::Foo"), &symbols_type, "foobini", None, &config);
+        assert_eq!(
+            link.as_deref(),
+            Some("https://docs.company.rs/foobini/1.0.0/foobini/struct.Foo.html")
+        );
     }
 
     #[test]
@@ -1326,6 +1589,77 @@ mod tests {
 
             [mod a]: https://docs.rs/foobini/latest/foobini/amodule/
             "
+        };
+
+        assert_eq!(new_readme.as_string(), expected);
+    }
+
+    #[test]
+    fn test_markdown_impl_items() {
+        let doc = indoc! { r#"
+            # Foobini
+
+            This crate has [`Foo::new()`](`crate::Foo::new`), [`Foo::a_method()`](`crate::Foo::a_method`),
+            and [`Foo::another_method()`](`crate::Foo::another_method`).
+
+            It also has [`Foo::no_self()`](`crate::Foo::no_self`).  There's also [`Bar::beer()`](`crate::amod::Bar::beer`).
+
+            Struct `Foo` has a [type called `baz`](`crate::Foo::Baz`) and a
+            [const called `number`](`crate::Foo::number`).
+
+            We have a function in `FooAlias` [called `hello`](`crate::FooAlias::hello`).
+
+            And in `MyEnum` we have [called `hey`](`crate::MyEnum::hey`).
+
+            And in `MyUnion` we have [called `sup`](`crate::MyUnion::sup`).
+            "#
+        };
+
+        let symbols_type: HashMap<ItemPath, SymbolType> = [
+            (item_path("crate"), SymbolType::Crate),
+            (item_path("crate::Foo"), SymbolType::Struct),
+            (item_path("crate::Foo::new"), SymbolType::ImplItem(ImplSymbolType::Method)),
+            (item_path("crate::Foo::a_method"), SymbolType::ImplItem(ImplSymbolType::Method)),
+            (item_path("crate::Foo::another_method"), SymbolType::ImplItem(ImplSymbolType::Method)),
+            (item_path("crate::Foo::no_self"), SymbolType::ImplItem(ImplSymbolType::Method)),
+            (item_path("crate::amod::Bar"), SymbolType::Struct),
+            (item_path("crate::amod::Bar::beer"), SymbolType::ImplItem(ImplSymbolType::Method)),
+            (item_path("crate::Foo::Baz"), SymbolType::ImplItem(ImplSymbolType::Type)),
+            (item_path("crate::Foo::number"), SymbolType::ImplItem(ImplSymbolType::Const)),
+            (item_path("crate::FooAlias"), SymbolType::Type),
+            (item_path("crate::FooAlias::hello"), SymbolType::ImplItem(ImplSymbolType::Method)),
+            (item_path("crate::MyEnum"), SymbolType::Enum),
+            (item_path("crate::MyEnum::hey"), SymbolType::ImplItem(ImplSymbolType::Method)),
+            (item_path("crate::MyUnion"), SymbolType::Union),
+            (item_path("crate::MyUnion::sup"), SymbolType::ImplItem(ImplSymbolType::Method)),
+        ]
+        .into_iter()
+        .collect();
+
+        let new_readme = rewrite_links(
+            &Doc::from_str(doc),
+            &symbols_type,
+            "foobini",
+            &|_| (),
+            &IntralinksConfig::default(),
+        );
+        let expected = indoc! { r#"
+            # Foobini
+
+            This crate has [`Foo::new()`](https://docs.rs/foobini/latest/foobini/struct.Foo.html#method.new), [`Foo::a_method()`](https://docs.rs/foobini/latest/foobini/struct.Foo.html#method.a_method),
+            and [`Foo::another_method()`](https://docs.rs/foobini/latest/foobini/struct.Foo.html#method.another_method).
+
+            It also has [`Foo::no_self()`](https://docs.rs/foobini/latest/foobini/struct.Foo.html#method.no_self).  There's also [`Bar::beer()`](https://docs.rs/foobini/latest/foobini/amod/struct.Bar.html#method.beer).
+
+            Struct `Foo` has a [type called `baz`](https://docs.rs/foobini/latest/foobini/struct.Foo.html#associatedtype.Baz) and a
+            [const called `number`](https://docs.rs/foobini/latest/foobini/struct.Foo.html#associatedconstant.number).
+
+            We have a function in `FooAlias` [called `hello`](https://docs.rs/foobini/latest/foobini/type.FooAlias.html#method.hello).
+
+            And in `MyEnum` we have [called `hey`](https://docs.rs/foobini/latest/foobini/enum.MyEnum.html#method.hey).
+
+            And in `MyUnion` we have [called `sup`](https://docs.rs/foobini/latest/foobini/union.MyUnion.html#method.sup).
+            "#
         };
 
         assert_eq!(new_readme.as_string(), expected);

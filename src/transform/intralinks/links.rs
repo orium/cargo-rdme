@@ -107,8 +107,11 @@ impl Link {
         }
     }
 
-    pub fn link_fragment(&self) -> &str {
-        self.split_link_fragment().1
+    pub fn link_fragment(&self) -> Option<&str> {
+        match self.split_link_fragment().1 {
+            "" => None,
+            f => Some(f),
+        }
     }
 }
 
