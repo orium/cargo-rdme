@@ -203,10 +203,10 @@ impl Doc {
     }
 
     fn is_toplevel_doc(attr: &syn::Attribute) -> bool {
-        use syn::token::Bang;
+        use syn::token::Not;
         use syn::AttrStyle;
 
-        attr.style == AttrStyle::Inner(Bang::default()) && attr.path.is_ident("doc")
+        attr.style == AttrStyle::Inner(Not::default()) && attr.path().is_ident("doc")
     }
 
     pub fn lines(&self) -> impl Iterator<Item = &str> {

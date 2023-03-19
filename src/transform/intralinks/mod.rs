@@ -343,7 +343,7 @@ fn symbols_type_impl_block(
                 .items
                 .iter()
                 .filter_map(|item| match item {
-                    ImplItem::Method(m) => {
+                    ImplItem::Fn(m) => {
                         let ident = m.sig.ident.to_string();
 
                         Some((ident, ImplSymbolType::Method))
@@ -381,7 +381,6 @@ fn item_symbols_type(module: &ItemPath, item: &Item) -> Vec<(ItemPath, SymbolTyp
         Item::Macro(syn::ItemMacro { ident: Some(ident), .. }) => {
             (item_path(ident), SymbolType::Macro)
         }
-        Item::Macro2(m) => (item_path(&m.ident), SymbolType::Macro),
         Item::Const(c) => (item_path(&c.ident), SymbolType::Const),
         Item::Fn(f) => (item_path(&f.sig.ident), SymbolType::Fn),
         Item::Static(s) => (item_path(&s.ident), SymbolType::Static),

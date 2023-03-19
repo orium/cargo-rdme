@@ -6,6 +6,7 @@
 use crate::markdown::Markdown;
 use crate::Doc;
 use std::path::{Path, PathBuf};
+use syn::Expr;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -26,23 +27,26 @@ pub fn extract_doc_from_source_file(
 }
 
 pub fn extract_doc_from_source_str(source: &str) -> Result<Option<Doc>, ExtractDocError> {
-    use syn::{parse_str, Lit, Meta, MetaNameValue};
+    use syn::{parse_str, ExprLit, Lit, Meta, MetaNameValue};
 
     let ast: syn::File = parse_str(source).map_err(ExtractDocError::ErrorParsingSourceFile)?;
     let mut lines: Vec<String> = Vec::with_capacity(1024);
 
     for attr in &ast.attrs {
         if Doc::is_toplevel_doc(attr) {
-            if let Ok(Meta::NameValue(MetaNameValue { lit: Lit::Str(lstr), .. })) =
-                attr.parse_meta()
+            if let Meta::NameValue(MetaNameValue {
+                value: Expr::Lit(ExprLit { lit: Lit::Str(lstr), .. }),
+                ..
+            }) = &attr.meta
             {
-                let string = &lstr.value();
+                let string: String = lstr.value();
 
                 match string.lines().count() {
                     0 => lines.push(String::new()),
                     1 => {
-                        let line = string.strip_prefix(' ').unwrap_or(string);
-                        lines.push(line.to_owned());
+                        let line =
+                            string.strip_prefix(' ').map(ToOwned::to_owned).unwrap_or(string);
+                        lines.push(line);
                     }
 
                     // Multiline comment.
