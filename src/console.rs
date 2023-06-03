@@ -4,7 +4,7 @@
  */
 
 use std::fmt::Display;
-use std::io::Write;
+use std::io::{IsTerminal, Write};
 use termcolor::ColorChoice;
 use termcolor::WriteColor;
 use termcolor::{ColorSpec, StandardStream};
@@ -12,7 +12,7 @@ use termcolor::{ColorSpec, StandardStream};
 pub use termcolor::Color;
 
 fn is_stderr_terminal() -> bool {
-    atty::is(atty::Stream::Stderr)
+    std::io::stderr().is_terminal()
 }
 
 fn print_color(

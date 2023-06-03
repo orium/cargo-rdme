@@ -40,8 +40,10 @@ pub fn test_readme_expected(test_name: &str) -> PathBuf {
     test_dir(test_name).join("README-expected.md")
 }
 
-fn is_terminal() -> bool {
-    atty::is(atty::Stream::Stderr) && atty::is(atty::Stream::Stdout)
+fn is_stderr_terminal() -> bool {
+    use std::io::IsTerminal;
+
+    std::io::stderr().is_terminal()
 }
 
 fn print_framed(stream: &mut termcolor::Buffer, text: &str) {
@@ -70,7 +72,7 @@ fn print_failure_readme_mismatch(
     use termcolor::{Buffer, Color, ColorSpec, WriteColor};
 
     let in_ci = std::env::var_os("CI").is_some();
-    let mut stream = match is_terminal() {
+    let mut stream = match is_stderr_terminal() {
         true => Buffer::ansi(),
         false => Buffer::no_color(),
     };
@@ -78,7 +80,7 @@ fn print_failure_readme_mismatch(
     stream.reset().unwrap();
 
     stream.set_color(ColorSpec::new().set_bold(true).set_fg(Some(Color::Red))).unwrap();
-    write!(stream, "The README doesn’t what was expected.").unwrap();
+    write!(stream, "The README doesn’t match what was expected.").unwrap();
     stream.reset().unwrap();
     write!(stream, "\n\n").unwrap();
     stream.set_color(ColorSpec::new().set_bold(true)).unwrap();
@@ -118,7 +120,7 @@ fn print_failure_readme_mismatch(
 fn print_failure_status_code_mismatch(expected_exit_code: i32, got_exit_code: i32, stderr: &str) {
     use termcolor::{Buffer, Color, ColorSpec, WriteColor};
 
-    let mut stream = match is_terminal() {
+    let mut stream = match is_stderr_terminal() {
         true => Buffer::ansi(),
         false => Buffer::no_color(),
     };
