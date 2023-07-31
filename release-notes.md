@@ -1,5 +1,10 @@
 # Release notes
 
+## 1.4.1
+
+* Ask `cargo metadata` to not access the network.  All the info we need is in `Cargo.toml`.
+* Update dependencies.
+
 ## 1.4.0
 
 * Support intralinks to methods and other `impl` items.
