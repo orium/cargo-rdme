@@ -74,11 +74,18 @@ impl Project {
     /// Creates a [`Project`] the current directory.  It will search ancestor paths until it finds
     /// the root of the project.
     pub fn from_current_dir() -> Result<Project, ProjectError> {
-        let cmd = cargo_metadata::MetadataCommand::new();
-        let metadata = cmd.exec()?;
+        let metadata = Project::get_cargo_metadata()?;
         let package = metadata.root_package().ok_or(ProjectError::ProjectHasNoRootPackage)?;
 
         Ok(Project::from_package(package))
+    }
+
+    fn get_cargo_metadata() -> Result<cargo_metadata::Metadata, ProjectError> {
+        let mut cmd = cargo_metadata::MetadataCommand::new();
+        // We kindly ask cargo not to access the network.  All information we need is available
+        // locally.
+        let cmd = cmd.no_deps().other_options(["--offline".to_owned()]);
+        Ok(cmd.exec()?)
     }
 
     fn select_package<'a>(
@@ -95,8 +102,7 @@ impl Project {
     }
 
     pub fn from_current_dir_workspace_project(project_name: &str) -> Result<Project, ProjectError> {
-        let cmd = cargo_metadata::MetadataCommand::new();
-        let metadata = cmd.exec()?;
+        let metadata = Project::get_cargo_metadata()?;
 
         let package = Project::select_package(&metadata, project_name)
             .ok_or_else(|| ProjectError::ProjectHasNoPackage(project_name.to_owned()))?;
