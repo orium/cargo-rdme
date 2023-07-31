@@ -29,17 +29,12 @@ impl Display for InvalidOptValue {
 
 impl Error for InvalidOptValue {}
 
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Default, Clone, Copy)]
 pub enum LineTerminatorOpt {
+    #[default]
     Auto,
     Lf,
     CrLf,
-}
-
-impl Default for LineTerminatorOpt {
-    fn default() -> LineTerminatorOpt {
-        LineTerminatorOpt::Auto
-    }
 }
 
 impl FromStr for LineTerminatorOpt {
@@ -55,18 +50,13 @@ impl FromStr for LineTerminatorOpt {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Default, Clone)]
 pub enum EntrypointOpt {
+    #[default]
     Auto,
     Lib,
     BinDefault,
     BinName(String),
-}
-
-impl Default for EntrypointOpt {
-    fn default() -> EntrypointOpt {
-        EntrypointOpt::Auto
-    }
 }
 
 impl FromStr for EntrypointOpt {

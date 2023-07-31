@@ -332,10 +332,8 @@ mod tests {
         ];
 
         for tag in tags {
-            let doc_str = format!(
-                "Foo:\n```{}\n# This is a comment.\nprintln!(\"#There\");\n```\nEnd\n",
-                tag
-            );
+            let doc_str =
+                format!("Foo:\n```{tag}\n# This is a comment.\nprintln!(\"#There\");\n```\nEnd\n");
 
             let expected_str =
                 "Foo:\n```rust\n# This is a comment.\nprintln!(\"#There\");\n```\nEnd\n";

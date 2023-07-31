@@ -521,9 +521,9 @@ mod tests {
         ];
 
         for tag in tags {
-            let doc_str = format!("```{}\n# This is a comment.\nprintln!(\"#There\");\n```\n", tag);
+            let doc_str = format!("```{tag}\n# This is a comment.\nprintln!(\"#There\");\n```\n");
 
-            let expected_str = format!("```{}\nprintln!(\"#There\");\n```\n", tag);
+            let expected_str = format!("```{tag}\nprintln!(\"#There\");\n```\n");
 
             let doc = Doc::from_str(doc_str);
             let expected = Doc::from_str(expected_str);
@@ -539,7 +539,7 @@ mod tests {
         let tags = ["text", "bash"];
 
         for tag in tags {
-            let doc_str = format!("```{}\n# This is a comment.\nprintln!(\"#There\");\n```\n", tag);
+            let doc_str = format!("```{tag}\n# This is a comment.\nprintln!(\"#There\");\n```\n");
             let doc = Doc::from_str(doc_str);
 
             let transform = DocTransformRustRemoveComments::new();

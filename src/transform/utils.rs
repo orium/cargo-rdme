@@ -97,8 +97,8 @@ mod tests {
         ];
 
         for tag in tags {
-            let doc = format!("Foo:\n```{}\nprintln!(\"There\");\n```\nEnd\n", tag);
-            let expected_str = format!("```{}\nprintln!(\"There\");\n```", tag);
+            let doc = format!("Foo:\n```{tag}\nprintln!(\"There\");\n```\nEnd\n");
+            let expected_str = format!("```{tag}\nprintln!(\"There\");\n```");
 
             let doc = Markdown::from_str(doc);
 

@@ -23,11 +23,11 @@ fn print_color(
 ) -> std::io::Result<()> {
     stream.reset()?;
     stream.set_color(ColorSpec::new().set_bold(true).set_fg(Some(color)))?;
-    write!(stream, "{}", level)?;
+    write!(stream, "{level}")?;
     stream.set_color(ColorSpec::new().set_bold(true))?;
     write!(stream, ":")?;
     stream.reset()?;
-    writeln!(stream, " {}", message)?;
+    writeln!(stream, " {message}")?;
     stream.flush()
 }
 
@@ -37,7 +37,7 @@ fn print_nocolor(
     message: impl Display,
 ) -> std::io::Result<()> {
     stream.reset()?;
-    writeln!(stream, "{}: {}", level, message)?;
+    writeln!(stream, "{level}: {message}")?;
     stream.flush()
 }
 

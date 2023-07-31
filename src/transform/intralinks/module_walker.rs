@@ -38,7 +38,7 @@ fn file_ast<P: AsRef<Path>>(filepath: P) -> Result<syn::File, ModuleWalkError> {
 
 /// Determines the module filename, which can be `<module>.rs` or `<module>/mod.rs`.
 fn module_filename(dir: &Path, module: &Ident) -> Option<PathBuf> {
-    let mod_file = dir.join(format!("{}.rs", module));
+    let mod_file = dir.join(format!("{module}.rs"));
 
     if mod_file.is_file() {
         return Some(mod_file);

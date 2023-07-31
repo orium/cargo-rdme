@@ -308,7 +308,7 @@ impl SymbolType {
             | SymbolType::Fn
             | SymbolType::Static => {
                 let p = path.clone().parent().unwrap_or_else(|| {
-                    panic!("item {} of type {:?} should have a parent module", path, self)
+                    panic!("item {path} of type {self:?} should have a parent module")
                 });
                 Some(p)
             }
@@ -317,11 +317,11 @@ impl SymbolType {
                     .clone()
                     .parent()
                     .unwrap_or_else(|| {
-                        panic!("item {} of type {:?} should have a parent type", path, self)
+                        panic!("item {path} of type {self:?} should have a parent type")
                     })
                     .parent()
                     .unwrap_or_else(|| {
-                        panic!("item {} of type {:?} should have a parent module", path, self)
+                        panic!("item {path} of type {self:?} should have a parent module")
                     });
                 Some(p)
             }
@@ -560,14 +560,14 @@ fn documentation_url(
         ItemPathAnchor::Root => {
             let std_crate_name =
                 item_path.path_components().next().expect("a root path should not be empty");
-            format!("https://doc.rust-lang.org/stable/{}/", std_crate_name)
+            format!("https://doc.rust-lang.org/stable/{std_crate_name}/")
         }
         ItemPathAnchor::Crate => {
             let base_url =
                 config.docs_rs_base_url.as_ref().map_or("https://docs.rs", String::as_str);
             let version = config.docs_rs_version.as_ref().map_or("latest", String::as_str);
 
-            format!("{}/{}/{}/{}/", base_url, crate_name, version, package_name)
+            format!("{base_url}/{crate_name}/{version}/{package_name}/")
         }
     };
 
@@ -588,25 +588,25 @@ fn documentation_url(
     }
 
     let name =
-        item_path.name().unwrap_or_else(|| panic!("failed to get last component of {}", item_path));
+        item_path.name().unwrap_or_else(|| panic!("failed to get last component of {item_path}"));
 
     match typ {
         SymbolType::Crate => unreachable!(),
-        SymbolType::Struct => link.push_str(&format!("struct.{}.html", name)),
-        SymbolType::Trait => link.push_str(&format!("trait.{}.html", name)),
-        SymbolType::Enum => link.push_str(&format!("enum.{}.html", name)),
-        SymbolType::Union => link.push_str(&format!("union.{}.html", name)),
-        SymbolType::Type => link.push_str(&format!("type.{}.html", name)),
-        SymbolType::Mod => link.push_str(&format!("{}/", name)),
-        SymbolType::Macro => link.push_str(&format!("macro.{}.html", name)),
-        SymbolType::Const => link.push_str(&format!("const.{}.html", name)),
-        SymbolType::Fn => link.push_str(&format!("fn.{}.html", name)),
-        SymbolType::Static => link.push_str(&format!("static.{}.html", name)),
+        SymbolType::Struct => link.push_str(&format!("struct.{name}.html")),
+        SymbolType::Trait => link.push_str(&format!("trait.{name}.html")),
+        SymbolType::Enum => link.push_str(&format!("enum.{name}.html")),
+        SymbolType::Union => link.push_str(&format!("union.{name}.html")),
+        SymbolType::Type => link.push_str(&format!("type.{name}.html")),
+        SymbolType::Mod => link.push_str(&format!("{name}/")),
+        SymbolType::Macro => link.push_str(&format!("macro.{name}.html")),
+        SymbolType::Const => link.push_str(&format!("const.{name}.html")),
+        SymbolType::Fn => link.push_str(&format!("fn.{name}.html")),
+        SymbolType::Static => link.push_str(&format!("static.{name}.html")),
         SymbolType::ImplItem(typ) => {
             let parent_path = item_path
                 .clone()
                 .parent()
-                .unwrap_or_else(|| panic!("item {} should always have a parent", item_path));
+                .unwrap_or_else(|| panic!("item {item_path} should always have a parent"));
 
             let link = documentation_url(
                 &parent_path,
@@ -623,11 +623,11 @@ fn documentation_url(
                 ImplSymbolType::Type => "associatedtype",
             };
 
-            return Some(format!("{}#{}.{}", link, impl_item_fragment_str, name));
+            return Some(format!("{link}#{impl_item_fragment_str}.{name}"));
         }
     }
 
-    return Some(format!("{}{}", link, fragment.unwrap_or("")));
+    Some(format!("{}{}", link, fragment.unwrap_or("")))
 }
 
 enum MarkdownLinkAction {
@@ -656,7 +656,7 @@ fn markdown_link(
             match link {
                 Some(l) => MarkdownLinkAction::Link(l.into()),
                 None => {
-                    emit_warning(&format!("Could not resolve definition of `{}`.", symbol));
+                    emit_warning(&format!("Could not resolve definition of `{symbol}`."));
 
                     // This was an intralink, but we were not able to generate a link.
                     MarkdownLinkAction::Strip
@@ -805,7 +805,7 @@ fn get_rustc_sysroot_libraries_dir() -> Result<PathBuf, IntralinkError> {
     let output = Command::new("rustc")
         .args(["--print=sysroot"])
         .output()
-        .map_err(|e| IntralinkError::LoadStdLibError(format!("failed to run rustc: {}", e)))?;
+        .map_err(|e| IntralinkError::LoadStdLibError(format!("failed to run rustc: {e}")))?;
 
     let s = String::from_utf8(output.stdout).expect("unexpected output from rustc");
     let sysroot = PathBuf::from(s.trim());

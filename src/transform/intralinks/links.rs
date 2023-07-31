@@ -166,8 +166,8 @@ impl MarkdownReferenceLink {
 impl Display for MarkdownReferenceLink {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            MarkdownReferenceLink::Normal { text, label } => write!(f, "[{}][{}]", text, label),
-            MarkdownReferenceLink::Shortcut { text: label } => write!(f, "[{}]", label),
+            MarkdownReferenceLink::Normal { text, label } => write!(f, "[{text}][{label}]"),
+            MarkdownReferenceLink::Shortcut { text: label } => write!(f, "[{label}]"),
         }
     }
 }
