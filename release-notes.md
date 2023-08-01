@@ -1,5 +1,9 @@
 # Release notes
 
+## 1.4.2
+
+* It turns out we might need the network to get the project metadata.  See release notes of version 1.4.1.
+
 ## 1.4.1
 
 * Ask `cargo metadata` to not access the network.  All the info we need is in `Cargo.toml`.
