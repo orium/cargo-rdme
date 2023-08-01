@@ -81,11 +81,7 @@ impl Project {
     }
 
     fn get_cargo_metadata() -> Result<cargo_metadata::Metadata, ProjectError> {
-        let mut cmd = cargo_metadata::MetadataCommand::new();
-        // We kindly ask cargo not to access the network.  All information we need is available
-        // locally.
-        let cmd = cmd.no_deps().other_options(["--offline".to_owned()]);
-        Ok(cmd.exec()?)
+        Ok(cargo_metadata::MetadataCommand::new().exec()?)
     }
 
     fn select_package<'a>(
