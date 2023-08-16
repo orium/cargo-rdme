@@ -42,7 +42,9 @@ function check_doc_url_links {
     assert_installed "cargo-deadlinks"
 
     echo 'Checking doc url links:'
-    cargo deadlinks
+    # TODO re-enable deadlinks once it's fixed.
+    echo "skipping cargo deadlinks since it's currently broken"
+    # cargo deadlinks
 }
 
 function check_unused_deps {

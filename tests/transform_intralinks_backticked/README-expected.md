@@ -5,7 +5,7 @@ This will not be [modified](crate::amodule).
 This [beautiful crate](https://docs.rs/integration_test/latest/integration_test/) is cool because it contains [modules](https://docs.rs/integration_test/latest/integration_test/amodule/) and some
 other [stuff](https://en.wikipedia.org/wiki/Stuff) as well.
 
-This link is broken, but this should [wor\\k \[ju\]st](f\\i\(n\)e).
+This link is broken, but this should wor\\k \[ju\]st.
 
 Go ahead and check all the [structs in foo](https://docs.rs/integration_test/latest/integration_test/foo/#structs) and
 [structs in foo](https://docs.rs/integration_test/latest/integration_test/foo/#structs) specifically [this one](https://docs.rs/integration_test/latest/integration_test/foo/struct.BestStruct.html)

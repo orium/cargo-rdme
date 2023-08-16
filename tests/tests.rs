@@ -334,7 +334,7 @@ fn integration_test_transform_intralinks_simple() {
 }
 
 #[test]
-fn integration_test_transform_intralinks_method() {
+fn integration_test_transform_intralinks_impl_items() {
     run_test("transform_intralinks_impl_items");
 }
 
@@ -344,8 +344,8 @@ fn integration_test_transform_intralinks_reference_links() {
 }
 
 #[test]
-fn integration_test_transform_intralinks_module_walk() {
-    run_test("transform_intralinks_module_walk");
+fn integration_test_transform_intralinks_multiple_modules() {
+    run_test("transform_intralinks_multiple_modules");
 }
 
 #[test]
@@ -353,9 +353,7 @@ fn integration_test_transform_intralinks_ambiguous_module() {
     run_test("transform_intralinks_ambiguous_module");
 }
 
-/// TODO Re-enable this one <https://github.com/dtolnay/syn/issues/1972> is fixed.
 #[test]
-#[ignore = "crashed due to syn bug"]
 fn integration_test_transform_intralinks_stdlib_links() {
     run_test("transform_intralinks_stdlib_links");
 }
@@ -415,10 +413,62 @@ fn integration_test_option_conf_file_intralinks_strip_links() {
 }
 
 #[test]
+fn integration_test_option_conf_file_intralinks_all_features() {
+    run_test("option_conf_file_intralinks_all_features");
+}
+
+#[test]
+fn integration_test_option_conf_file_intralinks_features() {
+    run_test("option_conf_file_intralinks_features");
+}
+
+#[test]
+fn integration_test_option_conf_file_intralinks_no_default_features() {
+    run_test("option_conf_file_intralinks_no_default_features");
+}
+
+#[test]
 fn integration_test_option_cmd_intralinks_strip_links() {
     let test_name = "option_cmd_intralinks_strip_links";
 
     let options = TestOptions { args: &["--intralinks-strip-links"], ..TestOptions::default() };
+
+    run_test_with_options(test_name, &options);
+}
+
+#[test]
+fn integration_test_option_cmd_intralinks_strip_links_disambiguators() {
+    let test_name = "option_cmd_intralinks_strip_links_disambiguators";
+
+    let options = TestOptions { args: &["--intralinks-strip-links"], ..TestOptions::default() };
+
+    run_test_with_options(test_name, &options);
+}
+
+#[test]
+fn integration_test_option_cmd_intralinks_all_features() {
+    let test_name = "option_cmd_intralinks_all_features";
+
+    let options = TestOptions { args: &["--intralinks-all-features"], ..TestOptions::default() };
+
+    run_test_with_options(test_name, &options);
+}
+
+#[test]
+fn integration_test_option_cmd_intralinks_features() {
+    let test_name = "option_cmd_intralinks_features";
+
+    let options = TestOptions { args: &["--intralinks-features", "foo"], ..TestOptions::default() };
+
+    run_test_with_options(test_name, &options);
+}
+
+#[test]
+fn integration_test_option_cmd_intralinks_no_default_features() {
+    let test_name = "option_cmd_intralinks_no_default_features";
+
+    let options =
+        TestOptions { args: &["--intralinks-no-default-features"], ..TestOptions::default() };
 
     run_test_with_options(test_name, &options);
 }
@@ -445,4 +495,118 @@ fn integration_test_option_cmd_heading_base_level() {
 #[test]
 fn integration_test_crate_procmacro() {
     run_test("crate_procmacro");
+}
+
+#[test]
+fn integration_test_transform_intralinks_all_item_kinds() {
+    run_test("transform_intralinks_all_item_kinds");
+}
+
+#[test]
+fn integration_test_transform_intralinks_relative() {
+    run_test("transform_intralinks_relative");
+}
+
+#[test]
+fn integration_test_transform_intralinks_impl_other_module() {
+    run_test("transform_intralinks_impl_other_module");
+}
+
+#[test]
+fn integration_test_transform_intralinks_disambiguators() {
+    run_test("transform_intralinks_disambiguators");
+}
+
+#[test]
+fn integration_test_transform_intralinks_reexported_module() {
+    run_test("transform_intralinks_reexported_module");
+}
+
+#[test]
+fn integration_test_transform_intralinks_workspace_dep() {
+    let test_name = "transform_intralinks_workspace_dep";
+
+    let options = TestOptions {
+        args: &["--workspace-project", "myproj", "--readme-path", "README.md"],
+        ..TestOptions::default()
+    };
+
+    run_test_with_options(test_name, &options);
+}
+
+#[test]
+fn integration_test_transform_intralinks_shortcut() {
+    run_test("transform_intralinks_shortcut");
+}
+
+#[test]
+fn integration_test_transform_intralinks_shortcut_unresolved() {
+    run_test("transform_intralinks_shortcut_unresolved");
+}
+
+#[test]
+fn integration_test_transform_intralinks_non_intralink_targets() {
+    run_test("transform_intralinks_non_intralink_targets");
+}
+
+#[test]
+fn integration_test_transform_intralinks_procedural_macros() {
+    run_test("transform_intralinks_procedural_macros");
+}
+
+#[test]
+fn integration_test_transform_intralinks_skip_rustdoc_when_no_intralinks() {
+    let test_name = "transform_intralinks_skip_rustdoc_when_no_intralinks";
+
+    // This checks that if rustdoc runs we actually fail, so that the real test before is
+    // actually asserting that rustdoc is not running because otherwise it would have failed.
+    let options = TestOptions {
+        args: &["--entrypoint", "bin:test-precondition"],
+        expected_exit_code: 1,
+        check_readme_expected: false,
+        ..TestOptions::default()
+    };
+    run_test_with_options(test_name, &options);
+
+    let options =
+        TestOptions { args: &["--entrypoint", "bin:real-test"], ..TestOptions::default() };
+
+    run_test_with_options(test_name, &options);
+}
+
+#[test]
+fn integration_test_transform_intralinks_skip_rustdoc_when_strip_intralinks() {
+    let test_name = "transform_intralinks_skip_rustdoc_when_strip_intralinks";
+
+    // This checks that if rustdoc runs we actually fail, so that the real test before is
+    // actually asserting that rustdoc is not running because otherwise it would have failed.
+    let options = TestOptions {
+        args: &["--entrypoint", "bin:test-precondition"],
+        expected_exit_code: 1,
+        check_readme_expected: false,
+        ..TestOptions::default()
+    };
+    run_test_with_options(test_name, &options);
+
+    let options = TestOptions {
+        args: &["--entrypoint", "bin:real-test", "--intralinks-strip-links"],
+        ..TestOptions::default()
+    };
+
+    run_test_with_options(test_name, &options);
+}
+
+#[test]
+fn integration_test_transform_intralinks_item_path_collision() {
+    run_test("transform_intralinks_item_path_collision");
+}
+
+#[test]
+fn integration_test_transform_intralinks_package_and_crate_names() {
+    run_test("transform_intralinks_package_and_crate_names");
+}
+
+#[test]
+fn integration_test_transform_intralinks_external_crate() {
+    run_test("transform_intralinks_external_crate");
 }
