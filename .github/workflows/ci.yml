@@ -20,12 +20,17 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
-      - name: Install rust
+      - name: Install rust (stable)
         uses: dtolnay/rust-toolchain@stable
-        with:
-          # We need to install the source of the standard library for the integration tests to check that links
-          # to the standard library are correctly generated.
-          components: rust-src, rustfmt
+
+      # We need to install rust nightly to run the integration tests: nightly is needed to get the rustdoc information
+      # for intralinks. This will not be needed once that feature stabilizes
+      # (https://github.com/rust-lang/rust/issues/76578).
+      - name: Install rust (nightly)
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Use stable rust for the build
+        run: rustup default stable
 
       - name: Install cargo plugins
         run: |
