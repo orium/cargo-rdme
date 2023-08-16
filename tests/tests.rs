@@ -326,7 +326,7 @@ fn integration_test_transform_intralinks_simple() {
 }
 
 #[test]
-fn integration_test_transform_intralinks_method() {
+fn integration_test_transform_intralinks_impl_items() {
     run_test("transform_intralinks_impl_items");
 }
 
@@ -336,8 +336,8 @@ fn integration_test_transform_intralinks_reference_links() {
 }
 
 #[test]
-fn integration_test_transform_intralinks_module_walk() {
-    run_test("transform_intralinks_module_walk");
+fn integration_test_transform_intralinks_multiple_modules() {
+    run_test("transform_intralinks_multiple_modules");
 }
 
 #[test]
@@ -423,4 +423,9 @@ fn integration_test_option_cmd_heading_base_level() {
 #[test]
 fn integration_test_crate_procmacro() {
     run_test("crate_procmacro");
+}
+
+#[test]
+fn integration_test_transform_intralinks_all_items_kinds() {
+    run_test("transform_intralinks_all_items_kinds");
 }

@@ -46,6 +46,12 @@ pub fn find_first_file_in_ancestors(dir_path: impl AsRef<Path>, filename: &str) 
     None
 }
 
+#[derive(Debug)]
+pub enum PackageTarget {
+    Bin { name: String },
+    Lib,
+}
+
 #[derive(PartialEq, Eq, Debug)]
 pub struct Project {
     package_name: String,
@@ -132,6 +138,14 @@ impl Project {
     }
 
     #[must_use]
+    pub fn get_bin_default_name(&self) -> Option<&str> {
+        match self.bin_path.len() {
+            1 => self.bin_path.keys().next().map(|name| name.as_str()),
+            _ => None,
+        }
+    }
+
+    #[must_use]
     pub fn get_bin_default_entryfile_path(&self) -> Option<&Path> {
         match self.bin_path.len() {
             1 => self
@@ -161,15 +175,6 @@ impl Project {
     pub fn get_package_name(&self) -> &str {
         &self.package_name
     }
-}
-
-fn project_package_name(manifest_path: impl AsRef<Path>) -> Option<String> {
-    let str: String = std::fs::read_to_string(&manifest_path).ok()?;
-    let toml: toml::Value = toml::from_str(&str).ok()?;
-    let package_name =
-        toml.get("package").and_then(|v| v.get("name")).and_then(toml::Value::as_str)?;
-
-    Some(package_name.to_owned())
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]

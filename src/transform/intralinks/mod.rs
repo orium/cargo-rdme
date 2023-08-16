@@ -7,26 +7,21 @@ use crate::transform::intralinks::links::{
     markdown_link_iterator, markdown_reference_link_definition_iterator, Link, MarkdownLink,
 };
 use crate::transform::DocTransform;
-use crate::Doc;
-use module_walker::walk_module_file;
+use crate::{Doc, PackageTarget};
+use itertools::Itertools;
+use rustdoc_types::{ItemEnum, ItemKind, ItemSummary, StructKind};
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
-use std::fmt;
-use std::hash::{Hash, Hasher};
-use std::path::{Path, PathBuf};
-use std::rc::Rc;
-use syn::{Item, ItemMod};
+use syn::__private::str;
 use thiserror::Error;
 use unicase::UniCase;
 
 mod links;
-mod module_walker;
 
 #[derive(Error, Debug)]
 pub enum IntralinkError {
     #[error("IO error: {0}")]
     IOError(std::io::Error),
-    #[error("failed to analyzing code: {0}")]
-    AstWalkError(module_walker::ModuleWalkError),
     #[error("failed to load standard library: {0}")]
     LoadStdLibError(String),
 }
@@ -34,12 +29,6 @@ pub enum IntralinkError {
 impl From<std::io::Error> for IntralinkError {
     fn from(err: std::io::Error) -> Self {
         IntralinkError::IOError(err)
-    }
-}
-
-impl From<module_walker::ModuleWalkError> for IntralinkError {
-    fn from(err: module_walker::ModuleWalkError) -> Self {
-        IntralinkError::AstWalkError(err)
     }
 }
 
@@ -57,7 +46,8 @@ pub struct IntralinksConfig {
 
 pub struct DocTransformIntralinks<F> {
     crate_name: String,
-    entrypoint: PathBuf,
+    package_target: PackageTarget,
+    workspace_package: Option<String>,
     emit_warning: F,
     config: IntralinksConfig,
 }
@@ -68,16 +58,137 @@ where
 {
     pub fn new(
         crate_name: impl Into<String>,
-        entrypoint: impl AsRef<Path>,
+        package_target: PackageTarget,
+        workspace_package: Option<String>,
         emit_warning: F,
         config: Option<IntralinksConfig>,
     ) -> DocTransformIntralinks<F> {
         DocTransformIntralinks {
             crate_name: crate_name.into(),
-            entrypoint: entrypoint.as_ref().to_path_buf(),
+            package_target,
+            workspace_package,
             emit_warning,
             config: config.unwrap_or_default(),
         }
+    }
+}
+
+mod rustdoc {
+    use rustdoc_types::*;
+    use std::collections::HashMap;
+    use std::path::Path;
+
+    // WIP! error handling: return own enum
+    pub fn crate_from_file(path: &Path) -> Crate {
+        let json = std::fs::read_to_string(path).expect("WIP!");
+        serde_json::from_str(&json).expect("WIP!")
+    }
+
+    pub fn crate_rustdoc_intralinks(c: &Crate) -> &HashMap<String, Id> {
+        &c.index.get(&c.root).expect("root id not present in index").links
+    }
+}
+
+#[derive(PartialEq, Eq, Hash, Clone)]
+struct ItemPath<'a> {
+    segments: Cow<'a, [String]>,
+}
+
+impl<'a> ItemPath<'a> {
+    fn new(segments: &'a [String]) -> ItemPath<'a> {
+        assert!(segments.len() > 0, "path item must not be empty");
+
+        ItemPath { segments: Cow::Borrowed(segments) }
+    }
+
+    fn push(&self, segment: String) -> ItemPath<'static> {
+        let mut segments = self.segments.clone().into_owned();
+
+        segments.push(segment);
+
+        ItemPath { segments: Cow::Owned(segments) }
+    }
+
+    fn parent(&'a self) -> Option<ItemPath<'a>> {
+        match self.segments.len() {
+            0 => unreachable!("this should never happen"),
+            1 => None,
+            len => Some(ItemPath::new(&self.segments[0..len - 1])),
+        }
+    }
+
+    fn name(&self) -> &str {
+        self.segments.last().expect("segments should not be empty")
+    }
+}
+
+// WIP! name
+struct ItemInfo {
+    crate_id: u32,
+    kind: ItemKind,
+}
+
+impl From<&ItemSummary> for ItemInfo {
+    fn from(item_summary: &ItemSummary) -> Self {
+        ItemInfo { crate_id: item_summary.crate_id, kind: item_summary.kind.clone() }
+    }
+}
+
+fn path_of_struct_with_field<'a>(
+    rustdoc_crate: &'a rustdoc_types::Crate,
+    field_id: &rustdoc_types::Id,
+) -> Option<ItemPath<'a>> {
+    use rustdoc_types::Struct;
+
+    let struct_item = rustdoc_crate.index.values().find(|item| match &item.inner {
+        ItemEnum::Struct(Struct { kind: StructKind::Plain { fields, .. }, .. }) => {
+            fields.contains(field_id)
+        }
+        _ => false,
+    })?;
+
+    let struct_summay = rustdoc_crate.paths.get(&struct_item.id)?;
+
+    Some(ItemPath::new(&struct_summay.path))
+}
+
+// WIP! name
+fn foo<'a>(
+    rustdoc_crate: &'a rustdoc_types::Crate,
+    id: &rustdoc_types::Id,
+) -> Option<(ItemPath<'a>, ItemInfo)> {
+    let item = rustdoc_crate.index.get(id)?;
+
+    match item.inner {
+        ItemEnum::StructField(_) => {
+            let item_info = ItemInfo { crate_id: item.crate_id, kind: ItemKind::StructField };
+            let name = item.name.as_ref()?;
+            let parent_path = path_of_struct_with_field(rustdoc_crate, id)?;
+            let path = parent_path.push(name.clone());
+
+            Some((path, item_info))
+        }
+        ItemEnum::Module(_)
+        | ItemEnum::ExternCrate { .. }
+        | ItemEnum::Import(_)
+        | ItemEnum::Union(_)
+        | ItemEnum::Struct(_)
+        | ItemEnum::Enum(_)
+        | ItemEnum::Variant(_)
+        | ItemEnum::Function(_)
+        | ItemEnum::Trait(_)
+        | ItemEnum::TraitAlias(_)
+        | ItemEnum::Impl(_)
+        | ItemEnum::TypeAlias(_)
+        | ItemEnum::OpaqueTy(_)
+        | ItemEnum::Constant(_)
+        | ItemEnum::Static(_)
+        | ItemEnum::ForeignType
+        | ItemEnum::Macro(_)
+        | ItemEnum::ProcMacro(_)
+        | ItemEnum::Primitive(_)
+        | ItemEnum::AssocConst { .. }
+        | ItemEnum::AssocType { .. } => todo!("WIP!"),
     }
 }
 
@@ -88,40 +199,307 @@ where
     type E = IntralinkError;
 
     fn transform(&self, doc: &Doc) -> Result<Doc, IntralinkError> {
-        let symbols: HashSet<ItemPath> = extract_markdown_intralink_symbols(doc);
+        // WIP! have a thing that checks if the nightly toolchain is installed.
 
-        // If there are no intralinks in the doc don't even bother doing anything else.
-        if symbols.is_empty() {
-            return Ok(doc.clone());
-        }
+        // WIP! do not run intralinks if there's none.
+
+        // WIP! we probably want to be able to configure which feature to have enabled when generating the code
+        // or at least never fail on warnings
+
+        // WIP! make sure we print errors we got from rustdoc, but not warnings (probably)
+        //      maybe we can do with --cap-lints error ?
+
+        let mut link_url_resolver: LinkUrlResolver =
+            LinkUrlResolver::new(self.crate_name.clone(), self.config.docs_rs.clone());
 
         // We only load symbols type information when we need them.
-        let symbols_type = match self.config.strip_links.unwrap_or(false) {
-            false => load_symbols_type(&self.entrypoint, &symbols, &self.emit_warning)?,
-            true => HashMap::new(),
-        };
+        if !self.config.strip_links.unwrap_or(false) {
+            let target = match &self.package_target {
+                PackageTarget::Bin { name } => rustdoc_json::PackageTarget::Bin(name.clone()),
+                PackageTarget::Lib => rustdoc_json::PackageTarget::Lib,
+            };
 
-        let doc =
-            rewrite_links(doc, &symbols_type, &self.crate_name, &self.emit_warning, &self.config);
+            // WIP! check version `format_version` before trying to parse for real
+
+            // WIP! set temporary target dir with target_dir?
+            // silent(self, silent: bool)
+            // quiet(self, quiet: bool)
+            let rustdoc_json_path = {
+                let mut builder = rustdoc_json::Builder::default()
+                    // TODO Use stable when this stabilizes (https://github.com/rust-lang/rust/issues/76578).
+                    .toolchain("nightly")
+                    // WIP! get manifest_path from somewhere
+                    .manifest_path("Cargo.toml")
+                    .document_private_items(true)
+                    // WIP! Should we parameterize the features thing?
+                    // .all_features(true)
+                    .package_target(target);
+
+                if let Some(package) = self.workspace_package.as_ref() {
+                    builder = builder.package(package);
+                }
+
+                builder.build()
+                    // WIP! proper error handling
+                    .expect("WIP!")
+            };
+
+            // WIP! make sure we can display error if they happen.
+
+            eprintln!("WIP! GREPME {}", rustdoc_json_path.display());
+
+            let rustdoc_crate = rustdoc::crate_from_file(&rustdoc_json_path);
+
+            // eprintln!("WIP! GREPME {:#?}", rustdoc_crate);
+
+            let links_items_id = rustdoc::crate_rustdoc_intralinks(&rustdoc_crate);
+
+            let mut path_item_info: HashMap<ItemPath<'_>, ItemInfo> =
+                HashMap::with_capacity(links_items_id.len());
+
+            for item_summary in rustdoc_crate.paths.values() {
+                let item_path = ItemPath::new(&item_summary.path);
+                let item_info =
+                    ItemInfo { crate_id: item_summary.crate_id, kind: item_summary.kind.clone() };
+
+                path_item_info.insert(item_path, item_info);
+            }
+
+            // WIP! We don't need to find the specific struct this way.  lets pass everything to
+            // the resolver.
+            for (link, item_id) in links_items_id {
+                eprintln!("GREPME link {:?} itemid {:?}", link, item_id);
+
+                if !rustdoc_crate.paths.contains_key(item_id) {
+                    let (item_path, item_info) =
+                        foo(&rustdoc_crate, &item_id).expect("could not find item info");
+
+                    path_item_info.insert(item_path, item_info);
+                }
+            }
+
+            for (link, item_id) in links_items_id {
+                // WIP! do not compute this again (see for loops above)
+                let (item_path, _): (ItemPath<'_>, ItemInfo) =
+                    match rustdoc_crate.paths.get(item_id) {
+                        None => foo(&rustdoc_crate, item_id).expect("could not find item info"),
+                        Some(item_summary) => {
+                            let item_path = ItemPath::new(item_summary.path.as_slice());
+                            (item_path, item_summary.into())
+                        }
+                    };
+
+                link_url_resolver.add(
+                    Link::new(link.clone()),
+                    item_path,
+                    &path_item_info,
+                    &rustdoc_crate.external_crates,
+                )
+            }
+        }
+
+        let doc = rewrite_links(doc, &link_url_resolver, &self.emit_warning, &self.config);
 
         Ok(doc)
     }
 }
 
+// WIP! reference links
+// WIP! impl items
+// WIP! external links like stdlib
+
+struct LinkUrlResolver {
+    link_url: HashMap<Link, String>,
+    config: IntralinksDocsRsConfig,
+    crate_name: String,
+}
+
+impl LinkUrlResolver {
+    fn new(crate_name: String, config: IntralinksDocsRsConfig) -> LinkUrlResolver {
+        LinkUrlResolver { link_url: HashMap::new(), crate_name, config }
+    }
+
+    // WIP! name
+    fn url_last_component(
+        kind: ItemKind,
+        name: &str,
+        parent_kind: Option<ItemKind>,
+        parent_name: Option<&str>,
+    ) -> String {
+        match kind {
+            // WIP! about about fields inside a union, enum, struct, functions in a trait etc?
+            ItemKind::Module => format!("{name}/"),
+            ItemKind::ExternCrate => todo!("WIP!"), //
+            ItemKind::Import => todo!("WIP!"),      //
+            ItemKind::Struct => format!("struct.{name}.html"),
+            ItemKind::StructField => {
+                let parent_kind = parent_kind.expect("this item kind needs to have a parent");
+                let parent_name = parent_name.expect("this item kind needs to have a parent");
+                let parent_last_component =
+                    LinkUrlResolver::url_last_component(parent_kind, parent_name, None, None);
+
+                format!("{}#structfield.{name}", parent_last_component)
+            }
+            ItemKind::Union => format!("union.{name}.html"),
+            ItemKind::Enum => format!("enum.{name}.html"),
+            ItemKind::Variant => todo!("WIP!"), //
+            ItemKind::Function => format!("fn.{name}.html"),
+            ItemKind::TypeAlias => format!("type.{name}.html"),
+            ItemKind::OpaqueTy => todo!("WIP!"), //
+            ItemKind::Constant => format!("const.{name}.html"),
+            ItemKind::Trait => format!("trait.{name}.html"),
+            ItemKind::TraitAlias => todo!("WIP!"), //
+            ItemKind::Impl => todo!("WIP!"),       //
+            ItemKind::Static => format!("static.{name}.html"),
+            ItemKind::ForeignType => todo!("WIP!"), //
+            ItemKind::Macro => format!("macro.{name}.html"),
+            ItemKind::ProcAttribute => todo!("WIP!"), //
+            ItemKind::ProcDerive => todo!("WIP!"),    //
+            ItemKind::AssocConst => todo!("WIP!"),    //
+            ItemKind::AssocType => todo!("WIP!"),     //
+            ItemKind::Primitive => format!("primitive.{name}.html"),
+            ItemKind::Keyword => todo!("WIP!"), //
+        }
+    }
+
+    // WIP! name
+    fn is_nested_item_kind(kind: ItemKind) -> bool {
+        match kind {
+            // WIP! about about fields inside a union, enum, struct, functions in a trait etc?
+            ItemKind::Module => false,
+            ItemKind::ExternCrate => todo!("WIP!"), //
+            ItemKind::Import => todo!("WIP!"),      //
+            ItemKind::Struct => false,
+            ItemKind::StructField => true,
+            ItemKind::Union => false,
+            ItemKind::Enum => false,
+            ItemKind::Variant => todo!("WIP!"), //
+            ItemKind::Function => false,
+            ItemKind::TypeAlias => false,
+            ItemKind::OpaqueTy => todo!("WIP!"), //
+            ItemKind::Constant => false,
+            ItemKind::Trait => false,
+            ItemKind::TraitAlias => todo!("WIP!"), //
+            ItemKind::Impl => todo!("WIP!"),       //
+            ItemKind::Static => false,
+            ItemKind::ForeignType => todo!("WIP!"), //
+            ItemKind::Macro => false,
+            ItemKind::ProcAttribute => todo!("WIP!"), //
+            ItemKind::ProcDerive => todo!("WIP!"),    //
+            ItemKind::AssocConst => todo!("WIP!"),    //
+            ItemKind::AssocType => todo!("WIP!"),     //
+            ItemKind::Primitive => false,
+            ItemKind::Keyword => todo!("WIP!"), //
+        }
+    }
+
+    fn add(
+        &mut self,
+        link: Link,
+        item_path: ItemPath<'_>,
+        links_items_id: &HashMap<ItemPath<'_>, ItemInfo>,
+        external_crates: &HashMap<u32, rustdoc_types::ExternalCrate>,
+    ) {
+        let item_info = links_items_id.get(&item_path).expect("item not found");
+        let parent_item_path = item_path.parent();
+        let parent_item_info =
+            parent_item_path.as_ref().and_then(|parent| links_items_id.get(&parent));
+
+        // WIP! improve this mess!
+        // 0 means local crate.
+        if item_info.crate_id == 0 {
+            let base_url =
+                self.config.docs_rs_base_url.as_ref().map_or("https://docs.rs", String::as_str);
+            let version = self.config.docs_rs_version.as_ref().map_or("latest", String::as_str);
+            // WIP! do we need this?  can we extract it from somewhere?
+            let crate_name = &self.crate_name;
+
+            let mut url = match item_path.segments.len() {
+                0 => unreachable!("an item should not have an empty path"),
+                1 => format!("{base_url}/{crate_name}/{version}/"),
+                _ => {
+                    let drop_back =
+                        LinkUrlResolver::is_nested_item_kind(item_info.kind.clone()) as usize + 1;
+                    let url_path = item_path.segments.iter().dropping_back(drop_back).join("/");
+                    format!("{base_url}/{crate_name}/{version}/{url_path}/")
+                }
+            };
+
+            eprintln!("GREPME kind {:?}", item_info.kind);
+
+            let last_component = LinkUrlResolver::url_last_component(
+                item_info.kind.clone(),
+                item_path.name(),
+                parent_item_info.map(|i| i.kind.clone()),
+                parent_item_path.as_ref().map(|i| i.name()),
+            );
+
+            url.push_str(&last_component);
+
+            self.link_url.insert(link, url);
+        } else {
+            if let Some(rustdoc_types::ExternalCrate {
+                // WIP! how about package name vs crate name
+                html_root_url: Some(ref base_url),
+                ..
+            }) = external_crates.get(&item_info.crate_id)
+            {
+                // TODO Once we are able to use the stable version we can remove this.
+                let base_url = base_url.replace("/nightly/", "/stable/");
+
+                let mut url = match item_path.segments.len() {
+                    0 => unreachable!("an item should not have an empty path"),
+                    1 => format!("{base_url}"),
+                    _ => {
+                        let drop_back = LinkUrlResolver::is_nested_item_kind(item_info.kind.clone())
+                            as usize
+                            + 1;
+                        let url_path = item_path.segments.iter().dropping_back(drop_back).join("/");
+                        format!("{base_url}{url_path}/")
+                    }
+                };
+
+                eprintln!("GREPME -> base_url {}", base_url);
+
+                eprintln!("GREPME kind {:?}", item_info.kind);
+
+                let last_component = LinkUrlResolver::url_last_component(
+                    item_info.kind.clone(),
+                    item_path.name(),
+                    parent_item_info.map(|i| i.kind.clone()),
+                    parent_item_path.as_ref().map(|i| i.name()),
+                );
+
+                url.push_str(&last_component);
+
+                self.link_url.insert(link, url);
+            }
+        }
+    }
+
+    fn url(&self, link: &Link) -> Option<&str> {
+        self.link_url.get(link).map(String::as_str)
+    }
+
+    fn is_intralink(link: &Link) -> bool {
+        let has_lone_colon = || link.raw_link.replace("::", "").contains(':');
+
+        !link.symbol().is_empty() && !link.raw_link.contains('/') && !has_lone_colon()
+    }
+}
+
 fn rewrite_links(
     doc: &Doc,
-    symbols_type: &HashMap<ItemPath, SymbolType>,
-    crate_name: &str,
+    link_url_resolver: &LinkUrlResolver,
     emit_warning: &impl Fn(&str),
     config: &IntralinksConfig,
 ) -> Doc {
     let RewriteReferenceLinksResult { doc, reference_links_to_remove } =
-        rewrite_reference_links_definitions(doc, symbols_type, crate_name, emit_warning, config);
+        rewrite_reference_links_definitions(doc, link_url_resolver, emit_warning, config);
 
     let doc = rewrite_markdown_links(
         &doc,
-        symbols_type,
-        crate_name,
+        link_url_resolver,
         emit_warning,
         config,
         &reference_links_to_remove,
@@ -133,503 +511,6 @@ fn rewrite_links(
     doc
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-pub enum ItemPathAnchor {
-    /// The anchor of a path starting with `::` such as `::std::fs::read`.
-    Root,
-    /// The anchor of a path starting with `crate` such as `crate::foo::is_prime`.
-    Crate,
-}
-
-/// The rust path of an item, such as `foo::bar::is_prime` or `crate`.
-#[derive(Clone)]
-pub struct ItemPath {
-    pub anchor: ItemPathAnchor,
-
-    /// This path vector can be shared and can end after the item_path we are representing.
-    /// This allow us to have a faster implementation for `ItemPath::all_ancestors()`.
-    path_shared: Rc<Vec<String>>,
-    path_end: usize,
-}
-
-impl ItemPath {
-    fn new(anchor: ItemPathAnchor) -> ItemPath {
-        ItemPath { anchor, path_shared: Rc::new(Vec::new()), path_end: 0 }
-    }
-
-    fn root(crate_name: &str) -> ItemPath {
-        ItemPath::new(ItemPathAnchor::Root).join(&crate_name)
-    }
-
-    fn from_string(s: &str) -> Option<ItemPath> {
-        let anchor;
-        let rest;
-
-        if let Some(r) = s.strip_prefix("::") {
-            anchor = ItemPathAnchor::Root;
-            rest = r;
-        } else if s == "crate" {
-            return Some(ItemPath::new(ItemPathAnchor::Crate));
-        } else if let Some(r) = s.strip_prefix("crate::") {
-            anchor = ItemPathAnchor::Crate;
-            rest = r;
-        } else {
-            return None;
-        }
-
-        if rest.is_empty() {
-            return None;
-        }
-
-        let path: Rc<Vec<String>> = Rc::new(rest.split("::").map(str::to_owned).collect());
-
-        Some(ItemPath { anchor, path_end: path.len(), path_shared: path })
-    }
-
-    fn path_components(&self) -> impl Iterator<Item = &str> {
-        self.path_shared[0..self.path_end].iter().map(String::as_str)
-    }
-
-    fn is_toplevel(&self) -> bool {
-        match self.anchor {
-            ItemPathAnchor::Root => self.path_end <= 1,
-            ItemPathAnchor::Crate => self.path_end == 0,
-        }
-    }
-
-    fn parent(mut self) -> Option<ItemPath> {
-        match self.is_toplevel() {
-            true => None,
-            false => {
-                self.path_end -= 1;
-                Some(self)
-            }
-        }
-    }
-
-    fn name(&self) -> Option<&str> {
-        self.path_end.checked_sub(1).and_then(|i| self.path_shared.get(i)).map(String::as_str)
-    }
-
-    fn join(mut self, s: &impl ToString) -> ItemPath {
-        let path = Rc::make_mut(&mut self.path_shared);
-        path.truncate(self.path_end);
-        path.push(s.to_string());
-        self.path_end += 1;
-        self
-    }
-
-    fn all_ancestors(&self) -> impl Iterator<Item = ItemPath> {
-        let first_ancestor = self.clone().parent();
-
-        std::iter::successors(first_ancestor, |ancestor| ancestor.clone().parent())
-    }
-}
-
-impl PartialEq for ItemPath {
-    fn eq(&self, other: &Self) -> bool {
-        self.anchor == other.anchor && self.path_components().eq(other.path_components())
-    }
-}
-
-impl Eq for ItemPath {}
-
-impl Hash for ItemPath {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.anchor.hash(state);
-        self.path_components().for_each(|c| c.hash(state));
-    }
-}
-
-impl fmt::Display for ItemPath {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        match self.anchor {
-            ItemPathAnchor::Root => (),
-            ItemPathAnchor::Crate => f.write_str("crate")?,
-        }
-
-        for s in self.path_components() {
-            f.write_str("::")?;
-            f.write_str(s)?;
-        }
-
-        Ok(())
-    }
-}
-
-impl fmt::Debug for ItemPath {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        fmt::Display::fmt(self, f)
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum ImplSymbolType {
-    Method,
-    Const,
-    Type,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum SymbolType {
-    Crate,
-    Struct,
-    Trait,
-    Enum,
-    Union,
-    Type,
-    Mod,
-    Macro,
-    Const,
-    Fn,
-    Static,
-    ImplItem(ImplSymbolType),
-}
-
-impl SymbolType {
-    /// Returns the path of the module where this item is defined.
-    ///
-    /// Importantly, if inse module `crate::amod` we have a `struct Foo` with method `Foo::method()`,
-    /// this will `Foo::method()` return `crate::amod`.
-    fn get_module_path(self, path: &ItemPath) -> Option<ItemPath> {
-        match self {
-            SymbolType::Crate => {
-                assert!(path.is_toplevel(), "a crate should always be in a toplevel path");
-                None
-            }
-            SymbolType::Struct
-            | SymbolType::Trait
-            | SymbolType::Enum
-            | SymbolType::Union
-            | SymbolType::Type
-            | SymbolType::Mod
-            | SymbolType::Macro
-            | SymbolType::Const
-            | SymbolType::Fn
-            | SymbolType::Static => {
-                let p = path.clone().parent().unwrap_or_else(|| {
-                    panic!("item {path} of type {self:?} should have a parent module")
-                });
-                Some(p)
-            }
-            SymbolType::ImplItem(_) => {
-                let p = path
-                    .clone()
-                    .parent()
-                    .unwrap_or_else(|| {
-                        panic!("item {path} of type {self:?} should have a parent type")
-                    })
-                    .parent()
-                    .unwrap_or_else(|| {
-                        panic!("item {path} of type {self:?} should have a parent module")
-                    });
-                Some(p)
-            }
-        }
-    }
-}
-
-fn symbols_type_impl_block(
-    module: &ItemPath,
-    impl_block: &syn::ItemImpl,
-) -> Vec<(ItemPath, SymbolType)> {
-    use syn::{ImplItem, Type, TypePath};
-
-    if let Type::Path(TypePath { qself: None, path }) = &*impl_block.self_ty {
-        if let Some(self_ident) = path.get_ident().map(ToString::to_string) {
-            let self_path = module.clone().join(&self_ident);
-
-            return impl_block
-                .items
-                .iter()
-                .filter_map(|item| match item {
-                    ImplItem::Fn(m) => {
-                        let ident = m.sig.ident.to_string();
-
-                        Some((ident, ImplSymbolType::Method))
-                    }
-                    ImplItem::Const(c) => {
-                        let ident = c.ident.to_string();
-
-                        Some((ident, ImplSymbolType::Const))
-                    }
-                    ImplItem::Type(t) => {
-                        let ident = t.ident.to_string();
-
-                        Some((ident, ImplSymbolType::Type))
-                    }
-                    _ => None,
-                })
-                .map(|(ident, tpy)| (self_path.clone().join(&ident), SymbolType::ImplItem(tpy)))
-                .collect();
-        }
-    }
-
-    Vec::new()
-}
-
-fn item_symbols_type(module: &ItemPath, item: &Item) -> Vec<(ItemPath, SymbolType)> {
-    let item_path = |ident: &syn::Ident| module.clone().join(ident);
-
-    let (path, symbol_type) = match item {
-        Item::Enum(e) => (item_path(&e.ident), SymbolType::Enum),
-        Item::Struct(s) => (item_path(&s.ident), SymbolType::Struct),
-        Item::Trait(t) => (item_path(&t.ident), SymbolType::Trait),
-        Item::Union(u) => (item_path(&u.ident), SymbolType::Union),
-        Item::Type(t) => (item_path(&t.ident), SymbolType::Type),
-        Item::Mod(m) => (item_path(&m.ident), SymbolType::Mod),
-        Item::Macro(syn::ItemMacro { ident: Some(ident), .. }) => {
-            (item_path(ident), SymbolType::Macro)
-        }
-        Item::Const(c) => (item_path(&c.ident), SymbolType::Const),
-        Item::Fn(f) => (item_path(&f.sig.ident), SymbolType::Fn),
-        Item::Static(s) => (item_path(&s.ident), SymbolType::Static),
-        Item::Impl(impl_block) => {
-            return symbols_type_impl_block(module, impl_block);
-        }
-
-        _ => return Vec::new(),
-    };
-
-    vec![(path, symbol_type)]
-}
-
-fn is_cfg_test(attribute: &syn::Attribute) -> bool {
-    let test_attribute: syn::Attribute = syn::parse_quote!(#[cfg(test)]);
-
-    *attribute == test_attribute
-}
-
-fn visit_module_item(
-    save_symbol: impl Fn(&ItemPath) -> bool,
-    symbols_type: &mut HashMap<ItemPath, SymbolType>,
-    module: &ItemPath,
-    item: &Item,
-) {
-    for (symbol, symbol_type) in item_symbols_type(module, item) {
-        if save_symbol(&symbol) {
-            symbols_type.insert(symbol, symbol_type);
-        }
-    }
-}
-
-/// Returns whether we should explore a module.
-fn check_explore_module(
-    should_explore_module: impl Fn(&ItemPath) -> bool,
-    modules_visited: &mut HashSet<ItemPath>,
-    mod_symbol: &ItemPath,
-    mod_item: &ItemMod,
-) -> bool {
-    // Conditional compilation can create multiple module definitions, e.g.
-    //
-    // ```
-    // #[cfg(foo)]
-    // mod a {}
-    // #[cfg(not(foo))]
-    // mod a {}
-    // ```
-    //
-    // We choose to consider the first one only.
-    if modules_visited.contains(mod_symbol) {
-        return false;
-    }
-
-    // If a module is gated by `#[cfg(test)]` we skip it.  This happens sometimes in the
-    // standard library, and we want to explore the correct, non-test, module.
-    if mod_item.attrs.iter().any(is_cfg_test) {
-        return false;
-    }
-
-    let explore = should_explore_module(mod_symbol);
-
-    if explore {
-        modules_visited.insert(mod_symbol.clone());
-    }
-
-    explore
-}
-
-fn explore_crate<P: AsRef<Path>>(
-    file: P,
-    crate_symbol: &ItemPath,
-    symbols: &HashSet<ItemPath>,
-    paths_to_explore: &HashSet<ItemPath>,
-    symbols_type: &mut HashMap<ItemPath, SymbolType>,
-    emit_warning: &impl Fn(&str),
-) -> Result<(), module_walker::ModuleWalkError> {
-    let mut modules_visited: HashSet<ItemPath> = HashSet::new();
-
-    // Walking the module only visits items, which means we need to add the root `crate` explicitly.
-    symbols_type.insert(crate_symbol.clone(), SymbolType::Crate);
-
-    let mut visit = |module: &ItemPath, item: &Item| {
-        let save_symbol = |symbol: &ItemPath| {
-            // We also check if it belongs to the paths to explore because of impl items (e.g. a
-            // method `Foo::method` we need to know about `Foo` type.  For instance if `Foo` is a
-            // struct then the link will be `⋯/struct.Foo.html#method.method`.
-            symbols.contains(symbol) || paths_to_explore.contains(symbol)
-        };
-
-        visit_module_item(save_symbol, symbols_type, module, item);
-    };
-
-    let mut explore_module = |mod_symbol: &ItemPath, mod_item: &ItemMod| -> bool {
-        check_explore_module(
-            |mod_symbol| paths_to_explore.contains(mod_symbol),
-            &mut modules_visited,
-            mod_symbol,
-            mod_item,
-        )
-    };
-
-    walk_module_file(file, crate_symbol, &mut visit, &mut explore_module, emit_warning)
-}
-
-fn load_symbols_type<P: AsRef<Path>>(
-    entry_point: P,
-    symbols: &HashSet<ItemPath>,
-    emit_warning: &impl Fn(&str),
-) -> Result<HashMap<ItemPath, SymbolType>, IntralinkError> {
-    let paths_to_explore: HashSet<ItemPath> = all_ancestor_paths(symbols.iter());
-    let mut symbols_type: HashMap<ItemPath, SymbolType> = HashMap::new();
-
-    // Only load standard library information if needed.
-    let std_lib_crates = match references_standard_library(symbols) {
-        true => get_standard_libraries()?,
-        false => Vec::new(),
-    };
-
-    for Crate { name, entrypoint } in std_lib_crates {
-        explore_crate(
-            entrypoint,
-            &ItemPath::root(&name),
-            symbols,
-            &paths_to_explore,
-            &mut symbols_type,
-            emit_warning,
-        )?;
-    }
-
-    explore_crate(
-        entry_point,
-        &ItemPath::new(ItemPathAnchor::Crate),
-        symbols,
-        &paths_to_explore,
-        &mut symbols_type,
-        emit_warning,
-    )?;
-
-    Ok(symbols_type)
-}
-
-/// Create a set with all ancestor paths of `symbols`.  For instance, if `symbols` is
-/// `{crate::foo::bar::baz, crate::baz::mumble}` it will return
-/// `{crate, crate::foo, crate::foo::bar, crate::baz}`.
-fn all_ancestor_paths<'a>(symbols: impl Iterator<Item = &'a ItemPath>) -> HashSet<ItemPath> {
-    symbols.into_iter().flat_map(ItemPath::all_ancestors).collect()
-}
-
-fn extract_markdown_intralink_symbols(doc: &Doc) -> HashSet<ItemPath> {
-    let item_paths_inline_links =
-        markdown_link_iterator(&doc.markdown).items().filter_map(|l| match l {
-            MarkdownLink::Inline { link: inline_link } => inline_link.link.link_as_item_path(),
-            MarkdownLink::Reference { .. } => None,
-        });
-
-    let item_paths_reference_link_def = markdown_reference_link_definition_iterator(&doc.markdown)
-        .items()
-        .filter_map(|l| l.link.link_as_item_path());
-
-    item_paths_inline_links.chain(item_paths_reference_link_def).collect()
-}
-
-/// Returns the url for the item.
-///
-/// This returns `None` if the item type(s) was not successfully resolved.
-fn documentation_url(
-    item_path: &ItemPath,
-    symbols_type: &HashMap<ItemPath, SymbolType>,
-    crate_name: &str,
-    fragment: Option<&str>,
-    config: &IntralinksDocsRsConfig,
-) -> Option<String> {
-    let package_name = crate_name.replace('-', "_");
-    let typ = *symbols_type.get(item_path)?;
-
-    let mut link = match item_path.anchor {
-        ItemPathAnchor::Root => {
-            let std_crate_name =
-                item_path.path_components().next().expect("a root path should not be empty");
-            format!("https://doc.rust-lang.org/stable/{std_crate_name}/")
-        }
-        ItemPathAnchor::Crate => {
-            let base_url =
-                config.docs_rs_base_url.as_ref().map_or("https://docs.rs", String::as_str);
-            let version = config.docs_rs_version.as_ref().map_or("latest", String::as_str);
-
-            format!("{base_url}/{crate_name}/{version}/{package_name}/")
-        }
-    };
-
-    if typ == SymbolType::Crate {
-        return Some(format!("{}{}", link, fragment.unwrap_or("")));
-    }
-
-    let skip_components = match item_path.anchor {
-        ItemPathAnchor::Root => 1,
-        ItemPathAnchor::Crate => 0,
-    };
-
-    let module_path = typ.get_module_path(item_path).expect("item should belong to a module");
-
-    for s in module_path.path_components().skip(skip_components) {
-        link.push_str(s);
-        link.push('/');
-    }
-
-    let name =
-        item_path.name().unwrap_or_else(|| panic!("failed to get last component of {item_path}"));
-
-    match typ {
-        SymbolType::Crate => unreachable!(),
-        SymbolType::Struct => link.push_str(&format!("struct.{name}.html")),
-        SymbolType::Trait => link.push_str(&format!("trait.{name}.html")),
-        SymbolType::Enum => link.push_str(&format!("enum.{name}.html")),
-        SymbolType::Union => link.push_str(&format!("union.{name}.html")),
-        SymbolType::Type => link.push_str(&format!("type.{name}.html")),
-        SymbolType::Mod => link.push_str(&format!("{name}/")),
-        SymbolType::Macro => link.push_str(&format!("macro.{name}.html")),
-        SymbolType::Const => link.push_str(&format!("const.{name}.html")),
-        SymbolType::Fn => link.push_str(&format!("fn.{name}.html")),
-        SymbolType::Static => link.push_str(&format!("static.{name}.html")),
-        SymbolType::ImplItem(typ) => {
-            let parent_path = item_path
-                .clone()
-                .parent()
-                .unwrap_or_else(|| panic!("item {item_path} should always have a parent"));
-
-            let link = documentation_url(
-                &parent_path,
-                symbols_type,
-                crate_name,
-                // We discard the fragment.
-                None,
-                config,
-            )?;
-
-            let impl_item_fragment_str = match typ {
-                ImplSymbolType::Method => "method",
-                ImplSymbolType::Const => "associatedconstant",
-                ImplSymbolType::Type => "associatedtype",
-            };
-
-            return Some(format!("{link}#{impl_item_fragment_str}.{name}"));
-        }
-    }
-
-    Some(format!("{}{}", link, fragment.unwrap_or("")))
-}
-
 enum MarkdownLinkAction {
     Link(Link),
     Preserve,
@@ -638,39 +519,31 @@ enum MarkdownLinkAction {
 
 fn markdown_link(
     link: &Link,
-    symbols_type: &HashMap<ItemPath, SymbolType>,
-    crate_name: &str,
+    link_url_resolver: &LinkUrlResolver,
     emit_warning: &impl Fn(&str),
-    config: &IntralinksConfig,
 ) -> MarkdownLinkAction {
-    match link.link_as_item_path() {
-        Some(symbol) => {
-            let link = documentation_url(
-                &symbol,
-                symbols_type,
-                crate_name,
-                link.link_fragment(),
-                &config.docs_rs,
-            );
+    assert!(LinkUrlResolver::is_intralink(&link));
 
-            match link {
-                Some(l) => MarkdownLinkAction::Link(l.into()),
-                None => {
-                    emit_warning(&format!("Could not resolve definition of `{symbol}`."));
+    match link_url_resolver.url(&link) {
+        None => {
+            emit_warning(&format!("Could not resolve definition of `{}`.", link.symbol()));
 
-                    // This was an intralink, but we were not able to generate a link.
-                    MarkdownLinkAction::Strip
-                }
-            }
+            MarkdownLinkAction::Strip
         }
-        None => MarkdownLinkAction::Preserve,
+        Some(url) => {
+            let url = match link.link_fragment() {
+                None => url.to_owned(),
+                Some(fragment) => format!("{url}#{fragment}"),
+            };
+
+            MarkdownLinkAction::Link(url.into())
+        }
     }
 }
 
 fn rewrite_markdown_links(
     doc: &Doc,
-    symbols_type: &HashMap<ItemPath, SymbolType>,
-    crate_name: &str,
+    link_url_resolver: &LinkUrlResolver,
     emit_warning: &impl Fn(&str),
     config: &IntralinksConfig,
     reference_links_to_remove: &HashSet<UniCase<String>>,
@@ -683,19 +556,16 @@ fn rewrite_markdown_links(
     for item_or_other in markdown_link_iterator(&doc.markdown).complete() {
         match item_or_other {
             ItemOrOther::Item(MarkdownLink::Inline { link: inline_link }) => {
-                let markdown_link: MarkdownLinkAction = match strip_links {
-                    false => markdown_link(
-                        &inline_link.link,
-                        symbols_type,
-                        crate_name,
-                        emit_warning,
-                        config,
-                    ),
-                    true => match inline_link.link.link_as_item_path() {
-                        None => MarkdownLinkAction::Preserve,
-                        Some(_) => MarkdownLinkAction::Strip,
-                    },
-                };
+                let markdown_link: MarkdownLinkAction =
+                    match LinkUrlResolver::is_intralink(&inline_link.link) {
+                        true => match strip_links {
+                            false => {
+                                markdown_link(&inline_link.link, link_url_resolver, emit_warning)
+                            }
+                            true => MarkdownLinkAction::Strip,
+                        },
+                        false => MarkdownLinkAction::Preserve,
+                    };
 
                 match markdown_link {
                     MarkdownLinkAction::Link(markdown_link) => {
@@ -731,8 +601,7 @@ struct RewriteReferenceLinksResult {
 
 fn rewrite_reference_links_definitions(
     doc: &Doc,
-    symbols_type: &HashMap<ItemPath, SymbolType>,
-    crate_name: &str,
+    link_url_resolver: &LinkUrlResolver,
     emit_warning: &impl Fn(&str),
     config: &IntralinksConfig,
 ) -> RewriteReferenceLinksResult {
@@ -747,19 +616,16 @@ fn rewrite_reference_links_definitions(
     for item_or_other in iter.complete() {
         match item_or_other {
             ItemOrOther::Item(link_ref_def) => {
-                let markdown_link: MarkdownLinkAction = match strip_links {
-                    false => markdown_link(
-                        &link_ref_def.link,
-                        symbols_type,
-                        crate_name,
-                        emit_warning,
-                        config,
-                    ),
-                    true => match link_ref_def.link.link_as_item_path() {
-                        None => MarkdownLinkAction::Preserve,
-                        Some(_) => MarkdownLinkAction::Strip,
-                    },
-                };
+                let markdown_link: MarkdownLinkAction =
+                    match LinkUrlResolver::is_intralink(&link_ref_def.link) {
+                        true => match strip_links {
+                            false => {
+                                markdown_link(&link_ref_def.link, link_url_resolver, emit_warning)
+                            }
+                            true => MarkdownLinkAction::Strip,
+                        },
+                        false => MarkdownLinkAction::Preserve,
+                    };
 
                 match markdown_link {
                     MarkdownLinkAction::Link(link) => {
@@ -799,322 +665,14 @@ fn rewrite_reference_links_definitions(
     RewriteReferenceLinksResult { doc: Doc::from_str(new_doc), reference_links_to_remove }
 }
 
-fn get_rustc_sysroot_libraries_dir() -> Result<PathBuf, IntralinkError> {
-    use std::process::Command;
-
-    let output = Command::new("rustc")
-        .args(["--print=sysroot"])
-        .output()
-        .map_err(|e| IntralinkError::LoadStdLibError(format!("failed to run rustc: {e}")))?;
-
-    let s = String::from_utf8(output.stdout).expect("unexpected output from rustc");
-    let sysroot = PathBuf::from(s.trim());
-    let src_path = sysroot.join("lib").join("rustlib").join("src").join("rust").join("library");
-
-    match src_path.is_dir() {
-        false => Err(IntralinkError::LoadStdLibError(format!(
-            "Cannot find rust standard library in \"{}\"",
-            src_path.display()
-        ))),
-        true => Ok(src_path),
-    }
-}
-
-#[derive(Debug)]
-struct Crate {
-    name: String,
-    entrypoint: PathBuf,
-}
-
-fn references_standard_library(symbols: &HashSet<ItemPath>) -> bool {
-    // The only way to reference standard libraries that we support is with a intra-link of form `::⋯`.
-    symbols.iter().any(|symbol| symbol.anchor == ItemPathAnchor::Root)
-}
-
-fn get_standard_libraries() -> Result<Vec<Crate>, IntralinkError> {
-    let libraries_dir = get_rustc_sysroot_libraries_dir()?;
-    let mut std_libs = Vec::with_capacity(64);
-
-    for entry in std::fs::read_dir(libraries_dir)? {
-        let entry = entry?;
-        let project_dir_path = entry.path();
-        let cargo_manifest_path = project_dir_path.join("Cargo.toml");
-        let lib_entrypoint = project_dir_path.join("src").join("lib.rs");
-
-        if cargo_manifest_path.is_file() && lib_entrypoint.is_file() {
-            let crate_name =
-                crate::project_package_name(&cargo_manifest_path).ok_or_else(|| {
-                    IntralinkError::LoadStdLibError(format!(
-                        "failed to load manifest in \"{}\"",
-                        cargo_manifest_path.display()
-                    ))
-                })?;
-            let crate_info = Crate { name: crate_name, entrypoint: lib_entrypoint };
-
-            std_libs.push(crate_info);
-        }
-    }
-
-    Ok(std_libs)
-}
-
 #[allow(clippy::too_many_lines)]
 #[cfg(test)]
 mod tests {
+    /* WIP! Adapt tests
     use super::*;
     use indoc::indoc;
-    use module_walker::walk_module_items;
-    use std::cell::RefCell;
 
-    fn item_path(id: &str) -> ItemPath {
-        ItemPath::from_string(id).unwrap()
-    }
-
-    #[test]
-    fn test_item_path_is_toplevel() {
-        assert!(!item_path("crate::baz::mumble").is_toplevel());
-        assert!(!item_path("::std::baz::mumble").is_toplevel());
-        assert!(!item_path("crate::baz").is_toplevel());
-        assert!(!item_path("::std::baz").is_toplevel());
-        assert!(item_path("crate").is_toplevel());
-        assert!(item_path("::std").is_toplevel());
-    }
-
-    #[test]
-    fn test_item_path_parent() {
-        assert_eq!(item_path("crate::baz::mumble").parent(), Some(item_path("crate::baz")));
-        assert_eq!(item_path("::std::baz::mumble").parent(), Some(item_path("::std::baz")));
-        assert_eq!(item_path("crate::baz").parent(), Some(item_path("crate")));
-        assert_eq!(item_path("::std::baz").parent(), Some(item_path("::std")));
-        assert_eq!(item_path("crate").parent(), None);
-        assert_eq!(item_path("::std").parent(), None);
-    }
-
-    #[test]
-    fn test_item_path_join() {
-        assert_eq!(item_path("crate::foo").join(&"bar"), item_path("crate::foo::bar"),);
-        assert_eq!(item_path("::std::foo").join(&"bar"), item_path("::std::foo::bar"),);
-
-        assert_eq!(
-            item_path("::std::foo::bar").parent().unwrap().join(&"baz"),
-            item_path("::std::foo::baz"),
-        );
-    }
-
-    #[test]
-    fn test_all_ancestor_paths() {
-        let symbols = [
-            item_path("crate::foo::bar::baz"),
-            item_path("crate::baz::mumble"),
-            item_path("::std::vec::Vec"),
-        ];
-        let expected: HashSet<ItemPath> = [
-            item_path("crate"),
-            item_path("crate::foo"),
-            item_path("crate::foo::bar"),
-            item_path("crate::baz"),
-            item_path("::std"),
-            item_path("::std::vec"),
-        ]
-        .into_iter()
-        .collect();
-
-        assert_eq!(all_ancestor_paths(symbols.iter()), expected);
-    }
-
-    fn explore_crate(
-        ast: &[Item],
-        dir: &Path,
-        crate_symbol: &ItemPath,
-        should_explore_module: impl Fn(&ItemPath) -> bool,
-        symbols_type: &mut HashMap<ItemPath, SymbolType>,
-        emit_warning: impl Fn(&str),
-    ) {
-        let mut modules_visited: HashSet<ItemPath> = HashSet::new();
-
-        symbols_type.insert(crate_symbol.clone(), SymbolType::Crate);
-
-        let mut visit = |module: &ItemPath, item: &Item| {
-            visit_module_item(|_| true, symbols_type, module, item);
-        };
-
-        let mut explore_module = |mod_symbol: &ItemPath, mod_item: &ItemMod| -> bool {
-            check_explore_module(&should_explore_module, &mut modules_visited, mod_symbol, mod_item)
-        };
-
-        walk_module_items(ast, dir, crate_symbol, &mut visit, &mut explore_module, &emit_warning)
-            .ok()
-            .unwrap();
-    }
-
-    #[test]
-    fn test_walk_module_and_symbols_type() {
-        let module_skip: ItemPath = item_path("crate::skip");
-
-        let source = indoc! { "
-            struct AStruct {}
-
-            mod skip {
-              struct Skip {}
-            }
-
-            mod a {
-              mod b {
-                trait ATrait {}
-              }
-
-              struct FooStruct {}
-            }
-            "
-        };
-
-        let mut symbols_type: HashMap<ItemPath, SymbolType> = HashMap::new();
-        let warnings = RefCell::new(Vec::new());
-
-        explore_crate(
-            &syn::parse_file(source).unwrap().items,
-            &PathBuf::new(),
-            &item_path("crate"),
-            |m| *m != module_skip,
-            &mut symbols_type,
-            |msg| warnings.borrow_mut().push(msg.to_owned()),
-        );
-
-        let expected: HashMap<ItemPath, SymbolType> = [
-            (item_path("crate"), SymbolType::Crate),
-            (item_path("crate::AStruct"), SymbolType::Struct),
-            (item_path("crate::skip"), SymbolType::Mod),
-            (item_path("crate::a"), SymbolType::Mod),
-            (item_path("crate::a::b"), SymbolType::Mod),
-            (item_path("crate::a::b::ATrait"), SymbolType::Trait),
-            (item_path("crate::a::FooStruct"), SymbolType::Struct),
-        ]
-        .into_iter()
-        .collect();
-
-        assert_eq!(symbols_type, expected);
-    }
-
-    #[test]
-    fn test_symbols_type_with_mod_under_cfg_test() {
-        let source = indoc! { "
-            #[cfg(not(test))]
-            mod a {
-              struct MyStruct {}
-            }
-
-            #[cfg(test)]
-            mod a {
-              struct MyStructTest {}
-            }
-
-            #[cfg(test)]
-            mod b {
-              struct MyStructTest {}
-            }
-
-            #[cfg(not(test))]
-            mod b {
-              struct MyStruct {}
-            }
-            "
-        };
-
-        let mut symbols_type: HashMap<ItemPath, SymbolType> = HashMap::new();
-        let warnings = RefCell::new(Vec::new());
-
-        explore_crate(
-            &syn::parse_file(source).unwrap().items,
-            &PathBuf::new(),
-            &item_path("crate"),
-            |_| true,
-            &mut symbols_type,
-            |msg| warnings.borrow_mut().push(msg.to_owned()),
-        );
-
-        let expected: HashMap<ItemPath, SymbolType> = [
-            (item_path("crate"), SymbolType::Crate),
-            (item_path("crate::a"), SymbolType::Mod),
-            (item_path("crate::a::MyStruct"), SymbolType::Struct),
-            (item_path("crate::b"), SymbolType::Mod),
-            (item_path("crate::b::MyStruct"), SymbolType::Struct),
-        ]
-        .into_iter()
-        .collect();
-
-        assert_eq!(symbols_type, expected);
-    }
-
-    #[test]
-    fn test_symbols_type_multiple_module_first_wins() {
-        let source = indoc! { "
-            #[cfg(not(foo))]
-            mod a {
-              struct MyStruct {}
-            }
-
-            #[cfg(foo)]
-            mod a {
-              struct Skip {}
-            }
-            "
-        };
-
-        let mut symbols_type: HashMap<ItemPath, SymbolType> = HashMap::new();
-        let warnings = RefCell::new(Vec::new());
-
-        explore_crate(
-            &syn::parse_file(source).unwrap().items,
-            &PathBuf::new(),
-            &item_path("crate"),
-            |_| true,
-            &mut symbols_type,
-            |msg| warnings.borrow_mut().push(msg.to_owned()),
-        );
-
-        let expected: HashMap<ItemPath, SymbolType> = [
-            (item_path("crate"), SymbolType::Crate),
-            (item_path("crate::a"), SymbolType::Mod),
-            (item_path("crate::a::MyStruct"), SymbolType::Struct),
-        ]
-        .into_iter()
-        .collect();
-
-        assert_eq!(symbols_type, expected);
-    }
-
-    #[test]
-    fn test_traverse_module_expore_lazily() {
-        let symbols: HashSet<ItemPath> = [item_path("crate::module")].into_iter().collect();
-        let modules = all_ancestor_paths(symbols.iter());
-
-        let source = indoc! { "
-            mod module {
-              struct Foo {}
-            }
-            "
-        };
-
-        let mut symbols_type: HashMap<ItemPath, SymbolType> = HashMap::new();
-        let warnings = RefCell::new(Vec::new());
-
-        explore_crate(
-            &syn::parse_file(source).unwrap().items,
-            &PathBuf::new(),
-            &item_path("crate"),
-            |module| modules.contains(module),
-            &mut symbols_type,
-            |msg| warnings.borrow_mut().push(msg.to_owned()),
-        );
-
-        let symbols_type: HashSet<ItemPath> = symbols_type.keys().cloned().collect();
-
-        // We should still get `crate::module`, but nothing inside it.
-        let expected: HashSet<ItemPath> =
-            [item_path("crate"), item_path("crate::module")].into_iter().collect();
-
-        assert_eq!(symbols_type, expected);
-    }
+    // WIP! check removed tests: maybe they can exist in some other form
 
     #[test]
     fn test_documentation_url() {
@@ -1273,39 +831,6 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_markdown_intralink_symbols() {
-        let doc = indoc! { "
-            # Foobini
-
-            This [beautiful crate](crate) is cool because it contains [modules](crate::amodule)
-            and some other [stuff](https://en.wikipedia.org/wiki/Stuff) as well.
-
-            Go ahead and check all the [structs in foo](crate::foo#structs).
-            Also check [this](::std::sync::Arc) and [this](::alloc::sync::Arc).
-
-            We also support [reference][style] [links].
-
-            [style]: crate::amodule
-            [links]: crate::foo#structs
-            "
-        };
-
-        let symbols = extract_markdown_intralink_symbols(&Doc::from_str(doc));
-
-        let expected: HashSet<ItemPath> = [
-            item_path("crate"),
-            item_path("crate::amodule"),
-            item_path("crate::foo"),
-            item_path("::std::sync::Arc"),
-            item_path("::alloc::sync::Arc"),
-        ]
-        .into_iter()
-        .collect();
-
-        assert_eq!(symbols, expected);
-    }
-
-    #[test]
     fn test_rewrite_markdown_links() {
         let doc = indoc! { r"
             # Foobini
@@ -1335,9 +860,7 @@ mod tests {
 
         let new_readme = rewrite_markdown_links(
             &Doc::from_str(doc),
-            &symbols_type,
-            "foobini",
-            &|_| (),
+            &HashMap::new(), // WIP!
             &IntralinksConfig::default(),
             &HashSet::new(),
         );
@@ -1396,9 +919,7 @@ mod tests {
 
         let new_readme = rewrite_links(
             &Doc::from_str(doc),
-            &symbols_type,
-            "foobini",
-            &|_| (),
+            &HashMap::new(), // WIP!
             &IntralinksConfig { strip_links: Some(true), ..Default::default() },
         );
         let expected = indoc! { r"
@@ -1456,9 +977,7 @@ mod tests {
 
         let new_readme = rewrite_markdown_links(
             &Doc::from_str(doc),
-            &symbols_type,
-            "foobini",
-            &|_| (),
+            &HashMap::new(), // WIP!
             &IntralinksConfig::default(),
             &HashSet::new(),
         );
@@ -1524,9 +1043,7 @@ mod tests {
 
         let new_readme = rewrite_links(
             &Doc::from_str(doc),
-            &symbols_type,
-            "foobini",
-            &|_| (),
+            &HashMap::new(), // WIP!
             &IntralinksConfig::default(),
         );
         let expected = indoc! { r#"
@@ -1576,9 +1093,7 @@ mod tests {
 
         let new_readme = rewrite_links(
             &Doc::from_str(doc),
-            &symbols_type,
-            "foobini",
-            &|_| (),
+            &HashMap::new(), // WIP!
             &IntralinksConfig::default(),
         );
         let expected = indoc! { r"
@@ -1637,9 +1152,7 @@ mod tests {
 
         let new_readme = rewrite_links(
             &Doc::from_str(doc),
-            &symbols_type,
-            "foobini",
-            &|_| (),
+            &HashMap::new(), // WIP!
             &IntralinksConfig::default(),
         );
         let expected = indoc! { r#"
@@ -1663,4 +1176,6 @@ mod tests {
 
         assert_eq!(new_readme.as_string(), expected);
     }
+
+     */
 }

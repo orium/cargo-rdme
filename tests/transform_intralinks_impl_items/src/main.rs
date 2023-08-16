@@ -61,7 +61,9 @@ impl MyEnum {
     fn hey(&self) {}
 }
 
-union MyUnion {}
+union MyUnion {
+    x: u32,
+}
 
 impl MyUnion {
     fn sup(&self) {}
