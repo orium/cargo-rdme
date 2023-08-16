@@ -203,6 +203,13 @@ docs-rs-base-url = "https://mydocs.rs"
 docs-rs-version = "1.0.0"
 # If this is set the intralinks will be stripping in the README file.
 strip-links = false
+
+# Enable all features when calling rustdoc to resolve intralinks.
+all-features = true
+# Features to enable when calling rustdoc to resolve intralinks.
+features = ["foo", "bar"]
+# Disable default features when calling rustdoc to resolve intralinks.
+no-default-features = false
 ```
 
 These setting can be overridden with command line flags. Run `cargo rdme --help` for more

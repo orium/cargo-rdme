@@ -7,43 +7,43 @@
 //! [d Same is a trait](crate::d::Same)
 
 #[cfg(not(foo))]
-mod a {
-  struct MyStruct {}
+pub mod a {
+    pub struct MyStruct {}
 }
 
 #[cfg(foo)]
-mod a {
-  struct Skip {}
+pub mod a {
+    pub struct Skip {}
 }
 
 #[cfg(not(test))]
-mod b {
-  struct MyStruct {}
+pub mod b {
+    pub struct MyStruct {}
 }
 
 #[cfg(test)]
-mod b {
-  struct MyStructTest {}
+pub mod b {
+    pub struct MyStructTest {}
 }
 
 #[cfg(test)]
-mod c {
-  struct MyStructTest {}
+pub mod c {
+    pub struct MyStructTest {}
 }
 
 #[cfg(not(test))]
-mod c {
-  struct MyStruct {}
+pub mod c {
+    pub struct MyStruct {}
 }
 
 #[cfg(test)]
-mod d {
-  struct Same {}
+pub mod d {
+    pub struct Same {}
 }
 
 #[cfg(not(test))]
-mod d {
-  trait Same {}
+pub mod d {
+    pub trait Same {}
 }
 
 fn main() {}

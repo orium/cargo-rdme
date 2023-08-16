@@ -1,3 +1,4 @@
+// WIP!end update README
 // Note: If you change this remember to update `README.md`. To do so run `cargo run`.
 //! Cargo command to create your README from your crate’s documentation.
 //!
@@ -191,6 +192,13 @@
 //! docs-rs-version = "1.0.0"
 //! # If this is set the intralinks will be stripping in the README file.
 //! strip-links = false
+//!
+//! # Enable all features when calling rustdoc to resolve intralinks.
+//! all-features = true
+//! # Features to enable when calling rustdoc to resolve intralinks.
+//! features = ["foo", "bar"]
+//! # Disable default features when calling rustdoc to resolve intralinks.
+//! no-default-features = false
 //! ```
 //!
 //! These setting can be overridden with command line flags. Run `cargo rdme --help` for more
@@ -215,7 +223,7 @@ use crate::options::{EntrypointOpt, LineTerminatorOpt};
 use cargo_rdme::transform::IntralinkError;
 use cargo_rdme::{Doc, ProjectError, Readme};
 use cargo_rdme::{
-    LineTerminator, Project, extract_doc_from_source_file, infer_line_terminator,
+    LineTerminator, PackageTarget, Project, extract_doc_from_source_file, infer_line_terminator,
     inject_doc_in_readme,
 };
 use std::cell::Cell;
@@ -244,6 +252,7 @@ impl From<RunError> for ExitCode {
             | RunError::ExtractDocError(_)
             | RunError::ReadmeError(_)
             | RunError::NoEntrySourceFile
+            | RunError::NoTargetPackage
             | RunError::NoReadmeFile
             | RunError::NoRustdoc
             | RunError::InjectDocError(_)
@@ -266,8 +275,10 @@ enum RunError {
     ExtractDocError(cargo_rdme::ExtractDocError),
     #[error("failed to process README: {0}")]
     ReadmeError(cargo_rdme::ReadmeError),
-    #[error("failed get crate's entry source file")]
+    #[error("failed to get crate's entry source file")]
     NoEntrySourceFile,
+    #[error("failed to get crate's target package")]
+    NoTargetPackage,
     #[error("crate's README file not found")]
     NoReadmeFile,
     #[error("crate-level rustdoc not found")]
@@ -357,6 +368,23 @@ fn entrypoint<'a>(project: &'a Project, entrypoint_opt: &EntrypointOpt) -> Optio
     }
 }
 
+fn package_target(project: &Project, entrypoint_opt: &EntrypointOpt) -> Option<PackageTarget> {
+    let bin_default = || {
+        project
+            .get_bin_default_crate_name()
+            .map(|name| PackageTarget::Bin { crate_name: name.to_owned() })
+    };
+
+    match entrypoint_opt {
+        EntrypointOpt::Auto => {
+            project.get_lib_entryfile_path().map(|_| PackageTarget::Lib).or_else(bin_default)
+        }
+        EntrypointOpt::Lib => Some(PackageTarget::Lib),
+        EntrypointOpt::BinDefault => bin_default(),
+        EntrypointOpt::BinName(name) => Some(PackageTarget::Bin { crate_name: name.clone() }),
+    }
+}
+
 fn line_terminator(
     line_terminator_opt: LineTerminatorOpt,
     readme_path: impl AsRef<Path>,
@@ -375,7 +403,7 @@ struct Warnings {
 fn transform_doc(
     doc: &Doc,
     project: &Project,
-    entrypoint: impl AsRef<Path>,
+    package_target: PackageTarget,
     options: &options::Options,
 ) -> Result<(Doc, Warnings), RunError> {
     use cargo_rdme::transform::{
@@ -394,7 +422,9 @@ fn transform_doc(
     let had_warnings = Cell::new(false);
     let transform = DocTransformIntralinks::new(
         project.get_package_name().as_str().to_owned(),
-        entrypoint,
+        package_target,
+        options.workspace_project.clone(),
+        project.get_manifest_path().clone(),
         |msg| {
             print_warning!("{}", msg);
             had_warnings.set(true);
@@ -442,12 +472,14 @@ fn run(options: options::Options) -> Result<(), RunError> {
     };
     let entryfile: &Path =
         entrypoint(&project, &options.entrypoint).ok_or(RunError::NoEntrySourceFile)?;
+    let package_target: PackageTarget =
+        package_target(&project, &options.entrypoint).ok_or(RunError::NoTargetPackage)?;
     let doc: Doc = match extract_doc_from_source_file(entryfile)? {
         None => return Err(RunError::NoRustdoc),
         Some(doc) => doc,
     };
 
-    let (doc, warnings) = transform_doc(&doc, &project, entryfile, &options)?;
+    let (doc, warnings) = transform_doc(&doc, &project, package_target, &options)?;
 
     let readme_path: PathBuf = match options.readme_path {
         None => project.get_readme_path().ok_or(RunError::NoReadmeFile)?,

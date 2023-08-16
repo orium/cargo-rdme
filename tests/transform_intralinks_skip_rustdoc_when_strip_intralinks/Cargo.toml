@@ -1,0 +1,12 @@
+[package]
+name = "integration_test"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "test-precondition"
+path = "src/test-precondition-main.rs"
+
+[[bin]]
+name = "real-test"
+path = "src/main.rs"

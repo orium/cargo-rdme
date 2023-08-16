@@ -21,10 +21,10 @@
 //! [BestStruct doc]: https://example.com/image.png
 //! [BestStruct]: crate::foo::BestStruct
 
-mod amodule {}
+pub mod amodule {}
 
-mod foo {
-  struct BestStruct {}
+pub mod foo {
+  pub struct BestStruct {}
 }
 
 fn main() {}
