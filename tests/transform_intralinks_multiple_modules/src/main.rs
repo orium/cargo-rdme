@@ -5,7 +5,7 @@
 //! [foo bar](crate::foo::bar)
 //! [foo bar S1](crate::foo::bar::S1)
 
-mod amodule;
-mod foo;
+pub mod amodule;
+pub mod foo;
 
 fn main() {}

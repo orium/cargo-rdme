@@ -1,0 +1,36 @@
+<!-- cargo-rdme start -->
+
+All item kinds:
+
+* [std](https://doc.rust-lang.org/stable/std/)
+* [Arc](https://doc.rust-lang.org/stable/alloc/sync/struct.Arc.html)
+* [core::cmp::Eq](https://doc.rust-lang.org/stable/core/cmp/trait.Eq.html)
+* [Path](https://doc.rust-lang.org/stable/std/path/struct.Path.html)
+* [u32](https://doc.rust-lang.org/stable/std/primitive.u32.html)
+* [crate](https://docs.rs/integration_test/latest/integration_test/)
+* [amodule](https://docs.rs/integration_test/latest/integration_test/amodule/)
+* [foo::BestStruct](https://docs.rs/integration_test/latest/integration_test/foo/struct.BestStruct.html)
+* [MyUnion](https://docs.rs/integration_test/latest/integration_test/union.MyUnion.html)
+* [MyUnion::f1](https://docs.rs/integration_test/latest/integration_test/union.MyUnion.html#structfield.f1)
+* [MyEnum](https://docs.rs/integration_test/latest/integration_test/enum.MyEnum.html)
+* [my_fn](https://docs.rs/integration_test/latest/integration_test/fn.my_fn.html)
+* [my_fn()](https://docs.rs/integration_test/latest/integration_test/fn.my_fn.html)
+* [foobini::MyType](https://docs.rs/integration_test/latest/integration_test/foobini/type.MyType.html)
+* [foobini::MyOpaqueType](https://docs.rs/integration_test/latest/integration_test/foobini/type.MyOpaqueType.html)
+* [MY_CONST](https://docs.rs/integration_test/latest/integration_test/const.MY_CONST.html)
+* [MyTrait](https://docs.rs/integration_test/latest/integration_test/trait.MyTrait.html)
+* [MyTrait::T](https://docs.rs/integration_test/latest/integration_test/trait.MyTrait.html#associatedtype.T)
+* [MyTrait::trait_method](https://docs.rs/integration_test/latest/integration_test/trait.MyTrait.html#tymethod.trait_method)
+* [MyTraitAlias](https://docs.rs/integration_test/latest/integration_test/traitalias.MyTraitAlias.html)
+* [MY_STATIC](https://docs.rs/integration_test/latest/integration_test/static.MY_STATIC.html)
+* [my_macro](https://docs.rs/integration_test/latest/integration_test/macro.my_macro.html)
+* [bar::BestStruct](https://docs.rs/integration_test/latest/integration_test/bar/struct.BestStruct.html)
+* [bar::BestStruct::my_field](https://docs.rs/integration_test/latest/integration_test/bar/struct.BestStruct.html#structfield.my_field)
+* [bar::BestStruct::0](https://docs.rs/integration_test/latest/integration_test/bar/struct.TupleStruct.html#structfield.0)
+* [MyEnum::Foo](https://docs.rs/integration_test/latest/integration_test/enum.MyEnum.html#variant.Foo)
+* [StructWithImpl::NUMBER](https://docs.rs/integration_test/latest/integration_test/struct.StructWithImpl.html#associatedconstant.NUMBER)
+* [StructWithImpl::Baz](https://docs.rs/integration_test/latest/integration_test/struct.StructWithImpl.html#associatedtype.Baz)
+* [StructWithImpl::a_method](https://docs.rs/integration_test/latest/integration_test/struct.StructWithImpl.html#method.a_method)
+* [Foobini](https://docs.rs/integration_test/latest/integration_test/re/struct.Foobini.html)
+
+<!-- cargo-rdme end -->
