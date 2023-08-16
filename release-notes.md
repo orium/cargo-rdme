@@ -1,5 +1,24 @@
 # Release notes
 
+## 2.0.0-pre
+
+1. Use rustdoc JSON for intralink resolution. This fixes a bunch of limitation we had with the previous `syn`-based
+   engine:
+   1. Support relative paths from the crate root (`self::`, bare names, multi-level module-relative).
+   2. Support all item kinds, including struct/union fields, enum variants, trait items, type aliases, statics, macros,
+      proc-macros, and primitive types (#10, #169).
+   3. Support explicit kind disambiguators (`struct@`, `fn@`, `primitive@`, ...) and suffix forms (`Foo()`, `Foo!`)
+      (#1, #186).
+   4. Support intralinks to items in any external crate, including regular dependencies and sibling crates within a
+      workspace (#152, #153).
+   5. Support intralinks through re-exports, including local `pub use` and stdlib re-exports like `std::vec::Vec` (#5).
+   6. Support impl items defined in a module other than the type's defining module (#170).
+   7. Support rustdoc's shortcut link form for intralinks, in backticked (`` [`Foo`] ``), path (`[foo::Bar]`), and
+      bare-identifier (`[Foo]`) variants (#7).
+   8. Macro-generated items, which the previous walker could not see, are now supported.
+2. Add `--all-features`, `--features`, and `--no-default-features` flags (and matching `[intralinks]` config keys) to
+   control how rustdoc builds the crate.
+
 ## 1.5.1
 
 * Use `gix` instead of `git2` to avoid overwriting a modified `README.md`.

@@ -82,6 +82,9 @@ pub struct CmdOptions {
     force: bool,
     readme_path: Option<PathBuf>,
     manifest_path: Option<PathBuf>,
+    intralinks_all_features: bool,
+    intralinks_features: Option<Vec<String>>,
+    intralinks_no_default_features: bool,
     heading_base_level: Option<u8>,
 }
 
@@ -111,6 +114,7 @@ fn get_cmd_args() -> Vec<OsString> {
     args
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn cmd_options() -> CmdOptions {
     use clap::{Arg, Command};
 
@@ -157,16 +161,35 @@ pub fn cmd_options() -> CmdOptions {
                 .action(ArgAction::SetTrue),
         )
         .arg(
-        Arg::new("no-fail-on-warnings")
-            .long("no-fail-on-warnings")
-            .help("do not exit with a error status code when checking if the README is up to date")
-            .action(ArgAction::SetTrue),
+            Arg::new("no-fail-on-warnings")
+                .long("no-fail-on-warnings")
+                .help("do not exit with a error status code when checking if the README is up to date")
+                .action(ArgAction::SetTrue),
         )
         .arg(
-        Arg::new("intralinks-strip-links")
-            .long("intralinks-strip-links")
-            .help("remove the intralinks")
-            .action(ArgAction::SetTrue),
+            Arg::new("intralinks-strip-links")
+                .long("intralinks-strip-links")
+                .help("remove the intralinks")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("intralinks-all-features")
+                .long("intralinks-all-features")
+                .help("enable all features when calling rustdoc to resolve intralinks")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("intralinks-features")
+                .long("intralinks-features")
+                .help("features to enable when calling rustdoc to resolve intralinks (comma separated list)")
+                .value_delimiter(',')
+                .action(ArgAction::Append),
+        )
+        .arg(
+            Arg::new("intralinks-no-default-features")
+                .long("intralinks-no-default-features")
+                .help("disable default features when calling rustdoc to resolve intralinks")
+                .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("heading-base-level")
@@ -193,6 +216,9 @@ pub fn cmd_options() -> CmdOptions {
     let readme_path = cmd_opts.get_one::<PathBuf>("readme-path").cloned();
     let manifest_path = cmd_opts.get_one::<PathBuf>("manifest-path").cloned();
 
+    let intralinks_features =
+        cmd_opts.get_many::<String>("intralinks-features").map(|v| v.cloned().collect());
+
     let heading_base_level = cmd_opts.get_one::<u8>("heading-base-level").copied();
 
     CmdOptions {
@@ -205,6 +231,9 @@ pub fn cmd_options() -> CmdOptions {
         force: cmd_opts.get_flag("force"),
         readme_path,
         manifest_path,
+        intralinks_all_features: cmd_opts.get_flag("intralinks-all-features"),
+        intralinks_features,
+        intralinks_no_default_features: cmd_opts.get_flag("intralinks-no-default-features"),
         heading_base_level,
     }
 }
@@ -288,6 +317,14 @@ fn config_file_options_from_str(
         intralinks_table.and_then(|t| t.get("docs-rs-version")).and_then(toml::Value::as_str);
     let intralinks_strip_links =
         intralinks_table.and_then(|t| t.get("strip-links")).and_then(toml::Value::as_bool);
+    let intralinks_all_features =
+        intralinks_table.and_then(|t| t.get("all-features")).and_then(toml::Value::as_bool);
+    let intralinks_features = intralinks_table
+        .and_then(|t| t.get("features"))
+        .and_then(toml::Value::as_array)
+        .map(|array| array.iter().filter_map(|v| v.as_str()).map(ToOwned::to_owned).collect());
+    let intralinks_no_default_features =
+        intralinks_table.and_then(|t| t.get("no-default-features")).and_then(toml::Value::as_bool);
 
     let intralinks = intralinks_table.map(|_| IntralinksConfig {
         docs_rs: IntralinksDocsRsConfig {
@@ -295,6 +332,9 @@ fn config_file_options_from_str(
             docs_rs_version: intralinks_docs_rs_version.map(ToOwned::to_owned),
         },
         strip_links: intralinks_strip_links,
+        all_features: intralinks_all_features,
+        features: intralinks_features,
+        no_default_features: intralinks_no_default_features,
     });
 
     Ok(ConfigFileOptions {
@@ -378,6 +418,27 @@ pub fn merge_options(
                     .and_then(|c| c.intralinks.as_ref())
                     .and_then(|il| il.strip_links),
             },
+            all_features: match cmd_options.intralinks_all_features {
+                true => Some(true),
+                false => config_file_options
+                    .as_ref()
+                    .and_then(|c| c.intralinks.as_ref())
+                    .and_then(|il| il.all_features),
+            },
+            features: match cmd_options.intralinks_features {
+                Some(features) => Some(features),
+                None => config_file_options
+                    .as_mut()
+                    .and_then(|c| c.intralinks.as_mut())
+                    .and_then(|il| il.features.take()),
+            },
+            no_default_features: match cmd_options.intralinks_no_default_features {
+                true => Some(true),
+                false => config_file_options
+                    .as_ref()
+                    .and_then(|c| c.intralinks.as_ref())
+                    .and_then(|il| il.no_default_features),
+            },
         }),
         heading_base_level: cmd_options
             .heading_base_level
@@ -408,6 +469,10 @@ mod tests {
             docs-rs-base-url = "https://internaldocs.rs"
             docs-rs-version = "1.0.0"
             strip-links = true
+
+            all-features = true
+            features = ["foo", "bar"]
+            no-default-features = true
             "#
         };
 
@@ -424,6 +489,9 @@ mod tests {
                     docs_rs_version: Some("1.0.0".to_owned()),
                 },
                 strip_links: Some(true),
+                all_features: Some(true),
+                features: Some(vec!["foo".to_owned(), "bar".to_owned()]),
+                no_default_features: Some(true),
             }),
             heading_base_level: Some(3),
         };
@@ -443,6 +511,9 @@ mod tests {
             force: true,
             readme_path: Some(PathBuf::from("rEaDmE.md")),
             manifest_path: Some(PathBuf::from("foo/Cargo.toml")),
+            intralinks_all_features: true,
+            intralinks_features: Some(vec!["foo".to_owned(), "bar".to_owned()]),
+            intralinks_no_default_features: true,
             heading_base_level: Some(4),
         };
         let config_file_options = ConfigFileOptions {
@@ -456,6 +527,9 @@ mod tests {
                     docs_rs_version: Some("1.0.0".to_owned()),
                 },
                 strip_links: Some(false),
+                all_features: Some(false),
+                features: Some(vec!["mumble".to_owned()]),
+                no_default_features: Some(false),
             }),
             heading_base_level: Some(3),
         };
@@ -477,6 +551,9 @@ mod tests {
                     docs_rs_version: Some("1.0.0".to_owned()),
                 },
                 strip_links: Some(true),
+                all_features: Some(true),
+                features: Some(vec!["foo".to_owned(), "bar".to_owned()]),
+                no_default_features: Some(true),
             }),
             heading_base_level: Some(4),
         };

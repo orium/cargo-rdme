@@ -7,6 +7,8 @@
 //! [this one](crate::foo::BestStruct).  Also, this is a nice function: [copy](::std::fs::copy).
 //!
 //! [![BestStruct doc](https://example.com/image.png)](crate::foo::BestStruct)
+//!
+//! Shortcut intralinks should also be stripped: [`crate::amodule`] and [crate::foo::BestStruct].
 
 mod amodule {}
 
