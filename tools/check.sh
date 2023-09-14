@@ -26,10 +26,14 @@ assert_installed "cargo-fmt"
 trap on_failure ERR
 
 echo 'Building:'
-cargo check --no-default-features --features fatal-warnings --all-targets
 cargo build --features fatal-warnings --all-targets
 echo 'Testing:'
-cargo test  --features fatal-warnings
+cargo test  --features fatal-warnings --all-targets
+# Weirdly, the `cargo test ... --all-targets ...` above does not run the tests in the documentation, so we run the
+# doc tests like this.
+# See https://github.com/rust-lang/cargo/issues/6669.
+echo 'Testing doc:'
+cargo test  --features fatal-warnings --doc
 echo 'Checking the benchmarks:'
 cargo bench --features fatal-warnings -- --test
 echo 'Checking documentation:'
