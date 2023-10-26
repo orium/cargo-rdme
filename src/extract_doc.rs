@@ -55,13 +55,13 @@ pub fn extract_doc_from_source_str(source: &str) -> Result<Option<Doc>, ExtractD
                             str.chars().all(char::is_whitespace)
                         }
 
-                        let x = string
+                        let comment_lines = string
                             .lines()
                             .enumerate()
                             .filter(|(i, l)| !(*i == 0 && empty_line(l)))
-                            .map(|(_, l)| l);
+                            .map(|(_, l)| l.to_owned());
 
-                        lines.extend(x.map(ToOwned::to_owned));
+                        lines.extend(comment_lines);
                     }
                 }
             }
