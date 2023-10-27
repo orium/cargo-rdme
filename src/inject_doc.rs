@@ -229,7 +229,7 @@ mod tests {
         assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeEnd(_))));
         assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeStart(_))));
         assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeEnd(_))));
-        assert!(matches!(iter.next(), None));
+        assert_eq!(iter.next(), None);
     }
 
     #[test]
@@ -255,7 +255,7 @@ mod tests {
         // stabilizes.
         assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeStart(_))));
         assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeEnd(_))));
-        assert!(matches!(iter.next(), None));
+        assert_eq!(iter.next(), None);
     }
 
     #[test]

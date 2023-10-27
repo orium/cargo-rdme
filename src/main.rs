@@ -523,7 +523,7 @@ fn main() {
                 let options = options::merge_options(cmd_options, config_file_options);
 
                 match run(options) {
-                    Ok(_) => ExitCode::Ok,
+                    Ok(()) => ExitCode::Ok,
                     Err(e) => {
                         print_error!("{}", &e);
                         e.into()

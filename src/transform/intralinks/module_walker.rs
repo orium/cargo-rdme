@@ -61,7 +61,7 @@ pub(super) fn walk_module_items(
     explore_module: &mut impl FnMut(&ItemPath, &syn::ItemMod) -> bool,
     emit_warning: &impl Fn(&str),
 ) -> Result<(), ModuleWalkError> {
-    for item in ast.iter() {
+    for item in ast {
         visit(mod_symbol, item);
 
         if let Item::Mod(module) = item {
