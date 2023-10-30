@@ -1,5 +1,5 @@
 [![Build Status](https://github.com/orium/cargo-rdme/workflows/CI/badge.svg)](https://github.com/orium/cargo-rdme/actions?query=workflow%3ACI)
-[![Code Coverage](https://codecov.io/gh/orium/cargo-rdme/branch/master/graph/badge.svg)](https://codecov.io/gh/orium/cargo-rdme)
+[![Code Coverage](https://codecov.io/gh/orium/cargo-rdme/branch/main/graph/badge.svg)](https://codecov.io/gh/orium/cargo-rdme)
 [![Dependency status](https://deps.rs/repo/github/orium/cargo-rdme/status.svg)](https://deps.rs/repo/github/orium/cargo-rdme)
 [![crates.io](https://img.shields.io/crates/v/cargo-rdme.svg)](https://crates.io/crates/cargo-rdme)
 [![Downloads crates.io](https://img.shields.io/crates/d/cargo-rdme.svg?label=crates.io%20downloads)](https://crates.io/crates/cargo-rdme)

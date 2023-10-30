@@ -22,7 +22,7 @@ jobs:
             archive: tar.zst zip
 
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@main
       - name: Build release binary
         uses: rust-build/rust-build.action@v1.4.0
         env:
