@@ -32,7 +32,7 @@ include = [
 ]
 
 [badges]
-codecov = { repository = "orium/cargo-rdme", branch = "master", service = "github" }
+codecov = { repository = "orium/cargo-rdme", branch = "main", service = "github" }
 
 [dependencies]
 toml = "0.8.6"
