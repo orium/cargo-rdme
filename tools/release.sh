@@ -46,11 +46,6 @@ echo "Current version is $(project_version)."
 echo -n "Which version do you want to release? "
 read release_version
 
-if ! grep "^## " release-notes.md | head -1 | grep --silent "^## $release_version$"; then
-    echo "You forgot to update the release notes." >&2
-    exit 1
-fi
-
 echo -n "Which will be the next version? "
 read next_version
 
@@ -79,6 +74,13 @@ if ! ./tools/check.sh 2>/dev/null > /dev/null; then
 fi
 
 echo "done."
+
+while ! grep "^## " release-notes.md | head -1 | grep --silent "^## $release_version$"; do
+    echo
+    echo "There's no entry for this version in the release notes."
+    echo -n "Go ahead and add them and press enter when you're done... "
+    read
+done
 
 set_version "$release_version"
 
