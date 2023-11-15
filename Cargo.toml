@@ -44,7 +44,7 @@ itertools = "0.11.0"
 clap = "4.0.7"
 # Disable ssh support in git2 to avoid depending on openssl (which fails to build if an unsupported version is found).
 git2 = { version = "0.18.1", default-features = false }
-termcolor = "1.1.3"
+termcolor = "1.4.0"
 cargo_metadata = "0.18.1"
 indoc = "2.0.4"
 unicase = "2.7.0"
