@@ -54,3 +54,23 @@ pretty_assertions = "1.4.0"
 
 [features]
 fatal-warnings = []
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+correctness = "deny"
+
+enum-variant-names = "allow"
+if-not-else = "allow"
+inline-always = "allow"
+match-bool = "allow"
+missing-errors-doc = "allow"
+module-name-repetitions = "allow"
+needless-raw-string-hashes = "allow"
+new-without-default = "allow"
+non-ascii-literal = "allow"
+partialeq-ne-impl = "allow"
+similar-names = "allow"
+single-match-else = "allow"
+struct-excessive-bools = "allow"
+use-self = "allow"
