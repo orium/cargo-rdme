@@ -4,21 +4,6 @@
  */
 
 #![cfg_attr(feature = "fatal-warnings", deny(warnings))]
-#![deny(clippy::correctness)]
-#![warn(clippy::pedantic)]
-#![allow(clippy::match_bool)]
-#![allow(clippy::if_not_else)]
-#![allow(clippy::module_name_repetitions)]
-#![allow(clippy::similar_names)]
-#![allow(clippy::use_self)]
-#![allow(clippy::single_match_else)]
-#![allow(clippy::inline_always)]
-#![allow(clippy::partialeq_ne_impl)]
-#![allow(clippy::missing_errors_doc)]
-#![allow(clippy::non_ascii_literal)]
-#![allow(clippy::enum_variant_names)]
-#![allow(clippy::new_without_default)]
-#![allow(clippy::struct_excessive_bools)]
 // Note: If you change this remember to update `README.md`.  To do so run `cargo run`.
 //! Cargo command to create your README from your crate’s documentation.
 //!
