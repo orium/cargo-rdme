@@ -39,7 +39,7 @@ toml = "0.8.8"
 thiserror = "1.0.56"
 syn = { version = "2.0.48", features = ["full", "extra-traits"] }
 proc-macro2 = { version = "1.0.76", features = ["span-locations"] }
-pulldown-cmark = "0.9.3"
+pulldown-cmark = "0.9.5"
 itertools = "0.12.0"
 clap = "4.4.13"
 # Disable ssh support in git2 to avoid depending on openssl (which fails to build if an unsupported version is found).
