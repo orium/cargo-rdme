@@ -5,7 +5,7 @@ version = "1.4.4-pre"
 authors = ["Diogo Sousa <diogogsousa@gmail.com>"]
 
 edition = "2021"
-rust-version = "1.70.0"
+rust-version = "1.74.0"
 
 homepage = "https://github.com/orium/cargo-rdme"
 repository = "https://github.com/orium/cargo-rdme"
