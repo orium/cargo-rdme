@@ -36,7 +36,7 @@ fn readme_line_iterator(readme: &Readme) -> MarkdownItemIterator<ReadmeLine> {
     let mut depth = 0;
 
     let iter = parser.into_offset_iter().filter_map(move |(event, range)| match event {
-        Event::Start(Tag::Heading(level, ..)) => Some((
+        Event::Start(Tag::Heading { level, .. }) => Some((
             range.clone().into(),
             ReadmeLine::Heading(
                 Heading { level: level as u8, text: &source[range.start..range.end] },
@@ -82,7 +82,7 @@ fn doc_heading_iterator(doc: &Doc) -> MarkdownItemIterator<Heading> {
     let parser = Parser::new_ext(source, Options::all());
 
     let iter = parser.into_offset_iter().filter_map(move |(event, range)| match event {
-        Event::Start(Tag::Heading(level, ..)) => Some((
+        Event::Start(Tag::Heading { level, .. }) => Some((
             range.clone().into(),
             Heading { level: level as u8, text: &source[range.start..range.end] },
         )),

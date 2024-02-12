@@ -7,7 +7,7 @@ use crate::markdown::Markdown;
 use crate::transform::intralinks::ItemPath;
 use crate::utils::{MarkdownItemIterator, Span};
 use itertools::Itertools;
-use pulldown_cmark::CowStr;
+use pulldown_cmark::{CowStr, TagEnd};
 use std::fmt;
 use std::fmt::Display;
 use unicase::UniCase;
@@ -187,55 +187,62 @@ pub fn markdown_link_iterator(markdown: &Markdown) -> MarkdownItemIterator<Markd
         Some(&mut broken_link_callback),
     );
 
-    let mut in_link = false;
+    let mut in_link: Option<LinkType> = None;
     let mut start_text = 0;
     let mut end_text = 0;
 
     let iter = parser.into_offset_iter().filter_map(move |(event, range)| match event {
-        Event::Start(Tag::Link(
-            LinkType::Inline
-            | LinkType::Reference
-            | LinkType::Shortcut
-            | LinkType::ReferenceUnknown
-            | LinkType::ShortcutUnknown,
-            ..,
-        )) => {
-            in_link = true;
+        Event::Start(Tag::Link {
+            link_type:
+                link_type @ (LinkType::Inline
+                | LinkType::Reference
+                | LinkType::Shortcut
+                | LinkType::ReferenceUnknown
+                | LinkType::ShortcutUnknown),
+            ..
+        }) => {
+            in_link = Some(link_type);
             start_text = range.start + 1;
             end_text = range.end;
             None
         }
-        Event::End(Tag::Link(LinkType::Inline, ..)) => {
-            in_link = false;
+        Event::End(TagEnd::Link) => match in_link {
+            Some(LinkType::Inline) => {
+                in_link = None;
 
-            let text = source[start_text..end_text].to_owned();
-            let link = source[(end_text + 2)..(range.end - 1)].to_owned().into();
+                let text = source[start_text..end_text].to_owned();
+                let link = source[(end_text + 2)..(range.end - 1)].to_owned().into();
 
-            let link = MarkdownLink::Inline { link: MarkdownInlineLink { text, link } };
+                let link = MarkdownLink::Inline { link: MarkdownInlineLink { text, link } };
 
-            Some((range.into(), link))
-        }
-        Event::End(Tag::Link(LinkType::Reference | LinkType::ReferenceUnknown, ..)) => {
-            in_link = false;
+                Some((range.into(), link))
+            }
+            Some(LinkType::Reference | LinkType::ReferenceUnknown) => {
+                in_link = None;
 
-            let text = source[start_text..end_text].to_owned();
-            let label = source[(end_text + 2)..(range.end - 1)].to_owned();
+                let text = source[start_text..end_text].to_owned();
+                let label = source[(end_text + 2)..(range.end - 1)].to_owned();
 
-            let link = MarkdownLink::Reference { link: MarkdownReferenceLink::new(text, label) };
+                let link =
+                    MarkdownLink::Reference { link: MarkdownReferenceLink::new(text, label) };
 
-            Some((range.into(), link))
-        }
-        Event::End(Tag::Link(LinkType::Shortcut | LinkType::ShortcutUnknown, ..)) => {
-            in_link = false;
+                Some((range.into(), link))
+            }
+            Some(LinkType::Shortcut | LinkType::ShortcutUnknown) => {
+                in_link = None;
 
-            let text = source[start_text..end_text].to_owned();
+                let text = source[start_text..end_text].to_owned();
 
-            let link = MarkdownLink::Reference { link: MarkdownReferenceLink::new_shortcut(text) };
+                let link =
+                    MarkdownLink::Reference { link: MarkdownReferenceLink::new_shortcut(text) };
 
-            Some((range.into(), link))
-        }
+                Some((range.into(), link))
+            }
+            Some(_) => None,
+            None => None,
+        },
         _ => {
-            if in_link {
+            if in_link.is_some() {
                 end_text = range.end;
             }
 
