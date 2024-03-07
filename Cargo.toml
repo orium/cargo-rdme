@@ -41,7 +41,7 @@ syn = { version = "2.0.48", features = ["full", "extra-traits"] }
 proc-macro2 = { version = "1.0.78", features = ["span-locations"] }
 pulldown-cmark = "0.10.0"
 itertools = "0.12.1"
-clap = "4.5.0"
+clap = "4.5.2"
 # Disable ssh support in git2 to avoid depending on openssl (which fails to build if an unsupported version is found).
 git2 = { version = "0.18.2", default-features = false }
 termcolor = "1.4.1"
