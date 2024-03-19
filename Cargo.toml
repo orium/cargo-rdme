@@ -35,7 +35,7 @@ include = [
 codecov = { repository = "orium/cargo-rdme", branch = "main", service = "github" }
 
 [dependencies]
-toml = "0.8.10"
+toml = "0.8.12"
 thiserror = "1.0.57"
 syn = { version = "2.0.48", features = ["full", "extra-traits"] }
 proc-macro2 = { version = "1.0.78", features = ["span-locations"] }
