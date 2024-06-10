@@ -1,5 +1,10 @@
 # Release notes
 
+## 1.4.4
+
+* Fix selection of packages in workspaces when there's a package name conflict with a dependency. 
+* Update dependencies.
+
 ## 1.4.3
 
 * Update dependencies.
