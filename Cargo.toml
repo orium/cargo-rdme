@@ -35,13 +35,13 @@ include = [
 codecov = { repository = "orium/cargo-rdme", branch = "main", service = "github" }
 
 [dependencies]
-toml = "0.8.13"
+toml = "0.8.14"
 thiserror = "1.0.61"
-syn = { version = "2.0.65", features = ["full", "extra-traits"] }
-proc-macro2 = { version = "1.0.83", features = ["span-locations"] }
+syn = { version = "2.0.66", features = ["full", "extra-traits"] }
+proc-macro2 = { version = "1.0.85", features = ["span-locations"] }
 pulldown-cmark = "0.11.0"
 itertools = "0.13.0"
-clap = "4.5.4"
+clap = "4.5.7"
 # Disable ssh support in git2 to avoid depending on openssl (which fails to build if an unsupported version is found).
 git2 = { version = "0.18.3", default-features = false }
 termcolor = "1.4.1"
@@ -56,14 +56,15 @@ pretty_assertions = "1.4.0"
 fatal-warnings = []
 
 [lints.clippy]
-all = { level = "warn", priority = -1 }
-pedantic = { level = "warn", priority = -1 }
-correctness = "deny"
+all = { level = "warn", priority = -2 }
+pedantic = { level = "warn", priority = -2 }
+correctness = { level = "deny", priority = -1 }
 
 enum-variant-names = "allow"
 if-not-else = "allow"
 inline-always = "allow"
 match-bool = "allow"
+match-same-arms = "allow"
 missing-errors-doc = "allow"
 module-name-repetitions = "allow"
 needless-raw-string-hashes = "allow"

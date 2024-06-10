@@ -264,9 +264,7 @@ fn parse_raw_reference_link_definition(
     // We need to parse things manually here, because the pulldown-cmark parser escapes the title
     // and the link.  We need the raw version to emit them later.
 
-    let Some(link_and_title) = raw_ref_def.get(label.len() + 3..).map(str::trim) else {
-        return None;
-    };
+    let link_and_title = raw_ref_def.get(label.len() + 3..).map(str::trim)?;
 
     assert_eq!(
         raw_ref_def.get(label.len() + 1..label.len() + 3),

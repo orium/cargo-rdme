@@ -146,8 +146,8 @@ pub enum ItemPathAnchor {
 pub struct ItemPath {
     pub anchor: ItemPathAnchor,
 
-    /// This path vector can be shared and can end after the item_path we are representing.
-    /// This allow us to have a faster implementation for `ItemPath::all_ancestors()`.
+    /// This path vector can be shared and can end after the `item_path` we are representing.
+    /// This allows us to have a faster implementation for `ItemPath::all_ancestors()`.
     path_shared: Rc<Vec<String>>,
     path_end: usize,
 }

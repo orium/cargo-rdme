@@ -32,9 +32,9 @@ fn integration_test_custom_lib_path() {
 
 #[test]
 fn integration_test_custom_readme_path() {
-    let option = TestOptions { readme_filename: "READ-ME.md", ..TestOptions::default() };
+    let options = TestOptions { readme_filename: "READ-ME.md", ..TestOptions::default() };
 
-    run_test_with_options("custom_readme_path", &option);
+    run_test_with_options("custom_readme_path", &options);
 }
 
 #[test]
@@ -58,13 +58,13 @@ fn integration_test_multiline_doc() {
 fn integration_test_option_cmd_override_readme_path() {
     let test_name = "option_cmd_override_readme_path";
 
-    let option = TestOptions {
+    let options = TestOptions {
         args: &["--readme-path", "r.md"],
         readme_filename: "r.md",
         ..TestOptions::default()
     };
 
-    run_test_with_options(test_name, &option);
+    run_test_with_options(test_name, &options);
 }
 
 #[test]
@@ -76,9 +76,9 @@ fn integration_test_option_cmd_line_terminator_lf() {
     assert_eq!(infer_line_terminator(readme_template).unwrap(), LineTerminator::CrLf);
     assert_eq!(infer_line_terminator(readme_expected).unwrap(), LineTerminator::Lf);
 
-    let option = TestOptions { args: &["--line-terminator", "lf"], ..TestOptions::default() };
+    let options = TestOptions { args: &["--line-terminator", "lf"], ..TestOptions::default() };
 
-    run_test_with_options(test_name, &option);
+    run_test_with_options(test_name, &options);
 }
 
 #[test]
@@ -90,18 +90,18 @@ fn integration_test_option_cmd_line_terminator_crlf() {
     assert_eq!(infer_line_terminator(readme_template).unwrap(), LineTerminator::Lf);
     assert_eq!(infer_line_terminator(readme_expected).unwrap(), LineTerminator::CrLf);
 
-    let option = TestOptions { args: &["--line-terminator", "crlf"], ..TestOptions::default() };
+    let options = TestOptions { args: &["--line-terminator", "crlf"], ..TestOptions::default() };
 
-    run_test_with_options(test_name, &option);
+    run_test_with_options(test_name, &options);
 }
 
 #[test]
 fn integration_test_option_conf_file_override_readme_path() {
     let test_name = "option_conf_file_override_readme_path";
 
-    let option = TestOptions { readme_filename: "r.md", ..TestOptions::default() };
+    let options = TestOptions { readme_filename: "r.md", ..TestOptions::default() };
 
-    run_test_with_options(test_name, &option);
+    run_test_with_options(test_name, &options);
 }
 
 #[test]
@@ -131,53 +131,53 @@ fn integration_test_option_conf_file_line_terminator_crlf() {
 #[test]
 fn integration_test_option_cmd_check_ok() {
     let test_name = "option_cmd_check_ok";
-    let option = TestOptions {
+    let options = TestOptions {
         args: &["--check"],
         check_readme_expected: false,
         expected_exit_code: 0,
         ..TestOptions::default()
     };
 
-    run_test_with_options(test_name, &option);
+    run_test_with_options(test_name, &options);
 }
 
 #[test]
 fn integration_test_option_cmd_check_fail() {
     let test_name = "option_cmd_check_fail";
-    let option = TestOptions {
+    let options = TestOptions {
         args: &["--check"],
         check_readme_expected: false,
         expected_exit_code: 3,
         ..TestOptions::default()
     };
 
-    run_test_with_options(test_name, &option);
+    run_test_with_options(test_name, &options);
 }
 
 #[test]
 fn integration_test_option_cmd_check_fail_because_warnings() {
     let test_name = "option_cmd_check_fail_because_warnings";
-    let option = TestOptions {
+    let options = TestOptions {
         args: &["--check"],
         check_readme_expected: false,
         expected_exit_code: 4,
         ..TestOptions::default()
     };
 
-    run_test_with_options(test_name, &option);
+    run_test_with_options(test_name, &options);
 }
 
 #[test]
 fn integration_test_option_cmd_check_no_fail_on_warnings() {
     let test_name = "option_cmd_check_no_fail_on_warnings";
-    let option = TestOptions {
+    let options = TestOptions {
         args: &["--check", "--no-fail-on-warnings"],
         check_readme_expected: false,
         expected_exit_code: 0,
         ..TestOptions::default()
     };
 
-    run_test_with_options(test_name, &option);
+    run_test_with_options(test_name, &options);
 }
 
 #[test]
@@ -185,23 +185,23 @@ fn integration_test_option_cmd_check_fail_line_terminator() {
     let test_name = "option_cmd_check_fail_line_terminator";
 
     // First check that the test would pass without the line terminator override.
-    let option = TestOptions {
+    let options = TestOptions {
         args: &["--check"],
         check_readme_expected: false,
         expected_exit_code: 0,
         ..TestOptions::default()
     };
 
-    run_test_with_options(test_name, &option);
+    run_test_with_options(test_name, &options);
 
-    let option = TestOptions {
+    let options = TestOptions {
         args: &["--check", "--line-terminator", "crlf"],
         check_readme_expected: false,
         expected_exit_code: 3,
         ..TestOptions::default()
     };
 
-    run_test_with_options(test_name, &option);
+    run_test_with_options(test_name, &options);
 }
 
 #[test]
@@ -233,44 +233,44 @@ fn integration_test_option_conf_file_entrypoint_select_bin_custom_path() {
 fn integration_test_option_cmd_entrypoint_bin() {
     let test_name = "option_cmd_entrypoint_bin";
 
-    let option = TestOptions { args: &["--entrypoint", "bin"], ..TestOptions::default() };
+    let options = TestOptions { args: &["--entrypoint", "bin"], ..TestOptions::default() };
 
-    run_test_with_options(test_name, &option);
+    run_test_with_options(test_name, &options);
 }
 
 #[test]
 fn integration_test_option_cmd_entrypoint_select_bin_single() {
     let test_name = "option_cmd_entrypoint_select_bin_single";
-    let option = TestOptions { args: &["--entrypoint", "bin"], ..TestOptions::default() };
+    let options = TestOptions { args: &["--entrypoint", "bin"], ..TestOptions::default() };
 
-    run_test_with_options(test_name, &option);
+    run_test_with_options(test_name, &options);
 }
 
 #[test]
 fn integration_test_option_cmd_entrypoint_select_bin() {
     let test_name = "option_cmd_entrypoint_select_bin";
 
-    let option = TestOptions { args: &["--entrypoint", "bin:foo"], ..TestOptions::default() };
+    let options = TestOptions { args: &["--entrypoint", "bin:foo"], ..TestOptions::default() };
 
-    run_test_with_options(test_name, &option);
+    run_test_with_options(test_name, &options);
 }
 
 #[test]
 fn integration_test_option_cmd_entrypoint_select_bin_custom_path() {
     let test_name = "option_cmd_entrypoint_select_bin_custom_path";
 
-    let option = TestOptions { args: &["--entrypoint", "bin:foo"], ..TestOptions::default() };
+    let options = TestOptions { args: &["--entrypoint", "bin:foo"], ..TestOptions::default() };
 
-    run_test_with_options(test_name, &option);
+    run_test_with_options(test_name, &options);
 }
 
 #[test]
 fn integration_test_separate_bin_and_lib() {
     let test_name = "separate_bin_and_lib";
 
-    let option = TestOptions { args: &["--entrypoint", "bin"], ..TestOptions::default() };
+    let options = TestOptions { args: &["--entrypoint", "bin"], ..TestOptions::default() };
 
-    run_test_with_options(test_name, &option);
+    run_test_with_options(test_name, &options);
 }
 
 #[test]
@@ -285,7 +285,7 @@ fn integration_test_avoid_overwrite_uncommitted_readme() {
     let test_name = "avoid_overwrite_uncommitted_readme";
     let readme_path = test_dir(test_name).join("README.md");
 
-    let option = TestOptions {
+    let options = TestOptions {
         check_readme_expected: false,
         expected_exit_code: 2,
         force: false,
@@ -296,7 +296,7 @@ fn integration_test_avoid_overwrite_uncommitted_readme() {
     file.write_all("A file!".as_bytes()).unwrap();
     drop(file);
 
-    run_test_with_options(test_name, &option);
+    run_test_with_options(test_name, &options);
 
     let mut file = File::open(&readme_path).unwrap();
     let mut content = String::new();
@@ -369,24 +369,24 @@ fn integration_test_option_conf_file_workspace() {
 fn integration_test_option_cmd_workspace() {
     let test_name = "option_cmd_workspace";
 
-    let option = TestOptions {
+    let options = TestOptions {
         args: &["--workspace-project", "otherproj", "--readme-path", "README.md"],
         ..TestOptions::default()
     };
 
-    run_test_with_options(test_name, &option);
+    run_test_with_options(test_name, &options);
 }
 
 #[test]
 fn integration_test_option_cmd_workspace_dependency_collision() {
     let test_name = "option_cmd_workspace_dependency_collision";
 
-    let option = TestOptions {
+    let options = TestOptions {
         args: &["--workspace-project", "cargo-rdme", "--readme-path", "README.md"],
         ..TestOptions::default()
     };
 
-    run_test_with_options(test_name, &option);
+    run_test_with_options(test_name, &options);
 }
 
 #[test]
@@ -408,9 +408,9 @@ fn integration_test_option_conf_file_intralinks_strip_links() {
 fn integration_test_option_cmd_intralinks_strip_links() {
     let test_name = "option_cmd_intralinks_strip_links";
 
-    let option = TestOptions { args: &["--intralinks-strip-links"], ..TestOptions::default() };
+    let options = TestOptions { args: &["--intralinks-strip-links"], ..TestOptions::default() };
 
-    run_test_with_options(test_name, &option);
+    run_test_with_options(test_name, &options);
 }
 
 #[test]
@@ -427,9 +427,9 @@ fn integration_test_option_conf_file_heading_base_level() {
 fn integration_test_option_cmd_heading_base_level() {
     let test_name = "option_cmd_heading_base_level";
 
-    let option = TestOptions { args: &["--heading-base-level", "3"], ..TestOptions::default() };
+    let options = TestOptions { args: &["--heading-base-level", "3"], ..TestOptions::default() };
 
-    run_test_with_options(test_name, &option);
+    run_test_with_options(test_name, &options);
 }
 
 #[test]
