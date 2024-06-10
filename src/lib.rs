@@ -73,13 +73,9 @@ impl Project {
         metadata: &'a cargo_metadata::Metadata,
         package_name: &str,
     ) -> Option<&'a cargo_metadata::Package> {
-        let package = metadata.packages.iter().find(|package| package.name == package_name)?;
-
-        // We need to make sure the package we found is actually a project of the workspace.
-        match metadata.workspace_members.contains(&package.id) {
-            false => None,
-            true => Some(package),
-        }
+        metadata.packages.iter().find(|package| {
+            package.name == package_name && metadata.workspace_members.contains(&package.id)
+        })
     }
 
     pub fn from_current_dir_workspace_project(project_name: &str) -> Result<Project, ProjectError> {

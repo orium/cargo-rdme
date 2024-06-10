@@ -378,6 +378,18 @@ fn integration_test_option_cmd_workspace() {
 }
 
 #[test]
+fn integration_test_option_cmd_workspace_dependency_collision() {
+    let test_name = "option_cmd_workspace_dependency_collision";
+
+    let option = TestOptions {
+        args: &["--workspace-project", "cargo-rdme", "--readme-path", "README.md"],
+        ..TestOptions::default()
+    };
+
+    run_test_with_options(test_name, &option);
+}
+
+#[test]
 fn integration_test_option_conf_file_intralinks_docs_rs_base_url() {
     run_test("option_conf_file_intralinks_docs_rs_base_url");
 }

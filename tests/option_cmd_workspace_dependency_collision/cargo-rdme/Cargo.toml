@@ -1,0 +1,4 @@
+[package]
+name = "cargo-rdme"
+version = "9000.0.0"
+edition = "2021"
