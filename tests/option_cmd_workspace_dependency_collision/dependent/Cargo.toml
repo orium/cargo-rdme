@@ -1,0 +1,10 @@
+[package]
+name = "dependent"
+version = "0.0.1"
+edition = "2021"
+
+
+[dependencies]
+# Depends on a published version of a crate with a lower version than the one 
+# of the same name in this workspace
+cargo-rdme = "1.4.3"
