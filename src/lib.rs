@@ -46,9 +46,16 @@ pub fn find_first_file_in_ancestors(dir_path: impl AsRef<Path>, filename: &str) 
     None
 }
 
+#[derive(Debug)]
+pub enum PackageTarget {
+    Bin { crate_name: String },
+    Lib,
+}
+
 #[derive(PartialEq, Eq, Debug)]
 pub struct Project {
     package_name: String,
+    manifest_path: PathBuf,
     readme_path: Option<PathBuf>,
     lib_path: Option<PathBuf>,
     bin_path: HashMap<String, PathBuf>,
@@ -103,16 +110,16 @@ impl Project {
         let bin_packages =
             package.targets.iter().filter(|target| target.kind.contains(&"bin".to_owned()));
 
-        let directory = package
-            .manifest_path
-            .clone()
-            .into_std_path_buf()
+        let manifest_path = package.manifest_path.clone().into_std_path_buf();
+
+        let directory = manifest_path
             .parent()
             .expect("error getting the parent path of the manifest file")
             .to_path_buf();
 
         Project {
             package_name: package.name.clone(),
+            manifest_path,
             readme_path: package.readme.as_ref().map(|p| p.clone().into_std_path_buf()),
             lib_path: lib_package.map(|t| t.src_path.clone().into_std_path_buf()),
             bin_path: bin_packages
@@ -125,6 +132,14 @@ impl Project {
     #[must_use]
     pub fn get_lib_entryfile_path(&self) -> Option<&Path> {
         self.lib_path.as_ref().filter(|p| p.is_file()).map(PathBuf::as_path)
+    }
+
+    #[must_use]
+    pub fn get_bin_default_crate_name(&self) -> Option<&str> {
+        match self.bin_path.len() {
+            1 => self.bin_path.keys().next().map(String::as_str),
+            _ => None,
+        }
     }
 
     #[must_use]
@@ -157,15 +172,11 @@ impl Project {
     pub fn get_package_name(&self) -> &str {
         &self.package_name
     }
-}
 
-fn project_package_name(manifest_path: impl AsRef<Path>) -> Option<String> {
-    let str: String = std::fs::read_to_string(&manifest_path).ok()?;
-    let toml: toml::Value = toml::from_str(&str).ok()?;
-    let package_name =
-        toml.get("package").and_then(|v| v.get("name")).and_then(toml::Value::as_str)?;
-
-    Some(package_name.to_owned())
+    #[must_use]
+    pub fn get_manifest_path(&self) -> &PathBuf {
+        &self.manifest_path
+    }
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]

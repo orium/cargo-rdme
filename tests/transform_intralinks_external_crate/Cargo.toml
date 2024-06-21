@@ -1,0 +1,7 @@
+[package]
+name = "integration_test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tower-service = "=0.3.2"

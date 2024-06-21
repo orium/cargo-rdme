@@ -38,16 +38,19 @@ codecov = { repository = "orium/cargo-rdme", branch = "main", service = "github"
 toml = "0.8.14"
 thiserror = "1.0.61"
 syn = { version = "2.0.66", features = ["full", "extra-traits"] }
-proc-macro2 = { version = "1.0.85", features = ["span-locations"] }
 pulldown-cmark = "0.11.0"
 itertools = "0.13.0"
 clap = "4.5.7"
 # Disable ssh support in git2 to avoid depending on openssl (which fails to build if an unsupported version is found).
-git2 = { version = "0.18.3", default-features = false }
+git2 = { version = "0.19.0", default-features = false }
 termcolor = "1.4.1"
 cargo_metadata = "0.18.1"
 indoc = "2.0.5"
 unicase = "2.7.0"
+rustdoc-json = "0.9.1"
+serde = "1.0.203"
+serde_json = "1.0.117"
+rustdoc-types = "0.26.0"
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"

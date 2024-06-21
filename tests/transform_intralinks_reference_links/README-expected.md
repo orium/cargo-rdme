@@ -6,7 +6,7 @@ This [beautiful crate] is cool because it contains [modules]
 and some other [stuff] as well.
 
 This link is broken and this is not supported,
-but this should [wor\\k \[fi\]ne].
+but this should wor\\k \[fi\]ne.
 
 Go ahead and check all the [structs in foo] specifically
 [this one].  Also, this is a nice function: [copy][cp].
@@ -16,7 +16,6 @@ Go ahead and check all the [structs in foo] specifically
 [beautiful crate]: https://docs.rs/integration_test/latest/integration_test/
 [modules]: https://docs.rs/integration_test/latest/integration_test/amodule/
 [stuff]: https://en.wikipedia.org/wiki/Stuff
-[wor\\k \[fi\]ne]: f\\i\(n\)e
 [structs in foo]: https://docs.rs/integration_test/latest/integration_test/foo/#structs
 [this one]: https://docs.rs/integration_test/latest/integration_test/foo/struct.BestStruct.html
 [cp]: https://doc.rust-lang.org/stable/std/fs/fn.copy.html#examples "A title here"

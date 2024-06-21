@@ -5,6 +5,6 @@ edition = "2021"
 
 
 [dependencies]
-# Depends on a published version of a crate with a lower version than the one 
-# of the same name in this workspace
+# Depends on a published version of a crate with the same name in this workspace. We want to test that we pick the
+# package in the workspace to extract the docs from.
 cargo-rdme = "1.4.3"
