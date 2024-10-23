@@ -8,3 +8,6 @@ edition = "2021"
 # Depends on a published version of a crate with a lower version than the one 
 # of the same name in this workspace
 cargo-rdme = "1.4.3"
+
+[package.metadata.cargo-machete]
+ignored = ["cargo-rdme"]

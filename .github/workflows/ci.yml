@@ -30,6 +30,7 @@ jobs:
       - name: Install cargo plugins
         run: |
           cargo install cargo-deadlinks
+          cargo install cargo-machete
 
       - name: Checkout repository
         uses: actions/checkout@v4

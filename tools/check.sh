@@ -21,6 +21,7 @@ function on_failure {
 }
 
 assert_installed "cargo-deadlinks"
+assert_installed "cargo-machete"
 assert_installed "cargo-fmt"
 
 trap on_failure ERR
@@ -41,6 +42,9 @@ cargo doc   --features fatal-warnings --no-deps
 
 echo 'Checking links:'
 cargo deadlinks
+
+echo 'Checking unused dependencies:'
+cargo machete
 
 echo 'Checking packaging:'
 cargo package --allow-dirty

@@ -85,7 +85,6 @@ dependencies = [
  "indoc",
  "itertools",
  "pretty_assertions",
- "proc-macro2",
  "pulldown-cmark",
  "syn",
  "termcolor",
