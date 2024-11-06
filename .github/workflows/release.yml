@@ -25,7 +25,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build release binary
-        uses: rust-build/rust-build.action@v1.4.4
+        # TODO(rust-build/rust-build.action/pull/99) Point to rust-build once this is fixed.
+        uses: orium/rust-build.action@f8eb5cc9df0c469c65a397b8b3986bb239ceefb1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
