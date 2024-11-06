@@ -1,5 +1,10 @@
 # Release notes
 
+## 1.4.6
+
+* Update dependencies.
+* Fix github build action: we should be back to publishing binaries.
+
 ## 1.4.5
 
 * Update dependencies.
