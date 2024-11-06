@@ -36,7 +36,7 @@ codecov = { repository = "orium/cargo-rdme", branch = "main", service = "github"
 
 [dependencies]
 toml = "0.8.19"
-thiserror = "1.0.65"
+thiserror = "2.0.0"
 syn = { version = "2.0.85", features = ["full", "extra-traits"] }
 pulldown-cmark = "0.12.2"
 itertools = "0.13.0"
