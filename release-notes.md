@@ -1,5 +1,9 @@
 # Release notes
 
+## 1.4.7
+
+* Another attempt at fixing github build action.
+
 ## 1.4.6
 
 * Update dependencies.
