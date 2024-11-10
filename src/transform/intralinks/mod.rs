@@ -118,19 +118,16 @@ fn rewrite_links(
     let RewriteReferenceLinksResult { doc, reference_links_to_remove } =
         rewrite_reference_links_definitions(doc, symbols_type, crate_name, emit_warning, config);
 
-    let doc = rewrite_markdown_links(
+    // TODO Refactor link removal code so that it all happens in a new phase and not inside the
+    //      functions above.
+    rewrite_markdown_links(
         &doc,
         symbols_type,
         crate_name,
         emit_warning,
         config,
         &reference_links_to_remove,
-    );
-
-    // TODO Refactor link removal code so that it all happens in a new phase and not inside the
-    //      functions above.
-
-    doc
+    )
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
