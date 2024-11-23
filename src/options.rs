@@ -115,6 +115,7 @@ pub fn cmd_options() -> CmdOptions {
     let cmd_opts = Command::new(PROJECT_NAME)
         .version(VERSION)
         .about("Create the README from your crate’s documentation.")
+        .styles(clap_cargo::style::CLAP_STYLING)
         .arg(
             Arg::new("entrypoint")
                 .long("entrypoint")
