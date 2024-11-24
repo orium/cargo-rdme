@@ -6,6 +6,7 @@
 #![cfg_attr(feature = "fatal-warnings", deny(warnings))]
 
 use crate::markdown::{Markdown, MarkdownError};
+use cargo_metadata::TargetKind;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -88,12 +89,18 @@ impl Project {
     }
 
     fn from_package(package: &cargo_metadata::Package) -> Project {
-        const LIB_CRATE_KINDS: [&str; 6] =
-            ["lib", "dylib", "staticlib", "cdylib", "rlib", "proc-macro"];
+        const LIB_CRATE_KINDS: [TargetKind; 6] = [
+            TargetKind::Lib,
+            TargetKind::DyLib,
+            TargetKind::StaticLib,
+            TargetKind::CDyLib,
+            TargetKind::RLib,
+            TargetKind::ProcMacro,
+        ];
         let lib_packages: Vec<&cargo_metadata::Target> = package
             .targets
             .iter()
-            .filter(|target| target.kind.iter().any(|k| LIB_CRATE_KINDS.contains(&k.as_str())))
+            .filter(|target| target.kind.iter().any(|k| LIB_CRATE_KINDS.contains(k)))
             .collect();
 
         assert!(lib_packages.len() <= 1, "more than one lib target");
@@ -101,7 +108,7 @@ impl Project {
         let lib_package = lib_packages.first();
 
         let bin_packages =
-            package.targets.iter().filter(|target| target.kind.contains(&"bin".to_owned()));
+            package.targets.iter().filter(|target| target.kind.contains(&TargetKind::Bin));
 
         let directory = package
             .manifest_path
