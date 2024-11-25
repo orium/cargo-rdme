@@ -1,5 +1,10 @@
 # Release notes
 
+## 1.4.8
+
+* Use cargo styles for cli help output.
+* Update dependencies.
+
 ## 1.4.7
 
 * Another attempt at fixing github build action.
