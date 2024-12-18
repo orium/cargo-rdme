@@ -41,7 +41,7 @@ itertools = "0.13.0"
 pulldown-cmark = "0.12.2"
 syn = { version = "2.0.89", features = ["full", "extra-traits"] }
 termcolor = "1.4.1"
-thiserror = "2.0.3"
+thiserror = "2.0.8"
 toml = "0.8.19"
 unicase = "2.8.0"
 
