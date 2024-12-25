@@ -43,7 +43,7 @@ syn = { version = "2.0.91", features = ["full", "extra-traits"] }
 termcolor = "1.4.1"
 thiserror = "2.0.9"
 toml = "0.8.19"
-unicase = "2.8.0"
+unicase = "2.8.1"
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"
