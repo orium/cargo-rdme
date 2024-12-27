@@ -4,7 +4,6 @@
  */
 
 use crate::markdown::Markdown;
-use crate::transform::intralinks::ItemPath;
 use crate::utils::{MarkdownItemIterator, Span};
 use itertools::Itertools;
 use pulldown_cmark::{CowStr, TagEnd};
@@ -72,16 +71,14 @@ impl Display for MarkdownInlineLink {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(Eq, PartialEq, Hash, Clone, Debug)]
 pub struct Link {
     pub raw_link: String,
 }
 
 impl Link {
-    pub fn link_as_item_path(&self) -> Option<ItemPath> {
-        let link = self.split_link_fragment().0;
-
-        ItemPath::from_string(link)
+    pub fn new(raw_link: String) -> Link {
+        Link { raw_link }
     }
 
     fn split_link_fragment(&self) -> (&str, &str) {
@@ -101,10 +98,14 @@ impl Link {
                 let (l, f) = link.split_at(i);
                 (
                     strip_last_backtick(strip_backtick_end, l),
-                    strip_last_backtick(strip_backtick_end, f),
+                    strip_last_backtick(strip_backtick_end, &f[1..]),
                 )
             }
         }
+    }
+
+    pub fn symbol(&self) -> &str {
+        self.split_link_fragment().0
     }
 
     pub fn link_fragment(&self) -> Option<&str> {
@@ -117,13 +118,13 @@ impl Link {
 
 impl From<String> for Link {
     fn from(raw_link: String) -> Link {
-        Link { raw_link }
+        Link::new(raw_link)
     }
 }
 
 impl From<&str> for Link {
     fn from(raw_link: &str) -> Link {
-        Link { raw_link: raw_link.to_owned() }
+        Link::new(raw_link.to_owned())
     }
 }
 
@@ -135,7 +136,9 @@ impl Display for Link {
 
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub enum MarkdownReferenceLink {
+    /// A reference link like [text][label].
     Normal { text: String, label: UniCase<String> },
+    /// A reference link like [label]. Note that the label is also the text.
     Shortcut { text: UniCase<String> },
 }
 
@@ -177,8 +180,7 @@ pub fn markdown_link_iterator(markdown: &Markdown) -> MarkdownItemIterator<Markd
 
     let source = markdown.as_string();
 
-    // We need to define a callback for broken links so that we can see broken links so that we can
-    // strip them.
+    // We need to define a callback for broken links so that we can see them and strip them.
     let mut broken_link_callback =
         |_| Some((CowStr::Borrowed("fake://link"), CowStr::Borrowed("fake title")));
     let parser = Parser::new_with_broken_link_callback(
@@ -238,8 +240,7 @@ pub fn markdown_link_iterator(markdown: &Markdown) -> MarkdownItemIterator<Markd
 
                 Some((range.into(), link))
             }
-            Some(_) => None,
-            None => None,
+            Some(_) | None => None,
         },
         _ => {
             if in_link.is_some() {
