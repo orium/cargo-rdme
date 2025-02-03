@@ -39,7 +39,7 @@ git2 = { version = "0.19.0", default-features = false }
 indoc = "2.0.5"
 itertools = "0.13.0"
 pulldown-cmark = "0.12.2"
-syn = { version = "2.0.91", features = ["full", "extra-traits"] }
+syn = { version = "2.0.98", features = ["full", "extra-traits"] }
 termcolor = "1.4.1"
 thiserror = "2.0.9"
 toml = "0.8.19"
