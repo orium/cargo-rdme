@@ -3,11 +3,11 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use crate::transform::intralinks::links::{
-    markdown_link_iterator, markdown_reference_link_definition_iterator, Link, MarkdownLink,
-};
-use crate::transform::DocTransform;
 use crate::Doc;
+use crate::transform::DocTransform;
+use crate::transform::intralinks::links::{
+    Link, MarkdownLink, markdown_link_iterator, markdown_reference_link_definition_iterator,
+};
 use module_walker::walk_module_file;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -216,7 +216,7 @@ impl ItemPath {
         self
     }
 
-    fn all_ancestors(&self) -> impl Iterator<Item = ItemPath> {
+    fn all_ancestors(&self) -> impl Iterator<Item = ItemPath> + use<> {
         let first_ancestor = self.clone().parent();
 
         std::iter::successors(first_ancestor, |ancestor| ancestor.clone().parent())
@@ -1228,7 +1228,9 @@ mod tests {
         );
         assert_eq!(
             link.as_deref(),
-            Some("https://docs.rs/foo-bar-mumble/latest/foo_bar_mumble/struct.MyStruct.html#implementations")
+            Some(
+                "https://docs.rs/foo-bar-mumble/latest/foo_bar_mumble/struct.MyStruct.html#implementations"
+            )
         );
 
         let symbols_type: HashMap<ItemPath, SymbolType> = [
@@ -1250,7 +1252,9 @@ mod tests {
         );
         assert_eq!(
             link.as_deref(),
-            Some("https://docs.rs/foo-bar-mumble/latest/foo_bar_mumble/mymod/struct.MyStruct.html#method.a_method")
+            Some(
+                "https://docs.rs/foo-bar-mumble/latest/foo_bar_mumble/mymod/struct.MyStruct.html#method.a_method"
+            )
         );
 
         let config = IntralinksDocsRsConfig {

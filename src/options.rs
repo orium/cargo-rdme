@@ -5,7 +5,7 @@
 
 use cargo_rdme::find_first_file_in_ancestors;
 use cargo_rdme::transform::{IntralinksConfig, IntralinksDocsRsConfig};
-use clap::{value_parser, ArgAction};
+use clap::{ArgAction, value_parser};
 use std::error::Error;
 use std::ffi::OsString;
 use std::fmt::{Display, Formatter};

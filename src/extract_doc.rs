@@ -3,8 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use crate::markdown::Markdown;
 use crate::Doc;
+use crate::markdown::Markdown;
 use std::path::{Path, PathBuf};
 use syn::Expr;
 use thiserror::Error;
@@ -27,7 +27,7 @@ pub fn extract_doc_from_source_file(
 }
 
 pub fn extract_doc_from_source_str(source: &str) -> Result<Option<Doc>, ExtractDocError> {
-    use syn::{parse_str, ExprLit, Lit, Meta, MetaNameValue};
+    use syn::{ExprLit, Lit, Meta, MetaNameValue, parse_str};
 
     let ast: syn::File = parse_str(source).map_err(ExtractDocError::ErrorParsingSourceFile)?;
     let mut lines: Vec<String> = Vec::with_capacity(1024);

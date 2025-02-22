@@ -391,7 +391,9 @@ mod tests {
 
         assert_eq!(iter.next(), None);
 
-        let markdown = Markdown::from_str("A [some [text]], [another [text2] (foo)](http://foo.com/foo(bar)), [another [] one][foo[]bar]");
+        let markdown = Markdown::from_str(
+            "A [some [text]], [another [text2] (foo)](http://foo.com/foo(bar)), [another [] one][foo[]bar]",
+        );
         let mut iter = markdown_link_iterator(&markdown).items_with_spans();
 
         let (Span { start, end }, link) = iter.next().unwrap();

@@ -219,11 +219,11 @@
 
 use crate::options::{EntrypointOpt, LineTerminatorOpt};
 use cargo_rdme::transform::IntralinkError;
-use cargo_rdme::{
-    extract_doc_from_source_file, infer_line_terminator, inject_doc_in_readme, LineTerminator,
-    Project,
-};
 use cargo_rdme::{Doc, ProjectError, Readme};
+use cargo_rdme::{
+    LineTerminator, Project, extract_doc_from_source_file, infer_line_terminator,
+    inject_doc_in_readme,
+};
 use std::cell::Cell;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -282,9 +282,7 @@ enum RunError {
     InjectDocError(cargo_rdme::InjectDocError),
     #[error("IO error: {0}")]
     IOError(std::io::Error),
-    #[error(
-        "not updating README: it has uncommitted changes (use `--force` to bypass this check)"
-    )]
+    #[error("not updating README: it has uncommitted changes (use `--force` to bypass this check)")]
     ReadmeNotUpdatedUncommittedChanges,
     #[error("failed to transform intralinks: {0}")]
     TransformIntraLinkError(IntralinkError),

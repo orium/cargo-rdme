@@ -6,9 +6,9 @@
 mod testing;
 
 use crate::testing::{test_dir, test_readme_expected, test_readme_template};
-use cargo_rdme::{infer_line_terminator, LineTerminator};
+use cargo_rdme::{LineTerminator, infer_line_terminator};
 use std::io::{Read, Write};
-use testing::{run_test, run_test_with_options, TestOptions};
+use testing::{TestOptions, run_test, run_test_with_options};
 
 #[test]
 fn integration_test_simple_single_marker() {

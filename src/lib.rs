@@ -17,8 +17,8 @@ mod markdown;
 pub mod transform;
 pub mod utils;
 
-pub use extract_doc::{extract_doc_from_source_file, ExtractDocError};
-pub use inject_doc::{inject_doc_in_readme, InjectDocError, MARKER_RDME};
+pub use extract_doc::{ExtractDocError, extract_doc_from_source_file};
+pub use inject_doc::{InjectDocError, MARKER_RDME, inject_doc_in_readme};
 
 #[derive(Error, Debug)]
 pub enum ProjectError {
@@ -193,8 +193,8 @@ impl Doc {
     }
 
     fn is_toplevel_doc(attr: &syn::Attribute) -> bool {
-        use syn::token::Not;
         use syn::AttrStyle;
+        use syn::token::Not;
 
         attr.style == AttrStyle::Inner(Not::default()) && attr.path().is_ident("doc")
     }
@@ -292,9 +292,5 @@ pub fn infer_line_terminator(file_path: impl AsRef<Path>) -> std::io::Result<Lin
     let crlf_lines: usize = content.matches("\r\n").count();
     let lf_lines: usize = content.matches('\n').count() - crlf_lines;
 
-    if crlf_lines > lf_lines {
-        Ok(LineTerminator::CrLf)
-    } else {
-        Ok(LineTerminator::Lf)
-    }
+    if crlf_lines > lf_lines { Ok(LineTerminator::CrLf) } else { Ok(LineTerminator::Lf) }
 }
