@@ -11,6 +11,7 @@ use crate::transform::intralinks::links::{
 use module_walker::walk_module_file;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::fmt::Write;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -589,16 +590,16 @@ fn documentation_url(
 
     match typ {
         SymbolType::Crate => unreachable!(),
-        SymbolType::Struct => link.push_str(&format!("struct.{name}.html")),
-        SymbolType::Trait => link.push_str(&format!("trait.{name}.html")),
-        SymbolType::Enum => link.push_str(&format!("enum.{name}.html")),
-        SymbolType::Union => link.push_str(&format!("union.{name}.html")),
-        SymbolType::Type => link.push_str(&format!("type.{name}.html")),
-        SymbolType::Mod => link.push_str(&format!("{name}/")),
-        SymbolType::Macro => link.push_str(&format!("macro.{name}.html")),
-        SymbolType::Const => link.push_str(&format!("const.{name}.html")),
-        SymbolType::Fn => link.push_str(&format!("fn.{name}.html")),
-        SymbolType::Static => link.push_str(&format!("static.{name}.html")),
+        SymbolType::Struct => write!(&mut link, "struct.{name}.html"),
+        SymbolType::Trait => write!(&mut link, "trait.{name}.html"),
+        SymbolType::Enum => write!(&mut link, "enum.{name}.html"),
+        SymbolType::Union => write!(&mut link, "union.{name}.html"),
+        SymbolType::Type => write!(&mut link, "type.{name}.html"),
+        SymbolType::Mod => write!(&mut link, "{name}/"),
+        SymbolType::Macro => write!(&mut link, "macro.{name}.html"),
+        SymbolType::Const => write!(&mut link, "const.{name}.html"),
+        SymbolType::Fn => write!(&mut link, "fn.{name}.html"),
+        SymbolType::Static => write!(&mut link, "static.{name}.html"),
         SymbolType::ImplItem(typ) => {
             let parent_path = item_path
                 .clone()
@@ -623,6 +624,7 @@ fn documentation_url(
             return Some(format!("{link}#{impl_item_fragment_str}.{name}"));
         }
     }
+    .expect("this should never fail");
 
     Some(format!("{}{}", link, fragment.unwrap_or("")))
 }
