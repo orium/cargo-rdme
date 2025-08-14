@@ -25,7 +25,7 @@ enum ReadmeLine<'a> {
     MarkerCargoRdmeEnd(Span),
 }
 
-fn readme_line_iterator(readme: &Readme) -> MarkdownItemIterator<ReadmeLine> {
+fn readme_line_iterator(readme: &Readme) -> MarkdownItemIterator<'_, ReadmeLine<'_>> {
     use pulldown_cmark::{Event, Options, Parser, Tag};
 
     let source = readme.as_string();
@@ -75,7 +75,7 @@ fn readme_line_iterator(readme: &Readme) -> MarkdownItemIterator<ReadmeLine> {
     MarkdownItemIterator::new(source, iter)
 }
 
-fn doc_heading_iterator(doc: &Doc) -> MarkdownItemIterator<Heading> {
+fn doc_heading_iterator(doc: &Doc) -> MarkdownItemIterator<'_, Heading<'_>> {
     use pulldown_cmark::{Event, Options, Parser, Tag};
 
     let source = doc.as_string();

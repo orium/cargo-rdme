@@ -172,7 +172,7 @@ impl Display for MarkdownReferenceLink {
     }
 }
 
-pub fn markdown_link_iterator(markdown: &Markdown) -> MarkdownItemIterator<MarkdownLink> {
+pub fn markdown_link_iterator(markdown: &Markdown) -> MarkdownItemIterator<'_, MarkdownLink> {
     use pulldown_cmark::{Event, LinkType, Options, Parser, Tag};
 
     let source = markdown.as_string();
@@ -296,7 +296,7 @@ fn parse_raw_reference_link_definition(
 
 pub fn markdown_reference_link_definition_iterator(
     markdown: &Markdown,
-) -> MarkdownItemIterator<MarkdownReferenceLinkDefinition> {
+) -> MarkdownItemIterator<'_, MarkdownReferenceLinkDefinition> {
     use pulldown_cmark::{Options, Parser};
 
     let source = markdown.as_string();

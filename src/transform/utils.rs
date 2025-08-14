@@ -16,7 +16,7 @@ pub fn is_rust_code_block(tags: &str) -> bool {
     })
 }
 
-pub fn rust_code_block_iterator(markdown: &Markdown) -> MarkdownItemIterator<&str> {
+pub fn rust_code_block_iterator(markdown: &Markdown) -> MarkdownItemIterator<'_, &str> {
     use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag};
 
     let source = markdown.as_string();
