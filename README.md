@@ -134,7 +134,7 @@ Take a look at the example below:
 
 ```rust
 //! To check if a number is prime use
-//! [`is_prime`](crate::is_prime).
+//! `is_prime`(crate::is_prime).
 ```
 
 </td>
@@ -142,7 +142,7 @@ Take a look at the example below:
 
 ```markdown
 To check if a number is prime use
-[`is_prime`](https://docs.rs/prime/latest/prime/fn.is_prime.html).
+`is_prime`(https://docs.rs/prime/latest/prime/fn.is_prime.html).
 ```
 
 </td>
