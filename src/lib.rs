@@ -6,7 +6,7 @@
 #![cfg_attr(feature = "fatal-warnings", deny(warnings))]
 
 use crate::markdown::{Markdown, MarkdownError};
-use cargo_metadata::TargetKind;
+use cargo_metadata::{PackageName, TargetKind};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -49,7 +49,7 @@ pub fn find_first_file_in_ancestors(dir_path: impl AsRef<Path>, filename: &str) 
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct Project {
-    package_name: String,
+    package_name: PackageName,
     readme_path: Option<PathBuf>,
     lib_path: Option<PathBuf>,
     bin_path: HashMap<String, PathBuf>,
@@ -161,7 +161,7 @@ impl Project {
     }
 
     #[must_use]
-    pub fn get_package_name(&self) -> &str {
+    pub fn get_package_name(&self) -> &PackageName {
         &self.package_name
     }
 }

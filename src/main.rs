@@ -399,7 +399,7 @@ fn transform_doc(
 
     let had_warnings = Cell::new(false);
     let transform = DocTransformIntralinks::new(
-        project.get_package_name(),
+        project.get_package_name().as_str().to_owned(),
         entrypoint,
         |msg| {
             print_warning!("{}", msg);
