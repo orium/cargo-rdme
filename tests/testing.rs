@@ -104,8 +104,8 @@ fn print_failure_readme_mismatch(
         write!(
             stream,
             "diff {} {}",
+            expected_readme_path.as_ref().display(),
             readme_path.as_ref().display(),
-            expected_readme_path.as_ref().display()
         )
         .unwrap();
         stream.reset().unwrap();
