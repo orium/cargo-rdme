@@ -15,7 +15,7 @@ readme = "README.md"
 keywords = ["readme", "cargo", "documentation"]
 categories = ["development-tools::cargo-plugins"]
 
-license = "MPL-2.0"
+license = "MIT"
 
 # What to include when packaging.
 include = [
