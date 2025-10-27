@@ -141,7 +141,7 @@ impl<'a> Iterator for ShorthandPatternIterator<'a> {
                 let after_pattern = &after_start[end_idx + 2..];
 
                 // Check if this is followed by a link URL (indicating it's already a markdown link).
-                let is_markdown_link = after_pattern.trim_start().starts_with('(');
+                let is_markdown_link = after_pattern.starts_with('(');
 
                 // Move past this pattern for next iteration.
                 self.remaining = &after_start[end_idx + 2..];
@@ -202,7 +202,7 @@ fn post_process_shorthand_links(
 
                     // Check if this is followed by a link URL (indicating it's already a markdown link).
                     let after_pattern = &remaining[start_idx + 2 + end_idx + 2..];
-                    let is_markdown_link = after_pattern.trim_start().starts_with('(');
+                    let is_markdown_link = after_pattern.starts_with('(');
 
                     let consumed = start_idx + 2 + end_idx + 2;
                     remaining = &remaining[consumed..];
