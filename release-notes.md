@@ -1,5 +1,10 @@
 # Release notes
 
+## 1.4.9
+
+* Relicensed project under the MIT license.
+* Update dependencies.
+
 ## 1.4.8
 
 * Use cargo styles for cli help output.

@@ -1,12 +1,7 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
- */
-
 #![cfg_attr(feature = "fatal-warnings", deny(warnings))]
 
 use crate::markdown::{Markdown, MarkdownError};
-use cargo_metadata::TargetKind;
+use cargo_metadata::{PackageName, TargetKind};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -49,7 +44,7 @@ pub fn find_first_file_in_ancestors(dir_path: impl AsRef<Path>, filename: &str) 
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct Project {
-    package_name: String,
+    package_name: PackageName,
     readme_path: Option<PathBuf>,
     lib_path: Option<PathBuf>,
     bin_path: HashMap<String, PathBuf>,
@@ -120,7 +115,7 @@ impl Project {
             .to_path_buf();
 
         Project {
-            package_name: package.name.to_string(),
+            package_name: package.name.clone(),
             readme_path: package.readme.as_ref().map(|p| p.clone().into_std_path_buf()),
             lib_path: lib_package.map(|t| t.src_path.clone().into_std_path_buf()),
             bin_path: bin_packages
@@ -162,7 +157,7 @@ impl Project {
     }
 
     #[must_use]
-    pub fn get_package_name(&self) -> &str {
+    pub fn get_package_name(&self) -> &PackageName {
         &self.package_name
     }
 }

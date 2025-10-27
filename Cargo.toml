@@ -1,11 +1,11 @@
 [package]
 name = "cargo-rdme"
 description = "Cargo command to create your `README.md` from your crate's documentation"
-version = "1.4.9-pre"
+version = "1.4.10-pre"
 authors = ["Diogo Sousa <diogogsousa@gmail.com>"]
 
 edition = "2024"
-rust-version = "1.85.0"
+rust-version = "1.86.0"
 
 homepage = "https://github.com/orium/cargo-rdme"
 repository = "https://github.com/orium/cargo-rdme"
@@ -15,7 +15,7 @@ readme = "README.md"
 keywords = ["readme", "cargo", "documentation"]
 categories = ["development-tools::cargo-plugins"]
 
-license = "MPL-2.0"
+license = "MIT"
 
 # What to include when packaging.
 include = [
@@ -31,22 +31,22 @@ include = [
 codecov = { repository = "orium/cargo-rdme", branch = "main", service = "github" }
 
 [dependencies]
-cargo_metadata = "0.22.0"
-clap = "4.5.47"
-clap-cargo = "0.17.1"
+cargo_metadata = "0.23"
+clap = "4.5"
+clap-cargo = "0.18"
 # Disable ssh support in git2 to avoid depending on openssl (which fails to build if an unsupported version is found).
-git2 = { version = "0.20.2", default-features = false }
-indoc = "2.0.6"
-itertools = "0.14.0"
-pulldown-cmark = "0.13.0"
-syn = { version = "2.0.106", features = ["full", "extra-traits"] }
-termcolor = "1.4.1"
-thiserror = "2.0.16"
-toml = "0.9.5"
-unicase = "2.8.1"
+git2 = { version = "0.20", default-features = false }
+indoc = "2.0"
+itertools = "0.14"
+pulldown-cmark = "0.13"
+syn = { version = "2.0", features = ["full", "extra-traits"] }
+termcolor = "1"
+thiserror = "2"
+toml = "0.9"
+unicase = "2.8"
 
 [dev-dependencies]
-pretty_assertions = "1.4.1"
+pretty_assertions = "1.4"
 
 [features]
 fatal-warnings = []

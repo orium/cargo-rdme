@@ -1,8 +1,3 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
- */
-
 #![cfg_attr(feature = "fatal-warnings", deny(warnings))]
 // Note: If you change this remember to update `README.md`.  To do so run `cargo run`.
 //! Cargo command to create your README from your crate’s documentation.
@@ -399,7 +394,7 @@ fn transform_doc(
 
     let had_warnings = Cell::new(false);
     let transform = DocTransformIntralinks::new(
-        project.get_package_name(),
+        project.get_package_name().as_str().to_owned(),
         entrypoint,
         |msg| {
             print_warning!("{}", msg);
