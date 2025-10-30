@@ -16,6 +16,11 @@
 //! Not a shorthand link (no backticks): [regular link](https://example.com).
 //!
 //! Nested in text: The [`nested_func()`] is useful for processing.
+//!
+//! Unresolvable links (should be stripped to just backticks):
+//! - [`NonExistentType`] should become just `NonExistentType`
+//! - [`unresolved_function()`] should become just `unresolved_function()`
+//! - Mixed: [`foo()`] works but [`DoesNotExist`] doesn't.
 
 fn my_function() {}
 fn first_function() {}

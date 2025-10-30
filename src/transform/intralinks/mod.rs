@@ -254,8 +254,12 @@ fn post_process_shorthand_links(
                                 // Successfully generated a docs.rs link.
                                 format!("[`{inner}`]({generated_link})")
                             }
-                            _ => {
-                                // Couldn't resolve as crate item, keep the original.
+                            MarkdownLinkAction::Strip => {
+                                // Unresolvable intralink, strip to just backticked code.
+                                format!("`{inner}`")
+                            }
+                            MarkdownLinkAction::Preserve => {
+                                // Not an intralink, keep the original.
                                 doc_str[pattern_start..pattern_end].to_string()
                             }
                         }
