@@ -1,5 +1,9 @@
 # Release notes
 
+## 1.5.0
+
+* Added the `--manifest-path` command line option.
+
 ## 1.4.9
 
 * Relicensed project under the MIT license.
