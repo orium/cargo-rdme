@@ -81,7 +81,14 @@ pub struct CmdOptions {
     intralinks_strip_links: bool,
     force: bool,
     readme_path: Option<PathBuf>,
+    manifest_path: Option<PathBuf>,
     heading_base_level: Option<u8>,
+}
+
+impl CmdOptions {
+    pub fn manifest_path(&self) -> Option<&Path> {
+        self.manifest_path.as_deref()
+    }
 }
 
 fn get_cmd_args() -> Vec<OsString> {
@@ -127,7 +134,13 @@ pub fn cmd_options() -> CmdOptions {
             Arg::new("readme-path")
                 .long("readme-path")
                 .short('r')
-                .help("README file path to use (overrides of what is specified in the project `Cargo.toml`)")
+                .help("README file path to use (overrides what is specified in the project `Cargo.toml`)")
+                .value_parser(value_parser!(PathBuf)),
+        )
+        .arg(
+            Arg::new("manifest-path")
+                .long("manifest-path")
+                .help("path to `Cargo.toml`")
                 .value_parser(value_parser!(PathBuf)),
         )
         .arg(
@@ -178,6 +191,7 @@ pub fn cmd_options() -> CmdOptions {
     let entrypoint = cmd_opts.get_one::<EntrypointOpt>("entrypoint").cloned();
 
     let readme_path = cmd_opts.get_one::<PathBuf>("readme-path").cloned();
+    let manifest_path = cmd_opts.get_one::<PathBuf>("manifest-path").cloned();
 
     let heading_base_level = cmd_opts.get_one::<u8>("heading-base-level").copied();
 
@@ -190,6 +204,7 @@ pub fn cmd_options() -> CmdOptions {
         intralinks_strip_links: cmd_opts.get_flag("intralinks-strip-links"),
         force: cmd_opts.get_flag("force"),
         readme_path,
+        manifest_path,
         heading_base_level,
     }
 }
@@ -314,6 +329,7 @@ pub struct Options {
     pub no_fail_on_warnings: bool,
     pub force: bool,
     pub readme_path: Option<PathBuf>,
+    pub manifest_path: Option<PathBuf>,
     pub intralinks: Option<IntralinksConfig>,
     pub heading_base_level: Option<u8>,
 }
@@ -343,6 +359,7 @@ pub fn merge_options(
         readme_path: cmd_options
             .readme_path
             .or_else(|| config_file_options.as_mut().and_then(|c| c.readme_path.take())),
+        manifest_path: cmd_options.manifest_path,
         intralinks: Some(IntralinksConfig {
             docs_rs: IntralinksDocsRsConfig {
                 docs_rs_base_url: config_file_options
@@ -425,6 +442,7 @@ mod tests {
             intralinks_strip_links: true,
             force: true,
             readme_path: Some(PathBuf::from("rEaDmE.md")),
+            manifest_path: Some(PathBuf::from("foo/Cargo.toml")),
             heading_base_level: Some(4),
         };
         let config_file_options = ConfigFileOptions {
@@ -452,6 +470,7 @@ mod tests {
             no_fail_on_warnings: true,
             force: true,
             readme_path: Some(PathBuf::from("rEaDmE.md")),
+            manifest_path: Some(PathBuf::from("foo/Cargo.toml")),
             intralinks: Some(IntralinksConfig {
                 docs_rs: IntralinksDocsRsConfig {
                     docs_rs_base_url: Some("https://internaldocs.rs".to_owned()),

@@ -54,15 +54,23 @@ pub struct Project {
 impl Project {
     /// Creates a [`Project`] the current directory.  It will search ancestor paths until it finds
     /// the root of the project.
-    pub fn from_current_dir() -> Result<Project, ProjectError> {
-        let metadata = Project::get_cargo_metadata()?;
+    pub fn from_current_dir(manifest_path: Option<&Path>) -> Result<Project, ProjectError> {
+        let metadata = Project::get_cargo_metadata(manifest_path)?;
         let package = metadata.root_package().ok_or(ProjectError::ProjectHasNoRootPackage)?;
 
         Ok(Project::from_package(package))
     }
 
-    fn get_cargo_metadata() -> Result<cargo_metadata::Metadata, ProjectError> {
-        Ok(cargo_metadata::MetadataCommand::new().exec()?)
+    fn get_cargo_metadata(
+        manifest_path: Option<&Path>,
+    ) -> Result<cargo_metadata::Metadata, ProjectError> {
+        let mut command = cargo_metadata::MetadataCommand::new();
+
+        if let Some(manifest_path) = manifest_path {
+            command.manifest_path(manifest_path);
+        }
+
+        Ok(command.exec()?)
     }
 
     fn select_package<'a>(
@@ -74,8 +82,11 @@ impl Project {
         })
     }
 
-    pub fn from_current_dir_workspace_project(project_name: &str) -> Result<Project, ProjectError> {
-        let metadata = Project::get_cargo_metadata()?;
+    pub fn from_current_dir_workspace_project(
+        manifest_path: Option<&Path>,
+        project_name: &str,
+    ) -> Result<Project, ProjectError> {
+        let metadata = Project::get_cargo_metadata(manifest_path)?;
 
         let package = Project::select_package(&metadata, project_name)
             .ok_or_else(|| ProjectError::ProjectHasNoPackage(project_name.to_owned()))?;

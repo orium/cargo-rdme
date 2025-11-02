@@ -63,6 +63,19 @@ fn integration_test_option_cmd_override_readme_path() {
 }
 
 #[test]
+fn integration_test_option_cmd_manifest_path() {
+    let test_name = "option_cmd_manifest_path";
+
+    let options = TestOptions {
+        args: &["--manifest-path", "foo/Cargo.toml"],
+        readme_filename: "foo/README.md",
+        ..TestOptions::default()
+    };
+
+    run_test_with_options(test_name, &options);
+}
+
+#[test]
 fn integration_test_option_cmd_line_terminator_lf() {
     let test_name = "option_cmd_line_terminator_lf";
     let readme_template = test_readme_template(test_name);

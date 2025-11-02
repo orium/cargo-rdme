@@ -436,8 +436,10 @@ fn update_readme(
 
 fn run(options: options::Options) -> Result<(), RunError> {
     let project: Project = match options.workspace_project {
-        None => Project::from_current_dir()?,
-        Some(ref project) => Project::from_current_dir_workspace_project(project)?,
+        None => Project::from_current_dir(options.manifest_path.as_deref())?,
+        Some(ref project) => {
+            Project::from_current_dir_workspace_project(options.manifest_path.as_deref(), project)?
+        }
     };
     let entryfile: &Path =
         entrypoint(&project, &options.entrypoint).ok_or(RunError::NoEntrySourceFile)?;
@@ -495,8 +497,13 @@ fn run(options: options::Options) -> Result<(), RunError> {
 fn main() {
     let cmd_options = options::cmd_options();
 
-    let exit_code: ExitCode = match std::env::current_dir() {
-        Ok(current_dir) => match options::config_file_options(current_dir) {
+    let directory = cmd_options
+        .manifest_path()
+        .and_then(|path| path.parent())
+        .map_or_else(std::env::current_dir, |p| Ok(p.to_owned()));
+
+    let exit_code: ExitCode = match directory {
+        Ok(dir) => match options::config_file_options(dir) {
             Ok(config_file_options) => {
                 let options = options::merge_options(cmd_options, config_file_options);
 
