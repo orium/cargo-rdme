@@ -31,22 +31,22 @@ include = [
 codecov = { repository = "orium/cargo-rdme", branch = "main", service = "github" }
 
 [dependencies]
-cargo_metadata = "0.23.0"
-clap = "4.5.48"
-clap-cargo = "0.18.0"
+cargo_metadata = "0.23"
+clap = "4.5"
+clap-cargo = "0.18"
 # Disable ssh support in git2 to avoid depending on openssl (which fails to build if an unsupported version is found).
-git2 = { version = "0.20.2", default-features = false }
-indoc = "2.0.6"
-itertools = "0.14.0"
-pulldown-cmark = "0.13.0"
-syn = { version = "2.0.106", features = ["full", "extra-traits"] }
-termcolor = "1.4.1"
-thiserror = "2.0.17"
-toml = "0.9.7"
-unicase = "2.8.1"
+git2 = { version = "0.20", default-features = false }
+indoc = "2.0"
+itertools = "0.14"
+pulldown-cmark = "0.13"
+syn = { version = "2.0", features = ["full", "extra-traits"] }
+termcolor = "1"
+thiserror = "2"
+toml = "0.9"
+unicase = "2.8"
 
 [dev-dependencies]
-pretty_assertions = "1.4.1"
+pretty_assertions = "1.4"
 
 [features]
 fatal-warnings = []
