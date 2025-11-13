@@ -48,9 +48,6 @@ unicase = "2.8.1"
 [dev-dependencies]
 pretty_assertions = "1.4.1"
 
-[features]
-fatal-warnings = []
-
 [lints.clippy]
 all = { level = "warn", priority = -2 }
 correctness = { level = "deny", priority = -1 }

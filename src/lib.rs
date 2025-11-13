@@ -1,5 +1,3 @@
-#![cfg_attr(feature = "fatal-warnings", deny(warnings))]
-
 use crate::markdown::{Markdown, MarkdownError};
 use cargo_metadata::{PackageName, TargetKind};
 use std::collections::HashMap;
