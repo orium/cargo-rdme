@@ -6,7 +6,7 @@ use termcolor::{ColorSpec, StandardStream};
 
 pub use termcolor::Color;
 
-fn is_stderr_terminal() -> bool {
+pub fn is_stderr_terminal() -> bool {
     std::io::stderr().is_terminal()
 }
 
