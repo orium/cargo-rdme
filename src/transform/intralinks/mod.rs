@@ -84,15 +84,21 @@ where
     type E = IntralinkError;
 
     fn transform(&self, doc: &Doc) -> Result<Doc, IntralinkError> {
-        let symbols: HashSet<ItemPath> = extract_markdown_intralink_symbols(doc);
+        let mut symbols: HashSet<ItemPath> = extract_markdown_intralink_symbols(doc);
 
-        // If there are no intralinks in the doc don't even bother doing anything else.
-        if symbols.is_empty() {
+        let strip_links = self.config.strip_links.unwrap_or(false);
+
+        // Also extract shorthand [`code`] patterns and add them as potential symbols.
+        let shorthand_symbols = extract_shorthand_symbols(doc);
+        symbols.extend(shorthand_symbols);
+
+        // If there are no links at all and we're not stripping, nothing to do.
+        if symbols.is_empty() && !strip_links {
             return Ok(doc.clone());
         }
 
         // We only load symbols type information when we need them.
-        let symbols_type = match self.config.strip_links.unwrap_or(false) {
+        let symbols_type = match strip_links {
             false => load_symbols_type(&self.entrypoint, &symbols, &self.emit_warning)?,
             true => HashMap::new(),
         };
@@ -100,8 +106,171 @@ where
         let doc =
             rewrite_links(doc, &symbols_type, &self.crate_name, &self.emit_warning, &self.config);
 
+        // Post-process the document to handle shorthand [`code`] patterns.
+        // This must handle standalone patterns but skip patterns that are already part of links.
+        let doc = post_process_shorthand_links(
+            &doc,
+            &symbols_type,
+            &self.crate_name,
+            &self.emit_warning,
+            &self.config,
+            strip_links,
+        );
+
         Ok(doc)
     }
+}
+
+/// Collect the inner code of every rustdoc reference *definition* of the form `` [`code`]: ... ``
+/// that appears at the start of a line.
+///
+/// Both the definition itself and any shortcut usages that resolve through it must be left
+/// untouched by the shorthand pass, otherwise we would corrupt reference links the user wrote on
+/// purpose (turning `` [`Foo`]: url `` into `` [`Foo`](url): url ``).
+fn shorthand_reference_definitions(text: &str) -> HashSet<&str> {
+    let mut defined = HashSet::new();
+
+    for line in text.lines() {
+        let Some(rest) = line.trim_start().strip_prefix("[`") else { continue };
+        let Some(end) = rest.find("`]") else { continue };
+
+        // It is a reference definition only if the closing `]` is immediately followed by `:`.
+        if rest[end + 2..].starts_with(':') {
+            defined.insert(&rest[..end]);
+        }
+    }
+
+    defined
+}
+
+/// Iterate over all `` [`code`] `` shorthand patterns in `text` that are genuine standalone
+/// shorthands, yielding `(start, end, code)` byte positions for each.
+///
+/// A `` [`code`] `` pattern is *not* a standalone shorthand (and is therefore skipped) when it is
+/// actually part of a markdown link or reference construct:
+///
+/// * `` [`code`](url) `` -- an inline link (`(` immediately follows the closing `]`).
+/// * `` [`code`][label] `` -- a full or collapsed reference link (`[` immediately follows).
+/// * `` [`code`] `` together with a `` [`code`]: ... `` definition -- a shortcut reference link.
+///
+/// Note that markdown requires the `(`/`[` to *immediately* follow the closing `]`; a space in
+/// between (e.g. `` [`f()`] (fast) ``) means it is not a link, so such patterns are still
+/// recognized as shorthands.
+fn shorthand_patterns(text: &str) -> impl Iterator<Item = (usize, usize, &str)> {
+    let defined = shorthand_reference_definitions(text);
+    let mut offset = 0;
+    let mut remaining = text;
+
+    std::iter::from_fn(move || {
+        while let Some(start_idx) = remaining.find("[`") {
+            let after_start = &remaining[start_idx + 2..];
+
+            let Some(end_idx) = after_start.find("`]") else {
+                // No closing `` `] ``: skip this `` [` `` and keep looking.
+                let consumed = start_idx + 2;
+                remaining = &remaining[consumed..];
+                offset += consumed;
+                continue;
+            };
+
+            let content = &after_start[..end_idx];
+            let after_pattern = &after_start[end_idx + 2..];
+            let start = offset + start_idx;
+            let end = start + 2 + end_idx + 2;
+
+            let consumed = start_idx + 2 + end_idx + 2;
+            remaining = &remaining[consumed..];
+            offset += consumed;
+
+            let is_link_or_reference = after_pattern.starts_with('(')
+                || after_pattern.starts_with('[')
+                || defined.contains(content);
+
+            if !content.is_empty() && !is_link_or_reference {
+                return Some((start, end, content));
+            }
+        }
+        None
+    })
+}
+
+/// Extract shorthand [`code`] patterns and return them as `ItemPaths`.
+fn extract_shorthand_symbols(doc: &Doc) -> HashSet<ItemPath> {
+    shorthand_patterns(doc.as_string())
+        .filter_map(|(_, _, inner)| {
+            // Remove trailing () if present for function names.
+            let clean_name = inner.trim_end_matches("()");
+            // Add as a crate-relative symbol.
+            ItemPath::from_string(&format!("crate::{clean_name}"))
+        })
+        .collect()
+}
+
+/// Post-process the entire document to handle shorthand [`code`] patterns.
+fn post_process_shorthand_links(
+    doc: &Doc,
+    symbols_type: &HashMap<ItemPath, SymbolType>,
+    crate_name: &str,
+    emit_warning: &impl Fn(&str),
+    config: &IntralinksConfig,
+    strip_links: bool,
+) -> Doc {
+    let doc_str = doc.as_string();
+
+    // Collect the standalone shorthand patterns together with their byte positions. Patterns that
+    // are part of a markdown link or reference construct are skipped (see `shorthand_patterns`).
+    let patterns: Vec<(usize, usize, &str)> = shorthand_patterns(doc_str).collect();
+
+    // Build the result string by processing each pattern using iterators.
+    let result = std::iter::once(0)
+        .chain(patterns.iter().map(|(_, end, _)| *end))
+        .zip(patterns.iter().map(|(start, _, _)| *start).chain(std::iter::once(doc_str.len())))
+        .zip(patterns.iter().map(Some).chain(std::iter::once(None)))
+        .map(|((last_end, start), pattern_opt)| {
+            let before_text = &doc_str[last_end..start];
+
+            match pattern_opt {
+                Some(&(pattern_start, pattern_end, inner)) => {
+                    let pattern_replacement = if strip_links {
+                        // When stripping, just output the code without brackets.
+                        format!("`{inner}`")
+                    } else {
+                        // Try to generate a docs.rs link.
+                        let clean_name = inner.trim_end_matches("()");
+                        let temp_link = Link::from(format!("crate::{clean_name}"));
+
+                        let markdown_link_action = markdown_link(
+                            &temp_link,
+                            symbols_type,
+                            crate_name,
+                            emit_warning,
+                            config,
+                        );
+
+                        match markdown_link_action {
+                            MarkdownLinkAction::Link(generated_link) => {
+                                // Successfully generated a docs.rs link.
+                                format!("[`{inner}`]({generated_link})")
+                            }
+                            MarkdownLinkAction::Strip => {
+                                // Unresolvable intralink, strip to just backticked code.
+                                format!("`{inner}`")
+                            }
+                            MarkdownLinkAction::Preserve => {
+                                // Not an intralink, keep the original.
+                                doc_str[pattern_start..pattern_end].to_string()
+                            }
+                        }
+                    };
+
+                    format!("{before_text}{pattern_replacement}")
+                }
+                None => before_text.to_string(),
+            }
+        })
+        .collect::<String>();
+
+    Doc::from_str(result)
 }
 
 fn rewrite_links(
