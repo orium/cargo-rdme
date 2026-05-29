@@ -163,11 +163,10 @@ impl ItemPath {
             rest = r;
         } else if s == "crate" {
             return Some(ItemPath::new(ItemPathAnchor::Crate));
-        } else if let Some(r) = s.strip_prefix("crate::") {
+        } else {
+            let r = s.strip_prefix("crate::")?;
             anchor = ItemPathAnchor::Crate;
             rest = r;
-        } else {
-            return None;
         }
 
         if rest.is_empty() {
