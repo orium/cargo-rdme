@@ -353,7 +353,9 @@ fn integration_test_transform_intralinks_ambiguous_module() {
     run_test("transform_intralinks_ambiguous_module");
 }
 
+/// TODO Re-enable this one <https://github.com/dtolnay/syn/issues/1972> is fixed.
 #[test]
+#[ignore = "crashed due to syn bug"]
 fn integration_test_transform_intralinks_stdlib_links() {
     run_test("transform_intralinks_stdlib_links");
 }
