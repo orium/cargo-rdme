@@ -5,7 +5,7 @@ version = "1.5.1-pre"
 authors = ["Diogo Sousa <diogogsousa@gmail.com>"]
 
 edition = "2024"
-rust-version = "1.86.0"
+rust-version = "1.87.0"
 
 homepage = "https://github.com/orium/cargo-rdme"
 repository = "https://github.com/orium/cargo-rdme"
@@ -32,17 +32,17 @@ codecov = { repository = "orium/cargo-rdme", branch = "main", service = "github"
 
 [dependencies]
 cargo_metadata = "0.23.1"
-clap = "4.5.54"
+clap = "4.6.1"
 clap-cargo = "0.18.3"
 # Disable ssh support in git2 to avoid depending on openssl (which fails to build if an unsupported version is found).
-git2 = { version = "0.20.3", default-features = false }
+git2 = { version = "0.21.0", default-features = false }
 indoc = "2.0.7"
 itertools = "0.14.0"
-pulldown-cmark = "0.13.0"
-syn = { version = "2.0.114", features = ["full", "extra-traits"] }
+pulldown-cmark = "0.13.4"
+syn = { version = "2.0.117", features = ["full", "extra-traits"] }
 termcolor = "1.4.1"
 thiserror = "2.0.18"
-toml = "0.9.8"
+toml = "1.1.2"
 unicase = "2.9.0"
 
 [dev-dependencies]
