@@ -1,5 +1,10 @@
 # Release notes
 
+## 1.5.1
+
+* Use `gix` instead of `git2` to avoid overwriting a modified `README.md`.
+* Update dependencies.
+
 ## 1.5.0
 
 * Added the `--manifest-path` command line option.
