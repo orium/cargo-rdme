@@ -34,8 +34,7 @@ codecov = { repository = "orium/cargo-rdme", branch = "main", service = "github"
 cargo_metadata = "0.23.1"
 clap = "4.6.1"
 clap-cargo = "0.18.3"
-# Disable ssh support in git2 to avoid depending on openssl (which fails to build if an unsupported version is found).
-git2 = { version = "0.21.0", default-features = false }
+gix = { version = "0.84.0", default-features = false, features = ["status", "dirwalk", "sha1"] }
 indoc = "2.0.7"
 itertools = "0.14.0"
 pulldown-cmark = "0.13.4"

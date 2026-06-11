@@ -409,16 +409,29 @@ fn transform_doc(
 ///
 /// This returns `None` if we were not able to determine that.
 fn git_is_current(path: impl AsRef<Path>) -> Option<bool> {
-    use git2::{Repository, Status};
+    use gix::bstr::BString;
 
-    let repository = Repository::discover(path.as_ref().parent()?).ok()?;
-    let repository_path = repository.path().parent()?;
+    let repo = gix::discover(path.as_ref().parent()?).ok()?;
+    let work_dir = repo.workdir()?;
+    let path_in_repo = path.as_ref().strip_prefix(work_dir).ok()?;
 
-    let path_repository_base = path.as_ref().strip_prefix(repository_path).ok()?;
+    // A file absent from the index is either untracked or gitignored. Either way, treat it as "not
+    // current", to avoid silently overwriting a file that git is not tracking.
+    let path_bstr = gix::bstr::BStr::new(path_in_repo.as_os_str().as_encoded_bytes());
+    let index = repo.index().ok()?;
+    if index.entry_by_path(path_bstr).is_none() {
+        return Some(false);
+    }
 
-    let status = repository.status_file(path_repository_base).ok()?;
+    // File is tracked. Check for staged or unstaged changes.
+    let cwd = std::env::current_dir().ok()?;
+    let path = path.as_ref().strip_prefix(&cwd).ok()?;
+    let pattern = BString::from(path.as_os_str().as_encoded_bytes());
 
-    Some(status == Status::CURRENT)
+    let items: Result<Vec<_>, _> =
+        repo.status(gix::progress::Discard).ok()?.into_iter([pattern]).ok()?.collect();
+
+    Some(items.ok()?.is_empty())
 }
 
 fn update_readme(
