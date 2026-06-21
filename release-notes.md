@@ -1,6 +1,6 @@
 # Release notes
 
-## 2.0.0-pre
+## 2.0.0
 
 1. Use rustdoc JSON for intralink resolution. This fixes a bunch of limitation we had with the previous `syn`-based
    engine:
