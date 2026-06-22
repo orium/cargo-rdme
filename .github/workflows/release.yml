@@ -20,9 +20,6 @@ jobs:
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
             zip: none
-          - target: x86_64-apple-darwin
-            os: macos-13
-            zip: all
           - target: aarch64-apple-darwin
             os: macos-14
             zip: all
@@ -31,7 +28,7 @@ jobs:
             zip: all
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: taiki-e/upload-rust-binary-action@v1
         with:

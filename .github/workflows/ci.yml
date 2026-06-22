@@ -47,7 +47,7 @@ jobs:
           cargo install taplo-cli
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check everything
         run: bash ./tools/check.sh basic doc_url_links unused_deps packaging fmt toml_fmt readme
@@ -70,7 +70,7 @@ jobs:
         run: cargo install cargo-msrv
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check the minimum supported rust version
         run: bash ./tools/check.sh msrv
@@ -85,7 +85,7 @@ jobs:
           components: clippy
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Run clippy
         run: bash ./tools/check.sh clippy
