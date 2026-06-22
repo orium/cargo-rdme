@@ -4,33 +4,42 @@ on:
   release:
     types: [created]
 
+permissions:
+  contents: write
+
 jobs:
   release:
     name: release ${{ matrix.target }}
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
 
     strategy:
       fail-fast: false
       matrix:
         include:
           - target: x86_64-unknown-linux-musl
-            archive: tar.zst tar.bz2
+            os: ubuntu-latest
+            zip: none
           - target: x86_64-apple-darwin
-            archive: tar.zst zip
+            os: macos-13
+            zip: all
+          - target: aarch64-apple-darwin
+            os: macos-14
+            zip: all
           - target: x86_64-pc-windows-gnu
-            archive: tar.zst zip
+            os: windows-latest
+            zip: all
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build release binary
-        uses: rust-build/rust-build.action@v1.4.4
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: taiki-e/upload-rust-binary-action@v1
         with:
-          TOOLCHAIN_VERSION: stable
-          RUSTTARGET: ${{ matrix.target }}
-          ARCHIVE_TYPES: ${{ matrix.archive }}
-          EXTRA_FILES: "README.md LICENSE.md"
-          PRE_BUILD: ".github/workflows/release_pre_build.sh"
+          bin: cargo-rdme
+          target: ${{ matrix.target }}
+          archive: $bin_$tag_$target
+          tar: all
+          zip: ${{ matrix.zip }}
+          include: README.md,LICENSE.md
+          checksum: sha256
+          locked: true
