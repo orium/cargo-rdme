@@ -1,5 +1,9 @@
 # Release notes
 
+## 2.0.1
+
+1. Migrate to `taiki-e/upload-rust-binary-action` for release binaries, fixing the macOS build.
+
 ## 2.0.0
 
 1. Use rustdoc JSON for intralink resolution. This fixes a bunch of limitation we had with the previous `syn`-based
