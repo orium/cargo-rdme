@@ -1,5 +1,11 @@
 # Release notes
 
+## 2.1.0
+
+1. Pin the rust toolchain nightly version used for intralink resolution. This ensures `cargo-rdme` doesn't break on
+   nightly updates.
+   1. Added subcommand to install the pinned nightly: `cargo rdme install-rust-toolchain-for-intralinks`.
+
 ## 2.0.1
 
 1. Migrate to `taiki-e/upload-rust-binary-action` for release binaries, fixing the macOS build.

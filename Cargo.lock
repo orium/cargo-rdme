@@ -136,7 +136,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-rdme"
-version = "2.0.2-pre"
+version = "2.1.0"
 dependencies = [
  "cargo_metadata",
  "clap",
