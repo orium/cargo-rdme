@@ -5,8 +5,9 @@
 //!
 //! You can install cargo rdme with cargo by running `cargo install cargo-rdme`.
 //!
-//! Cargo rdme uses rustdoc to resolve [intralinks](#intralinks), which requires a nightly rust
-//! toolchain. Install it with `rustup toolchain install nightly`.
+//! Cargo rdme uses rustdoc to resolve [intralinks](#intralinks), which requires a specific
+//! nightly rust toolchain (pinned by cargo rdme).
+//! Install it with `cargo rdme install-rust-toolchain-for-intralinks`.
 //!
 //! # Usage
 //!
@@ -136,9 +137,9 @@
 //! </table>
 //!
 //! To resolve intralinks, cargo rdme invokes `rustdoc` on your crate and consumes its JSON output.
-//! It requires a nightly toolchain, because rustdoc’s JSON output is unstable (see
-//! [rust-lang/rust#76578](https://github.com/rust-lang/rust/issues/76578)). Install it with
-//! `rustup toolchain install nightly`.
+//! It requires a specific nightly rust toolchain, because rustdoc’s JSON output is unstable (see
+//! [rust-lang/rust#76578](https://github.com/rust-lang/rust/issues/76578)) and can break between
+//! nightly updates. Install it with `cargo rdme install-rust-toolchain-for-intralinks`.
 //!
 //! ## Heading levels
 //!
@@ -210,6 +211,8 @@
 //! - name: Check if the README is up to date.
 //!   run: |
 //!     cargo install cargo-rdme
+//!     # If you use intralinks, install the specific nightly rust toolchain cargo-rdme requires:
+//!     cargo rdme install-rust-toolchain-for-intralinks
 //!     cargo rdme --check
 //! ```
 
@@ -532,35 +535,64 @@ fn run(options: options::Options) -> Result<(), RunError> {
     }
 }
 
+fn install_rust_toolchain_for_intralinks() -> Result<(), IntralinkError> {
+    use cargo_rdme::transform::{
+        EXPECTED_RUST_TOOLCHAIN, install_expected_rust_toolchain,
+        is_expected_rust_toolchain_installed,
+    };
+
+    if is_expected_rust_toolchain_installed()? {
+        print_info!("rust toolchain `{}` is already installed.", EXPECTED_RUST_TOOLCHAIN);
+        return Ok(());
+    }
+
+    print_info!("installing rust toolchain `{}`...", EXPECTED_RUST_TOOLCHAIN);
+    install_expected_rust_toolchain()?;
+    print_info!("rust toolchain `{}` installed.", EXPECTED_RUST_TOOLCHAIN);
+
+    Ok(())
+}
+
 fn main() {
-    let cmd_options = options::cmd_options();
-
-    let directory = cmd_options
-        .manifest_path()
-        .and_then(|path| path.parent())
-        .map_or_else(std::env::current_dir, |p| Ok(p.to_owned()));
-
-    let exit_code: ExitCode = match directory {
-        Ok(dir) => match options::config_file_options(dir) {
-            Ok(config_file_options) => {
-                let options = options::merge_options(cmd_options, config_file_options);
-
-                match run(options) {
-                    Ok(()) => ExitCode::Ok,
-                    Err(e) => {
-                        print_error!("{}", &e);
-                        e.into()
-                    }
+    let exit_code: ExitCode = match options::command() {
+        options::Command::InstallRustToolchainForIntralinks => {
+            match install_rust_toolchain_for_intralinks() {
+                Ok(()) => ExitCode::Ok,
+                Err(e) => {
+                    print_error!("failed to install rust toolchain: {}", e);
+                    ExitCode::Error
                 }
             }
-            Err(e) => {
-                print_error!("unable to read config file: {}", e);
-                ExitCode::Error
+        }
+        options::Command::Run(cmd_options) => {
+            let directory = cmd_options
+                .manifest_path()
+                .and_then(|path| path.parent())
+                .map_or_else(std::env::current_dir, |p| Ok(p.to_owned()));
+
+            match directory {
+                Ok(dir) => match options::config_file_options(dir) {
+                    Ok(config_file_options) => {
+                        let options = options::merge_options(cmd_options, config_file_options);
+
+                        match run(options) {
+                            Ok(()) => ExitCode::Ok,
+                            Err(e) => {
+                                print_error!("{}", &e);
+                                e.into()
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        print_error!("unable to read config file: {}", e);
+                        ExitCode::Error
+                    }
+                },
+                Err(e) => {
+                    print_error!("unable to get current directory: {}", e);
+                    ExitCode::Error
+                }
             }
-        },
-        Err(e) => {
-            print_error!("unable to get current directory: {}", e);
-            ExitCode::Error
         }
     };
 

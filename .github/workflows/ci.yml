@@ -9,9 +9,6 @@ on:
     - cron: '0 19 * * 3'
 
 env:
-  # Do not pin to a specific nightly, so that we know we need to update `cargo-rdme` when nightly bumps the rustdoc json
-  # version.
-  INTRALINKS_TOOLCHAIN: nightly
   CARGO_TERM_COLOR: always
 
 jobs:
@@ -28,15 +25,6 @@ jobs:
         with:
           components: rustfmt
 
-      # TODO Use stable when this stabilizes (https://github.com/rust-lang/rust/issues/76578).
-      # We need to install rust nightly to run the integration tests: nightly is needed to get the rustdoc information
-      # for intralinks. This will not be needed once that feature stabilizes
-      # (https://github.com/rust-lang/rust/issues/76578).
-      - name: Install rust (nightly)
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ env.INTRALINKS_TOOLCHAIN }}
-
       - name: Use stable rust for the build
         run: rustup default stable
 
@@ -48,6 +36,13 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v7
+
+      # TODO Use stable when this stabilizes (https://github.com/rust-lang/rust/issues/76578).
+      # We need to install rust nightly to run the integration tests: nightly is needed to get the rustdoc information
+      # for intralinks. This will not be needed once that feature stabilizes
+      # (https://github.com/rust-lang/rust/issues/76578).
+      - name: Install rust nightly for intralinks
+        run: cargo run install-rust-toolchain-for-intralinks
 
       - name: Check everything
         run: bash ./tools/check.sh basic doc_url_links unused_deps packaging fmt toml_fmt readme

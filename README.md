@@ -17,8 +17,9 @@ Cargo command to create your README from your crate’s documentation.
 
 You can install cargo rdme with cargo by running `cargo install cargo-rdme`.
 
-Cargo rdme uses rustdoc to resolve [intralinks](#intralinks), which requires a nightly rust
-toolchain. Install it with `rustup toolchain install nightly`.
+Cargo rdme uses rustdoc to resolve [intralinks](#intralinks), which requires a specific
+nightly rust toolchain (pinned by cargo rdme).
+Install it with `cargo rdme install-rust-toolchain-for-intralinks`.
 
 ## Usage
 
@@ -148,9 +149,9 @@ To check if a number is prime use
 </table>
 
 To resolve intralinks, cargo rdme invokes `rustdoc` on your crate and consumes its JSON output.
-It requires a nightly toolchain, because rustdoc’s JSON output is unstable (see
-[rust-lang/rust#76578](https://github.com/rust-lang/rust/issues/76578)). Install it with
-`rustup toolchain install nightly`.
+It requires a specific nightly rust toolchain, because rustdoc’s JSON output is unstable (see
+[rust-lang/rust#76578](https://github.com/rust-lang/rust/issues/76578)) and can break between
+nightly updates. Install it with `cargo rdme install-rust-toolchain-for-intralinks`.
 
 ### Heading levels
 
@@ -222,6 +223,8 @@ If you use GitHub Actions you can add this step to verify if the README is up to
 - name: Check if the README is up to date.
   run: |
     cargo install cargo-rdme
+    # If you use intralinks, install the specific nightly rust toolchain cargo-rdme requires:
+    cargo rdme install-rust-toolchain-for-intralinks
     cargo rdme --check
 ```
 

@@ -6,7 +6,8 @@ mod rust_remove_comments;
 mod utils;
 
 pub use intralinks::{
-    DocTransformIntralinks, IntralinkError, IntralinksConfig, IntralinksDocsRsConfig,
+    DocTransformIntralinks, EXPECTED_RUST_TOOLCHAIN, IntralinkError, IntralinksConfig,
+    IntralinksDocsRsConfig, install_expected_rust_toolchain, is_expected_rust_toolchain_installed,
 };
 pub use rust_markdown_tag::DocTransformRustMarkdownTag;
 pub use rust_remove_comments::DocTransformRustRemoveComments;

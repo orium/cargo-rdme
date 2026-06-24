@@ -114,14 +114,29 @@ fn get_cmd_args() -> Vec<OsString> {
     args
 }
 
-#[allow(clippy::too_many_lines)]
-pub fn cmd_options() -> CmdOptions {
-    use clap::{Arg, Command};
+#[derive(Debug)]
+pub enum Command {
+    Run(CmdOptions),
+    InstallRustToolchainForIntralinks,
+}
 
-    let cmd_opts = Command::new(PROJECT_NAME)
+#[allow(clippy::too_many_lines)]
+pub fn command() -> Command {
+    use clap::{Arg, Command as ClapCommand};
+
+    let cmd_opts = ClapCommand::new(PROJECT_NAME)
         .version(VERSION)
         .about("Create the README from your crate’s documentation.")
         .styles(clap_cargo::style::CLAP_STYLING)
+        .subcommand(
+            ClapCommand::new("install-rust-toolchain-for-intralinks")
+                .about(
+                    "Install the nightly rust toolchain needed for intralink resolution.\n\
+                     \n\
+                     If the toolchain is already installed this is command does nothing.",
+                )
+                .hide(true),
+        )
         .arg(
             Arg::new("entrypoint")
                 .long("entrypoint")
@@ -206,6 +221,10 @@ pub fn cmd_options() -> CmdOptions {
         )
         .get_matches_from(get_cmd_args());
 
+    if let Some(("install-rust-toolchain-for-intralinks", _)) = cmd_opts.subcommand() {
+        return Command::InstallRustToolchainForIntralinks;
+    }
+
     let workspace_project = cmd_opts.get_one::<String>("workspace-project").cloned();
 
     let line_terminator: Option<LineTerminatorOpt> =
@@ -221,7 +240,7 @@ pub fn cmd_options() -> CmdOptions {
 
     let heading_base_level = cmd_opts.get_one::<u8>("heading-base-level").copied();
 
-    CmdOptions {
+    Command::Run(CmdOptions {
         workspace_project,
         entrypoint,
         line_terminator,
@@ -235,7 +254,7 @@ pub fn cmd_options() -> CmdOptions {
         intralinks_features,
         intralinks_no_default_features: cmd_opts.get_flag("intralinks-no-default-features"),
         heading_base_level,
-    }
+    })
 }
 
 #[derive(Error, Debug)]
