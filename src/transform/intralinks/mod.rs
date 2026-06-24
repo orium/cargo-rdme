@@ -3,6 +3,9 @@ use crate::transform::intralinks::links::{
     Link, MarkdownInlineLink, MarkdownLink, MarkdownReferenceLink, markdown_link_iterator,
     markdown_reference_link_definition_iterator,
 };
+pub use crate::transform::intralinks::rustdoc::{
+    EXPECTED_RUST_TOOLCHAIN, install_expected_rust_toolchain, is_expected_rust_toolchain_installed,
+};
 use crate::transform::intralinks::rustdoc::{IntralinkResolver, create_intralink_resolver};
 use crate::{Doc, PackageTarget};
 use itertools::Itertools;
@@ -34,7 +37,12 @@ pub enum IntralinkError {
     ParseRustdocError { serde_error: serde_json::Error },
     #[error("unsupported rustdoc format version {version} (expected version {expected_version})")]
     UnsupportedRustdocFormatVersion { version: u32, expected_version: u32 },
-    #[error("rust toolchain not installed: {expected}")]
+    #[error(
+        "rust toolchain not installed: {expected}\n\n\
+         `cargo-rdme` needs {expected} to do intralink resolution. To install it run:\n\n    \
+         rustup toolchain install {expected}\n\n\
+         or, equivalently, run `cargo rdme install-rust-toolchain-for-intralinks`."
+    )]
     RustToolchainNotInstalled { expected: &'static str },
     #[error("failed to run rustup toolchain: {error}")]
     RustupToolchain { error: rustup_toolchain::Error },

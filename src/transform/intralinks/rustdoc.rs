@@ -13,8 +13,18 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 // TODO Remove this when rustdoc json stabilizes (https://github.com/rust-lang/rust/issues/76578).
-const EXPECTED_RUST_TOOLCHAIN: &str = "nightly";
+pub const EXPECTED_RUST_TOOLCHAIN: &str = "nightly-2026-06-22";
 const EXPECTED_RUSTDOC_FORMAT_VERSION: u32 = 57;
+
+pub fn is_expected_rust_toolchain_installed() -> Result<bool, IntralinkError> {
+    rustup_toolchain::is_installed(EXPECTED_RUST_TOOLCHAIN)
+        .map_err(|error| IntralinkError::RustupToolchain { error })
+}
+
+pub fn install_expected_rust_toolchain() -> Result<(), IntralinkError> {
+    rustup_toolchain::install(EXPECTED_RUST_TOOLCHAIN)
+        .map_err(|error| IntralinkError::RustupToolchain { error })
+}
 
 fn crate_from_file(path: &Path) -> Result<Crate, IntralinkError> {
     let json = std::fs::read_to_string(path)
@@ -472,13 +482,14 @@ fn run_rustdoc(
         };
         let mut stderr = Vec::new();
 
-        let toolchain = match rustup_toolchain::is_installed(EXPECTED_RUST_TOOLCHAIN) {
-            Ok(true) => Ok(EXPECTED_RUST_TOOLCHAIN),
-            Ok(false) => {
-                Err(IntralinkError::RustToolchainNotInstalled { expected: EXPECTED_RUST_TOOLCHAIN })
+        let toolchain = match is_expected_rust_toolchain_installed()? {
+            true => EXPECTED_RUST_TOOLCHAIN,
+            false => {
+                return Err(IntralinkError::RustToolchainNotInstalled {
+                    expected: EXPECTED_RUST_TOOLCHAIN,
+                });
             }
-            Err(error) => Err(IntralinkError::RustupToolchain { error }),
-        }?;
+        };
 
         let mut builder = rustdoc_json::Builder::default()
             .toolchain(toolchain)
