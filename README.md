@@ -1,10 +1,10 @@
-[![Build Status](https://github.com/orium/cargo-rdme/workflows/CI/badge.svg)](https://github.com/orium/cargo-rdme/actions?query=workflow%3ACI)
+[![Build Status](https://github.com/orium/cargo-rdme/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/orium/cargo-rdme/actions/workflows/ci.yml?query=branch%3Amain)
 [![Code Coverage](https://codecov.io/gh/orium/cargo-rdme/branch/main/graph/badge.svg)](https://codecov.io/gh/orium/cargo-rdme)
 [![Dependency status](https://deps.rs/repo/github/orium/cargo-rdme/status.svg)](https://deps.rs/repo/github/orium/cargo-rdme)
 [![crates.io](https://img.shields.io/crates/v/cargo-rdme.svg)](https://crates.io/crates/cargo-rdme)
 [![Downloads crates.io](https://img.shields.io/crates/d/cargo-rdme.svg?label=crates.io%20downloads)](https://crates.io/crates/cargo-rdme)
 [![Downloads github](https://img.shields.io/github/downloads/orium/cargo-rdme/total.svg?label=github%20downloads)](https://github.com/orium/cargo-rdme/releases)
-[![Github stars](https://img.shields.io/github/stars/orium/cargo-rdme.svg?logo=github)](https://github.com/orium/cargo-rdme/stargazers)
+[![Github stars](https://img.shields.io/github/stars/orium/cargo-rdme?style=flat&logo=github)](https://github.com/orium/cargo-rdme/stargazers)
 [![License](https://img.shields.io/crates/l/cargo-rdme.svg)](./LICENSE.md)
 
 # Cargo rdme
