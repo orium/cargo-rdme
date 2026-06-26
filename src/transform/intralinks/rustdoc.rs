@@ -13,8 +13,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 // TODO Remove this when rustdoc json stabilizes (https://github.com/rust-lang/rust/issues/76578).
-pub const EXPECTED_RUST_TOOLCHAIN: &str = "nightly-2026-06-22";
-const EXPECTED_RUSTDOC_FORMAT_VERSION: u32 = 57;
+pub const EXPECTED_RUST_TOOLCHAIN: &str = "nightly-2026-06-26";
+const EXPECTED_RUSTDOC_FORMAT_VERSION: u32 = 59;
 
 pub fn is_expected_rust_toolchain_installed() -> Result<bool, IntralinkError> {
     rustup_toolchain::is_installed(EXPECTED_RUST_TOOLCHAIN)
