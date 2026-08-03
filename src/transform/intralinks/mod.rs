@@ -61,6 +61,7 @@ pub struct IntralinksConfig {
     pub all_features: Option<bool>,
     pub features: Option<Vec<String>>,
     pub no_default_features: Option<bool>,
+    pub rustdoc_toolchain: Option<String>,
 }
 
 pub struct DocTransformIntralinks<F> {

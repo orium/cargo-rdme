@@ -152,6 +152,10 @@ To resolve intralinks, cargo rdme invokes `rustdoc` on your crate and consumes i
 It requires a specific nightly rust toolchain, because rustdoc’s JSON output is unstable (see
 [rust-lang/rust#76578](https://github.com/rust-lang/rust/issues/76578)) and can break between
 nightly updates. Install it with `cargo rdme install-rust-toolchain-for-intralinks`.
+Alternatively, if you are sure that another installed toolchain is compatible, you can either set
+`rustdoc-toolchain` in the `intralinks` section of the configuration file or the
+`CARGO_RDME_RUSTDOC_TOOLCHAIN` environment variable to a specific toolchain version, or to
+`"default"` in order to use the default toolchain.
 
 ### Heading levels
 

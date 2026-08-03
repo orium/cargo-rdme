@@ -140,6 +140,10 @@
 //! It requires a specific nightly rust toolchain, because rustdoc’s JSON output is unstable (see
 //! [rust-lang/rust#76578](https://github.com/rust-lang/rust/issues/76578)) and can break between
 //! nightly updates. Install it with `cargo rdme install-rust-toolchain-for-intralinks`.
+//! Alternatively, if you are sure that another installed toolchain is compatible, you can either set
+//! `rustdoc-toolchain` in the `intralinks` section of the configuration file or the
+//! `CARGO_RDME_RUSTDOC_TOOLCHAIN` environment variable to a specific toolchain version, or to
+//! `"default"` in order to use the default toolchain.
 //!
 //! ## Heading levels
 //!
@@ -573,7 +577,8 @@ fn main() {
             match directory {
                 Ok(dir) => match options::config_file_options(dir) {
                     Ok(config_file_options) => {
-                        let options = options::merge_options(cmd_options, config_file_options);
+                        let mut options = options::merge_options(cmd_options, config_file_options);
+                        options::apply_envvar_overrides(&mut options);
 
                         match run(options) {
                             Ok(()) => ExitCode::Ok,
