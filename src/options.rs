@@ -344,6 +344,8 @@ fn config_file_options_from_str(
         .map(|array| array.iter().filter_map(|v| v.as_str()).map(ToOwned::to_owned).collect());
     let intralinks_no_default_features =
         intralinks_table.and_then(|t| t.get("no-default-features")).and_then(toml::Value::as_bool);
+    let rustdoc_toolchain =
+        intralinks_table.and_then(|t| t.get("rustdoc-toolchain")).and_then(toml::Value::as_str);
 
     let intralinks = intralinks_table.map(|_| IntralinksConfig {
         docs_rs: IntralinksDocsRsConfig {
@@ -354,6 +356,7 @@ fn config_file_options_from_str(
         all_features: intralinks_all_features,
         features: intralinks_features,
         no_default_features: intralinks_no_default_features,
+        rustdoc_toolchain: rustdoc_toolchain.map(ToOwned::to_owned),
     });
 
     Ok(ConfigFileOptions {
@@ -458,10 +461,19 @@ pub fn merge_options(
                     .and_then(|c| c.intralinks.as_ref())
                     .and_then(|il| il.no_default_features),
             },
+            rustdoc_toolchain: config_file_options
+                .as_ref()
+                .and_then(|c| c.intralinks.as_ref().and_then(|il| il.rustdoc_toolchain.clone())),
         }),
         heading_base_level: cmd_options
             .heading_base_level
             .or_else(|| config_file_options.and_then(|c| c.heading_base_level)),
+    }
+}
+
+pub fn apply_envvar_overrides(options: &mut Options) {
+    if let Ok(override_value) = std::env::var("CARGO_RDME_RUSTDOC_TOOLCHAIN") {
+        options.intralinks.get_or_insert_default().rustdoc_toolchain = Some(override_value);
     }
 }
 
@@ -488,6 +500,7 @@ mod tests {
             docs-rs-base-url = "https://internaldocs.rs"
             docs-rs-version = "1.0.0"
             strip-links = true
+            rustdoc-toolchain = "nightly-2026-08-03"
 
             all-features = true
             features = ["foo", "bar"]
@@ -511,6 +524,7 @@ mod tests {
                 all_features: Some(true),
                 features: Some(vec!["foo".to_owned(), "bar".to_owned()]),
                 no_default_features: Some(true),
+                rustdoc_toolchain: Some("nightly-2026-08-03".to_owned()),
             }),
             heading_base_level: Some(3),
         };
@@ -549,6 +563,7 @@ mod tests {
                 all_features: Some(false),
                 features: Some(vec!["mumble".to_owned()]),
                 no_default_features: Some(false),
+                rustdoc_toolchain: Some("nightly-2026-08-03".to_owned()),
             }),
             heading_base_level: Some(3),
         };
@@ -573,6 +588,7 @@ mod tests {
                 all_features: Some(true),
                 features: Some(vec!["foo".to_owned(), "bar".to_owned()]),
                 no_default_features: Some(true),
+                rustdoc_toolchain: Some("nightly-2026-08-03".to_owned()),
             }),
             heading_base_level: Some(4),
         };

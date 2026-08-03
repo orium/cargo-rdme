@@ -482,17 +482,24 @@ fn run_rustdoc(
         };
         let mut stderr = Vec::new();
 
-        let toolchain = match is_expected_rust_toolchain_installed()? {
-            true => EXPECTED_RUST_TOOLCHAIN,
-            false => {
-                return Err(IntralinkError::RustToolchainNotInstalled {
-                    expected: EXPECTED_RUST_TOOLCHAIN,
-                });
+        let toolchain = if let Some(toolchain) = &config.rustdoc_toolchain {
+            if toolchain == "default" { None } else { Some(toolchain.as_str()) }
+        } else {
+            match is_expected_rust_toolchain_installed()? {
+                true => Some(EXPECTED_RUST_TOOLCHAIN),
+                false => {
+                    return Err(IntralinkError::RustToolchainNotInstalled {
+                        expected: EXPECTED_RUST_TOOLCHAIN,
+                    });
+                }
             }
         };
 
-        let mut builder = rustdoc_json::Builder::default()
-            .toolchain(toolchain)
+        let mut builder = rustdoc_json::Builder::default();
+        if let Some(toolchain) = toolchain {
+            builder = builder.toolchain(toolchain);
+        }
+        builder = builder
             .manifest_path(manifest_path)
             .document_private_items(true)
             .all_features(config.all_features.unwrap_or_default())
