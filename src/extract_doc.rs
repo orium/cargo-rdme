@@ -28,36 +28,34 @@ pub fn extract_doc_from_source_str(source: &str) -> Result<Option<Doc>, ExtractD
     let mut lines: Vec<String> = Vec::with_capacity(1024);
 
     for attr in &ast.attrs {
-        if Doc::is_toplevel_doc(attr) {
-            if let Meta::NameValue(MetaNameValue {
+        if Doc::is_toplevel_doc(attr)
+            && let Meta::NameValue(MetaNameValue {
                 value: Expr::Lit(ExprLit { lit: Lit::Str(lstr), .. }),
                 ..
             }) = &attr.meta
-            {
-                let string: String = lstr.value();
+        {
+            let string: String = lstr.value();
 
-                match string.lines().count() {
-                    0 => lines.push(String::new()),
-                    1 => {
-                        let line =
-                            string.strip_prefix(' ').map(ToOwned::to_owned).unwrap_or(string);
-                        lines.push(line);
+            match string.lines().count() {
+                0 => lines.push(String::new()),
+                1 => {
+                    let line = string.strip_prefix(' ').map(ToOwned::to_owned).unwrap_or(string);
+                    lines.push(line);
+                }
+
+                // Multiline comment.
+                _ => {
+                    fn empty_line(str: &str) -> bool {
+                        str.chars().all(char::is_whitespace)
                     }
 
-                    // Multiline comment.
-                    _ => {
-                        fn empty_line(str: &str) -> bool {
-                            str.chars().all(char::is_whitespace)
-                        }
+                    let comment_lines = string
+                        .lines()
+                        .enumerate()
+                        .filter(|(i, l)| !(*i == 0 && empty_line(l)))
+                        .map(|(_, l)| l.to_owned());
 
-                        let comment_lines = string
-                            .lines()
-                            .enumerate()
-                            .filter(|(i, l)| !(*i == 0 && empty_line(l)))
-                            .map(|(_, l)| l.to_owned());
-
-                        lines.extend(comment_lines);
-                    }
+                    lines.extend(comment_lines);
                 }
             }
         }
