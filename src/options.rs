@@ -542,6 +542,7 @@ mod tests {
     use cargo_rdme::transform::IntralinksDocsConfig;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
+    use std::assert_matches;
 
     fn parse(config_str: &str) -> Result<ConfigFileOptions, ConfigFileOptionsError> {
         config_file_options_from_str(config_str, |_| {})
@@ -673,7 +674,7 @@ mod tests {
         };
 
         let err = parse(str).unwrap_err();
-        assert!(matches!(err, ConfigFileOptionsError::ConflictingDocsOptions { .. }));
+        assert_matches!(err, ConfigFileOptionsError::ConflictingDocsOptions { .. });
     }
 
     #[test]
@@ -688,7 +689,7 @@ mod tests {
         };
 
         let err = parse(str).unwrap_err();
-        assert!(matches!(err, ConfigFileOptionsError::ConflictingDocsOptions { .. }));
+        assert_matches!(err, ConfigFileOptionsError::ConflictingDocsOptions { .. });
     }
 
     #[test]
@@ -700,7 +701,7 @@ mod tests {
         };
 
         let err = parse(str).unwrap_err();
-        assert!(matches!(err, ConfigFileOptionsError::FlatLayoutRequiresBaseUrl));
+        assert_matches!(err, ConfigFileOptionsError::FlatLayoutRequiresBaseUrl);
     }
 
     #[test]
@@ -714,7 +715,7 @@ mod tests {
         };
 
         let err = parse(str).unwrap_err();
-        assert!(matches!(err, ConfigFileOptionsError::FlatLayoutRejectsVersion));
+        assert_matches!(err, ConfigFileOptionsError::FlatLayoutRejectsVersion);
     }
 
     #[test]
@@ -730,7 +731,7 @@ mod tests {
         };
 
         let err = parse(str).unwrap_err();
-        assert!(matches!(err, ConfigFileOptionsError::FlatLayoutRejectsVersion));
+        assert_matches!(err, ConfigFileOptionsError::FlatLayoutRejectsVersion);
     }
 
     #[test]
@@ -742,7 +743,7 @@ mod tests {
         };
 
         let err = parse(str).unwrap_err();
-        assert!(matches!(err, ConfigFileOptionsError::InvalidField("intralinks.docs.layout")));
+        assert_matches!(err, ConfigFileOptionsError::InvalidField("intralinks.docs.layout"));
     }
 
     #[test]

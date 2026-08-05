@@ -191,6 +191,7 @@ mod tests {
     use super::*;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
+    use std::assert_matches;
 
     #[test]
     fn test_readme_line_iterator() {
@@ -213,17 +214,15 @@ mod tests {
         let readme = Readme::from_str(str);
         let mut iter = readme_line_iterator(&readme).items();
 
-        // TODO Replace by `assert_matches!()` once https://github.com/rust-lang/rust/issues/82775
-        // stabilizes.
-        assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeStart(_))));
-        assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeEnd(_))));
-        assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdme(_))));
-        assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeStart(_))));
-        assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeEnd(_))));
-        assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeStart(_))));
-        assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeEnd(_))));
-        assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeStart(_))));
-        assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeEnd(_))));
+        assert_matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeStart(_)));
+        assert_matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeEnd(_)));
+        assert_matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdme(_)));
+        assert_matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeStart(_)));
+        assert_matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeEnd(_)));
+        assert_matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeStart(_)));
+        assert_matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeEnd(_)));
+        assert_matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeStart(_)));
+        assert_matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeEnd(_)));
         assert_eq!(iter.next(), None);
     }
 
@@ -246,10 +245,8 @@ mod tests {
         let readme = Readme::from_str(str);
         let mut iter = readme_line_iterator(&readme).items();
 
-        // TODO Replace by `assert_matches!()` once https://github.com/rust-lang/rust/issues/82775
-        // stabilizes.
-        assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeStart(_))));
-        assert!(matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeEnd(_))));
+        assert_matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeStart(_)));
+        assert_matches!(iter.next(), Some(ReadmeLine::MarkerCargoRdmeEnd(_)));
         assert_eq!(iter.next(), None);
     }
 
