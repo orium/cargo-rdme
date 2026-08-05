@@ -1,5 +1,11 @@
 # Release notes
 
+## 2.2.0
+
+1. Allow the rustdoc toolchain to be overridden with an env var (#271).
+2. Intralinks can now generate URLs in both the docs-rs and flat formats (#272).
+3. Update dependencies, including the nightly toolchain used for intralink resolution.
+
 ## 2.1.0
 
 1. Pin the rust toolchain nightly version used for intralink resolution. This ensures `cargo-rdme` doesn't break on
