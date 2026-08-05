@@ -1,5 +1,5 @@
 use cargo_rdme::find_first_file_in_ancestors;
-use cargo_rdme::transform::{IntralinksConfig, IntralinksDocsRsConfig};
+use cargo_rdme::transform::{IntralinksConfig, IntralinksDocsConfig};
 use clap::{ArgAction, value_parser};
 use std::error::Error;
 use std::ffi::OsString;
@@ -267,6 +267,12 @@ pub enum ConfigFileOptionsError {
     InvalidField(&'static str),
     #[error("invalid entrypoint table")]
     InvalidEntrypointTable,
+    #[error("`{new}` and `{old}` cannot be set at the same time")]
+    ConflictingDocsOptions { new: &'static str, old: &'static str },
+    #[error("`intralinks.docs.base-url` is required when `intralinks.docs.layout = \"flat\"`")]
+    FlatLayoutRequiresBaseUrl,
+    #[error("`intralinks.docs.version` cannot be set when `intralinks.docs.layout = \"flat\"`")]
+    FlatLayoutRejectsVersion,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -279,8 +285,10 @@ pub struct ConfigFileOptions {
     heading_base_level: Option<u8>,
 }
 
+#[allow(clippy::too_many_lines)]
 fn config_file_options_from_str(
     config_str: &str,
+    mut emit_deprecation_warning: impl FnMut(&str),
 ) -> Result<ConfigFileOptions, ConfigFileOptionsError> {
     let config_toml: toml::Value =
         toml::from_str(config_str).map_err(ConfigFileOptionsError::ErrorParsingToml)?;
@@ -330,10 +338,68 @@ fn config_file_options_from_str(
 
     let intralinks_table = config_toml.get("intralinks").and_then(toml::Value::as_table);
 
-    let intralinks_docs_rs_base_url =
+    // TODO Remove `docs-rs-base-url` and `docs-rs-version` in 3.0.0. Superseded by the
+    //      `[intralinks.docs]` table (with `layout`, `base-url`, `version`).
+    let intralinks_docs_rs_base_url_deprecated =
         intralinks_table.and_then(|t| t.get("docs-rs-base-url")).and_then(toml::Value::as_str);
-    let intralinks_docs_rs_version =
+    let intralinks_docs_rs_version_deprecated =
         intralinks_table.and_then(|t| t.get("docs-rs-version")).and_then(toml::Value::as_str);
+
+    let intralinks_docs_table =
+        intralinks_table.and_then(|t| t.get("docs")).and_then(toml::Value::as_table);
+    let intralinks_docs_layout =
+        intralinks_docs_table.and_then(|t| t.get("layout")).and_then(toml::Value::as_str);
+    let intralinks_docs_base_url =
+        intralinks_docs_table.and_then(|t| t.get("base-url")).and_then(toml::Value::as_str);
+    let intralinks_docs_version =
+        intralinks_docs_table.and_then(|t| t.get("version")).and_then(toml::Value::as_str);
+
+    if intralinks_docs_base_url.is_some() && intralinks_docs_rs_base_url_deprecated.is_some() {
+        return Err(ConfigFileOptionsError::ConflictingDocsOptions {
+            new: "intralinks.docs.base-url",
+            old: "intralinks.docs-rs-base-url",
+        });
+    }
+
+    if intralinks_docs_version.is_some() && intralinks_docs_rs_version_deprecated.is_some() {
+        return Err(ConfigFileOptionsError::ConflictingDocsOptions {
+            new: "intralinks.docs.version",
+            old: "intralinks.docs-rs-version",
+        });
+    }
+
+    let base_url = intralinks_docs_base_url.or(intralinks_docs_rs_base_url_deprecated);
+    let version = intralinks_docs_version.or(intralinks_docs_rs_version_deprecated);
+
+    let docs = match intralinks_docs_layout {
+        Some("flat") => {
+            if version.is_some() {
+                return Err(ConfigFileOptionsError::FlatLayoutRejectsVersion);
+            }
+            let base_url =
+                base_url.ok_or(ConfigFileOptionsError::FlatLayoutRequiresBaseUrl)?.to_owned();
+
+            IntralinksDocsConfig::Flat { base_url }
+        }
+        Some("docs-rs") | None => IntralinksDocsConfig::DocsRs {
+            base_url: base_url.map(ToOwned::to_owned),
+            version: version.map(ToOwned::to_owned),
+        },
+        Some(_) => return Err(ConfigFileOptionsError::InvalidField("intralinks.docs.layout")),
+    };
+
+    if intralinks_docs_rs_base_url_deprecated.is_some() {
+        emit_deprecation_warning(
+            "`[intralinks].docs-rs-base-url` is deprecated: use `[intralinks.docs].base-url` instead.",
+        );
+    }
+
+    if intralinks_docs_rs_version_deprecated.is_some() {
+        emit_deprecation_warning(
+            "`[intralinks].docs-rs-version` is deprecated: use `[intralinks.docs].version` instead.",
+        );
+    }
+
     let intralinks_strip_links =
         intralinks_table.and_then(|t| t.get("strip-links")).and_then(toml::Value::as_bool);
     let intralinks_all_features =
@@ -348,10 +414,7 @@ fn config_file_options_from_str(
         intralinks_table.and_then(|t| t.get("rustdoc-toolchain")).and_then(toml::Value::as_str);
 
     let intralinks = intralinks_table.map(|_| IntralinksConfig {
-        docs_rs: IntralinksDocsRsConfig {
-            docs_rs_base_url: intralinks_docs_rs_base_url.map(ToOwned::to_owned),
-            docs_rs_version: intralinks_docs_rs_version.map(ToOwned::to_owned),
-        },
+        docs,
         strip_links: intralinks_strip_links,
         all_features: intralinks_all_features,
         features: intralinks_features,
@@ -371,13 +434,14 @@ fn config_file_options_from_str(
 
 pub fn config_file_options(
     current_dir: impl AsRef<Path>,
+    emit_deprecation_warning: impl FnMut(&str),
 ) -> Result<Option<ConfigFileOptions>, ConfigFileOptionsError> {
     find_first_file_in_ancestors(current_dir, ".cargo-rdme.toml")
         .map(|file_path| {
             let config_str = std::fs::read_to_string(&file_path)
                 .map_err(|_| ConfigFileOptionsError::ErrorReadingConfigFile(file_path))?;
 
-            config_file_options_from_str(&config_str)
+            config_file_options_from_str(&config_str, emit_deprecation_warning)
         })
         .transpose()
 }
@@ -423,16 +487,11 @@ pub fn merge_options(
             .or_else(|| config_file_options.as_mut().and_then(|c| c.readme_path.take())),
         manifest_path: cmd_options.manifest_path,
         intralinks: Some(IntralinksConfig {
-            docs_rs: IntralinksDocsRsConfig {
-                docs_rs_base_url: config_file_options
-                    .as_mut()
-                    .and_then(|c| c.intralinks.as_mut())
-                    .and_then(|il| il.docs_rs.docs_rs_base_url.take()),
-                docs_rs_version: config_file_options
-                    .as_mut()
-                    .and_then(|c| c.intralinks.as_mut())
-                    .and_then(|il| il.docs_rs.docs_rs_version.take()),
-            },
+            docs: config_file_options
+                .as_mut()
+                .and_then(|c| c.intralinks.as_mut())
+                .map(|il| std::mem::take(&mut il.docs))
+                .unwrap_or_default(),
             strip_links: match cmd_options.intralinks_strip_links {
                 true => Some(true),
                 false => config_file_options
@@ -480,9 +539,23 @@ pub fn apply_envvar_overrides(options: &mut Options) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cargo_rdme::transform::IntralinksDocsRsConfig;
+    use cargo_rdme::transform::IntralinksDocsConfig;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
+
+    fn parse(config_str: &str) -> Result<ConfigFileOptions, ConfigFileOptionsError> {
+        config_file_options_from_str(config_str, |_| {})
+    }
+
+    fn parse_collect_warnings(
+        config_str: &str,
+    ) -> Result<(ConfigFileOptions, Vec<String>), ConfigFileOptionsError> {
+        let mut warnings: Vec<String> = Vec::new();
+        let options =
+            config_file_options_from_str(config_str, |msg| warnings.push(msg.to_owned()))?;
+
+        Ok((options, warnings))
+    }
 
     #[test]
     fn test_config_file_options_from_str() {
@@ -497,18 +570,20 @@ mod tests {
             bin-name = "baz"
 
             [intralinks]
-            docs-rs-base-url = "https://internaldocs.rs"
-            docs-rs-version = "1.0.0"
             strip-links = true
             rustdoc-toolchain = "nightly-2026-08-03"
 
             all-features = true
             features = ["foo", "bar"]
             no-default-features = true
+
+            [intralinks.docs]
+            base-url = "https://internaldocs.rs"
+            version = "1.0.0"
             "#
         };
 
-        let config_file_opts = config_file_options_from_str(str).unwrap();
+        let config_file_opts = parse(str).unwrap();
 
         let expected = ConfigFileOptions {
             workspace_project: Some("myproj".to_owned()),
@@ -516,9 +591,9 @@ mod tests {
             line_terminator: Some(LineTerminatorOpt::CrLf),
             readme_path: Some(PathBuf::from("ReAdMe.md")),
             intralinks: Some(IntralinksConfig {
-                docs_rs: IntralinksDocsRsConfig {
-                    docs_rs_base_url: Some("https://internaldocs.rs".to_owned()),
-                    docs_rs_version: Some("1.0.0".to_owned()),
+                docs: IntralinksDocsConfig::DocsRs {
+                    base_url: Some("https://internaldocs.rs".to_owned()),
+                    version: Some("1.0.0".to_owned()),
                 },
                 strip_links: Some(true),
                 all_features: Some(true),
@@ -530,6 +605,144 @@ mod tests {
         };
 
         assert_eq!(config_file_opts, expected);
+    }
+
+    #[test]
+    fn test_config_file_options_from_str_flat_layout() {
+        let str = indoc! { r#"
+            [intralinks.docs]
+            layout = "flat"
+            base-url = "https://rust.docs.kernel.org/next"
+            "#
+        };
+
+        let config_file_opts = parse(str).unwrap();
+
+        let expected_intralinks = IntralinksConfig {
+            docs: IntralinksDocsConfig::Flat {
+                base_url: "https://rust.docs.kernel.org/next".to_owned(),
+            },
+            strip_links: None,
+            all_features: None,
+            features: None,
+            no_default_features: None,
+            rustdoc_toolchain: None,
+        };
+
+        assert_eq!(config_file_opts.intralinks, Some(expected_intralinks));
+    }
+
+    #[test]
+    fn test_config_file_options_from_str_deprecated_keys_emit_warnings() {
+        let str = indoc! { r#"
+            [intralinks]
+            docs-rs-base-url = "https://internaldocs.rs"
+            docs-rs-version = "1.0.0"
+            "#
+        };
+
+        let (config_file_opts, warnings) = parse_collect_warnings(str).unwrap();
+
+        let expected_intralinks = IntralinksConfig {
+            docs: IntralinksDocsConfig::DocsRs {
+                base_url: Some("https://internaldocs.rs".to_owned()),
+                version: Some("1.0.0".to_owned()),
+            },
+            strip_links: None,
+            all_features: None,
+            features: None,
+            no_default_features: None,
+            rustdoc_toolchain: None,
+        };
+
+        assert_eq!(config_file_opts.intralinks, Some(expected_intralinks));
+        assert_eq!(warnings.len(), 2);
+        assert!(warnings[0].contains("docs-rs-base-url"));
+        assert!(warnings[1].contains("docs-rs-version"));
+    }
+
+    #[test]
+    fn test_config_file_options_from_str_conflicting_base_url() {
+        let str = indoc! { r#"
+            [intralinks]
+            docs-rs-base-url = "https://internaldocs.rs"
+
+            [intralinks.docs]
+            base-url = "https://other.docs"
+            "#
+        };
+
+        let err = parse(str).unwrap_err();
+        assert!(matches!(err, ConfigFileOptionsError::ConflictingDocsOptions { .. }));
+    }
+
+    #[test]
+    fn test_config_file_options_from_str_conflicting_version() {
+        let str = indoc! { r#"
+            [intralinks]
+            docs-rs-version = "1.0.0"
+
+            [intralinks.docs]
+            version = "2.0.0"
+            "#
+        };
+
+        let err = parse(str).unwrap_err();
+        assert!(matches!(err, ConfigFileOptionsError::ConflictingDocsOptions { .. }));
+    }
+
+    #[test]
+    fn test_config_file_options_from_str_flat_requires_base_url() {
+        let str = indoc! { r#"
+            [intralinks.docs]
+            layout = "flat"
+            "#
+        };
+
+        let err = parse(str).unwrap_err();
+        assert!(matches!(err, ConfigFileOptionsError::FlatLayoutRequiresBaseUrl));
+    }
+
+    #[test]
+    fn test_config_file_options_from_str_flat_rejects_version() {
+        let str = indoc! { r#"
+            [intralinks.docs]
+            layout = "flat"
+            base-url = "https://mydocs.example"
+            version = "1.0.0"
+            "#
+        };
+
+        let err = parse(str).unwrap_err();
+        assert!(matches!(err, ConfigFileOptionsError::FlatLayoutRejectsVersion));
+    }
+
+    #[test]
+    fn test_config_file_options_from_str_flat_rejects_deprecated_version() {
+        let str = indoc! { r#"
+            [intralinks]
+            docs-rs-version = "1.0.0"
+
+            [intralinks.docs]
+            layout = "flat"
+            base-url = "https://mydocs.example"
+            "#
+        };
+
+        let err = parse(str).unwrap_err();
+        assert!(matches!(err, ConfigFileOptionsError::FlatLayoutRejectsVersion));
+    }
+
+    #[test]
+    fn test_config_file_options_from_str_invalid_layout() {
+        let str = indoc! { r#"
+            [intralinks.docs]
+            layout = "bogus"
+            "#
+        };
+
+        let err = parse(str).unwrap_err();
+        assert!(matches!(err, ConfigFileOptionsError::InvalidField("intralinks.docs.layout")));
     }
 
     #[test]
@@ -555,9 +768,9 @@ mod tests {
             line_terminator: Some(LineTerminatorOpt::Lf),
             readme_path: Some(PathBuf::from("ReAdMe.md")),
             intralinks: Some(IntralinksConfig {
-                docs_rs: IntralinksDocsRsConfig {
-                    docs_rs_base_url: Some("https://internaldocs.rs".to_owned()),
-                    docs_rs_version: Some("1.0.0".to_owned()),
+                docs: IntralinksDocsConfig::DocsRs {
+                    base_url: Some("https://internaldocs.rs".to_owned()),
+                    version: Some("1.0.0".to_owned()),
                 },
                 strip_links: Some(false),
                 all_features: Some(false),
@@ -580,9 +793,9 @@ mod tests {
             readme_path: Some(PathBuf::from("rEaDmE.md")),
             manifest_path: Some(PathBuf::from("foo/Cargo.toml")),
             intralinks: Some(IntralinksConfig {
-                docs_rs: IntralinksDocsRsConfig {
-                    docs_rs_base_url: Some("https://internaldocs.rs".to_owned()),
-                    docs_rs_version: Some("1.0.0".to_owned()),
+                docs: IntralinksDocsConfig::DocsRs {
+                    base_url: Some("https://internaldocs.rs".to_owned()),
+                    version: Some("1.0.0".to_owned()),
                 },
                 strip_links: Some(true),
                 all_features: Some(true),

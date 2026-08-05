@@ -197,10 +197,6 @@ type = "bin"
 bin-name = "my-bin-name"
 
 [intralinks]
-# Defines the base url to use in intralinks urls. The default value is `https://docs.rs`.
-docs-rs-base-url = "https://mydocs.rs"
-# Defines the version to use in intralinks urls. The default value is `latest`.
-docs-rs-version = "1.0.0"
 # If this is set the intralinks will be stripping in the README file.
 strip-links = false
 
@@ -210,6 +206,18 @@ strip-links = false
 features = ["foo", "bar"]
 # Disable default features when calling rustdoc to resolve intralinks.
 no-default-features = false
+
+[intralinks.docs]
+# Layout of the documentation URLs. Either `docs-rs` (default), which produces URLs like
+# `{base-url}/{crate}/{version}/{path}`, or `flat`, which produces URLs like
+# `{base-url}/{path}` (the same layout as `cargo doc` output).
+layout = "docs-rs"
+# Base URL for documentation links. Defaults to `https://docs.rs` when `layout = "docs-rs"`.
+# Required when `layout = "flat"`.
+base-url = "https://mydocs.rs"
+# Version segment used in documentation URLs. Defaults to `latest`. Must not be set when
+# `layout = "flat"`.
+version = "1.0.0"
 ```
 
 These setting can be overridden with command line flags. Run `cargo rdme --help` for more

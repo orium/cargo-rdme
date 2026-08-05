@@ -1,0 +1,3 @@
+[intralinks.docs]
+layout = "flat"
+base-url = "https://rust.docs.kernel.org/next"

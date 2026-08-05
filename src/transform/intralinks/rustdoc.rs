@@ -1,7 +1,7 @@
 use crate::PackageTarget;
 use crate::transform::intralinks::ItemPath;
 use crate::transform::intralinks::links::Link;
-use crate::transform::{IntralinkError, IntralinksConfig, IntralinksDocsRsConfig};
+use crate::transform::{IntralinkError, IntralinksConfig, IntralinksDocsConfig};
 use itertools::Itertools;
 use rustdoc_json::BuildError;
 use rustdoc_types::{
@@ -331,12 +331,12 @@ fn transitive_items<'a>(
 
 pub struct IntralinkResolver<'a> {
     link_url: HashMap<Link, String>,
-    config: &'a IntralinksDocsRsConfig,
+    config: &'a IntralinksDocsConfig,
     package_name: &'a str,
 }
 
 impl<'a> IntralinkResolver<'a> {
-    pub fn new(package_name: &'a str, config: &'a IntralinksDocsRsConfig) -> IntralinkResolver<'a> {
+    pub fn new(package_name: &'a str, config: &'a IntralinksDocsConfig) -> IntralinkResolver<'a> {
         IntralinkResolver { link_url: HashMap::new(), package_name, config }
     }
 
@@ -383,8 +383,17 @@ impl<'a> IntralinkResolver<'a> {
             .is_some_and(|base_url| base_url.starts_with("https://doc.rust-lang.org/"))
     }
 
-    fn make_url(base_url: &str, package_name: &str, version: &str, url_path: &str) -> String {
+    fn make_docs_rs_url(
+        base_url: &str,
+        package_name: &str,
+        version: &str,
+        url_path: &str,
+    ) -> String {
         format!("{base_url}/{package_name}/{version}/{url_path}")
+    }
+
+    fn make_flat_url(base_url: &str, url_path: &str) -> String {
+        format!("{base_url}/{url_path}")
     }
 
     fn add(
@@ -393,8 +402,6 @@ impl<'a> IntralinkResolver<'a> {
         item_info: &ItemInfo,
         external_crates: &HashMap<u32, ExternalCrate>,
     ) {
-        let docs_rs_base_url = self.config.docs_rs_base_url.as_deref().unwrap_or("https://docs.rs");
-
         let path_segment_kind = |i: usize| match item_info.path.len() - i {
             1 => item_info.kind,
             2 => item_info.parent_kind.unwrap_or(ItemKind::Module),
@@ -410,12 +417,16 @@ impl<'a> IntralinkResolver<'a> {
 
         let url = match item_info.crate_id {
             // Local crate has id 0.
-            0 => {
-                let version = self.config.docs_rs_version.as_deref().unwrap_or("latest");
-                let package_name = &self.package_name;
+            0 => match self.config {
+                IntralinksDocsConfig::DocsRs { base_url, version } => {
+                    let base_url = base_url.as_deref().unwrap_or("https://docs.rs");
+                    let version = version.as_deref().unwrap_or("latest");
+                    let package_name = &self.package_name;
 
-                Self::make_url(docs_rs_base_url, package_name, version, &url_path)
-            }
+                    Self::make_docs_rs_url(base_url, package_name, version, &url_path)
+                }
+                IntralinksDocsConfig::Flat { base_url } => Self::make_flat_url(base_url, &url_path),
+            },
             // External crate
             _ => {
                 let Some(external_crate) = external_crates.get(&item_info.crate_id) else {
@@ -437,19 +448,25 @@ impl<'a> IntralinkResolver<'a> {
 
                         format!("{base_url}{url_path}")
                     }
-                    None => {
-                        let crate_name = &external_crate.name;
+                    None => match self.config {
+                        IntralinksDocsConfig::DocsRs { base_url, .. } => {
+                            let base_url = base_url.as_deref().unwrap_or("https://docs.rs");
+                            let crate_name = &external_crate.name;
 
-                        // TODO We are using the crate name instead of the package name: that means that
-                        //      we might generate a wrong url. In most cases the crate name matches the
-                        //      package name. When it doesn't it is often because underscores in the
-                        //      crate name becomes dashes in the package name. Fortunately `docs.rs`
-                        //      will redirect in that case (e.g. https://docs.rs/tower_service/ will
-                        //      redirect to https://docs.rs/tower-service/latest/tower_service/).
-                        // TODO We shouldn't hardcode "latest" here: we should get that information from
-                        //      the version rustdoc determined the crate was using.
-                        Self::make_url(docs_rs_base_url, crate_name, "latest", &url_path)
-                    }
+                            // TODO We are using the crate name instead of the package name: that means that
+                            //      we might generate a wrong url. In most cases the crate name matches the
+                            //      package name. When it doesn't it is often because underscores in the
+                            //      crate name becomes dashes in the package name. Fortunately `docs.rs`
+                            //      will redirect in that case (e.g. https://docs.rs/tower_service/ will
+                            //      redirect to https://docs.rs/tower-service/latest/tower_service/).
+                            // TODO We shouldn't hardcode "latest" here: we should get that information from
+                            //      the version rustdoc determined the crate was using.
+                            Self::make_docs_rs_url(base_url, crate_name, "latest", &url_path)
+                        }
+                        IntralinksDocsConfig::Flat { base_url } => {
+                            Self::make_flat_url(base_url, &url_path)
+                        }
+                    },
                 }
             }
         };
@@ -592,7 +609,7 @@ pub fn create_intralink_resolver<'a>(
 
     let items_info: HashMap<ItemId, ItemInfo<'_>> = items_info(&rustdoc_crate);
     let links_items_id = crate_rustdoc_intralinks(&rustdoc_crate);
-    let mut intralink_resolver = IntralinkResolver::new(package_name, &config.docs_rs);
+    let mut intralink_resolver = IntralinkResolver::new(package_name, &config.docs);
 
     for (link, item_id) in links_items_id {
         let link = Link::new(link.clone());

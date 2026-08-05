@@ -48,15 +48,35 @@ pub enum IntralinkError {
     RustupToolchain { error: rustup_toolchain::Error },
 }
 
-#[derive(Default, Debug, PartialEq, Eq, Clone)]
-pub struct IntralinksDocsRsConfig {
-    pub docs_rs_base_url: Option<String>,
-    pub docs_rs_version: Option<String>,
+/// Layout of the documentation URLs produced for intralinks.
+///
+/// [`IntralinksDocsConfig::DocsRs`] follows the `docs.rs` scheme, inserting a `{crate}/{version}`
+/// segment between the base URL and the item path. [`IntralinksDocsConfig::Flat`] omits those
+/// segments, appending the item path directly to the base URL: this matches the layout produced
+/// by a local `cargo doc` build and hosting setups that mirror it.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum IntralinksDocsConfig {
+    DocsRs {
+        /// When `None`, defaults to `https://docs.rs`.
+        base_url: Option<String>,
+        /// When `None`, defaults to `latest`.
+        version: Option<String>,
+    },
+    Flat {
+        /// Base URL to prepend to the item path.
+        base_url: String,
+    },
+}
+
+impl Default for IntralinksDocsConfig {
+    fn default() -> IntralinksDocsConfig {
+        IntralinksDocsConfig::DocsRs { base_url: None, version: None }
+    }
 }
 
 #[derive(Default, Debug, PartialEq, Eq, Clone)]
 pub struct IntralinksConfig {
-    pub docs_rs: IntralinksDocsRsConfig,
+    pub docs: IntralinksDocsConfig,
     pub strip_links: Option<bool>,
     pub all_features: Option<bool>,
     pub features: Option<Vec<String>>,
@@ -180,7 +200,7 @@ where
         let intralink_resolver: IntralinkResolver<'_> = match strip_links {
             true => {
                 // Create an empty resolver, since we are going to strip all intralinks.
-                IntralinkResolver::new(self.package_name.as_str(), &self.config.docs_rs)
+                IntralinkResolver::new(self.package_name.as_str(), &self.config.docs)
             }
             false => create_intralink_resolver(
                 self.package_name.as_str(),

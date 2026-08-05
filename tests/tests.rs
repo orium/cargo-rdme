@@ -403,6 +403,11 @@ fn integration_test_option_conf_file_intralinks_docs_rs_base_url() {
 }
 
 #[test]
+fn integration_test_option_conf_file_intralinks_docs_flat_layout() {
+    run_test("option_conf_file_intralinks_docs_flat_layout");
+}
+
+#[test]
 fn integration_test_option_conf_file_intralinks_docs_rs_version() {
     run_test("option_conf_file_intralinks_docs_rs_version");
 }
