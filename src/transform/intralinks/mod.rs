@@ -116,6 +116,13 @@ impl<'a> ItemPath<'a> {
         ItemPath { segments: Cow::Owned(segments) }
     }
 
+    fn parent(&self) -> Option<ItemPath<'_>> {
+        match self.segments.len() {
+            0 | 1 => None,
+            len => Some(ItemPath { segments: Cow::Borrowed(&self.segments[..len - 1]) }),
+        }
+    }
+
     fn segments(&self) -> impl Iterator<Item = &str> {
         self.segments.iter().map(String::as_str)
     }

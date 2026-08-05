@@ -13,8 +13,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 // TODO Remove this when rustdoc json stabilizes (https://github.com/rust-lang/rust/issues/76578).
-pub const EXPECTED_RUST_TOOLCHAIN: &str = "nightly-2026-07-18";
-const EXPECTED_RUSTDOC_FORMAT_VERSION: u32 = 60;
+pub const EXPECTED_RUST_TOOLCHAIN: &str = "nightly-2026-08-05";
+const EXPECTED_RUSTDOC_FORMAT_VERSION: u32 = 61;
 
 pub fn is_expected_rust_toolchain_installed() -> Result<bool, IntralinkError> {
     rustup_toolchain::is_installed(EXPECTED_RUST_TOOLCHAIN)
@@ -283,8 +283,9 @@ fn transitive_items<'a>(
         items_info
             .entry(item_id)
             .and_modify(|existing_item_info| {
-                *existing_item_info =
-                    existing_item_info.merge(item_info).expect("unmergeable item info");
+                *existing_item_info = existing_item_info.merge(item_info).unwrap_or_else(|| {
+                    panic!("unmergeable item info: {item_info:?} and {existing_item_info:?}")
+                });
             })
             .or_insert_with(|| item_info.clone());
     }
@@ -539,14 +540,42 @@ fn run_rustdoc(
     }
 }
 
+/// Rustdoc's `paths` map classifies inherent and trait methods as `Function`, and it doesn't
+/// carry parent information. We recover both by looking at the parent path segment: if the
+/// parent is a type-like item, the entry is an associated item under an impl (or trait) block.
+fn infer_context_from_path(
+    path: &ItemPath<'_>,
+    path_to_kind: &HashMap<ItemPath<'_>, rustdoc_types::ItemKind>,
+) -> (ItemContext, Option<ItemKind>) {
+    let Some(parent_path) = path.parent() else {
+        return (ItemContext::Normal, None);
+    };
+
+    match path_to_kind.get(&parent_path) {
+        Some(rustdoc_types::ItemKind::Struct) => (ItemContext::Impl, Some(ItemKind::Struct)),
+        Some(rustdoc_types::ItemKind::Enum) => (ItemContext::Impl, Some(ItemKind::Enum)),
+        Some(rustdoc_types::ItemKind::Union) => (ItemContext::Impl, Some(ItemKind::Union)),
+        Some(rustdoc_types::ItemKind::Primitive) => (ItemContext::Impl, Some(ItemKind::Primitive)),
+        Some(rustdoc_types::ItemKind::TypeAlias) => (ItemContext::Impl, Some(ItemKind::TypeAlias)),
+        Some(rustdoc_types::ItemKind::Trait) => (ItemContext::Trait, Some(ItemKind::Trait)),
+        Some(rustdoc_types::ItemKind::Module) => (ItemContext::Normal, Some(ItemKind::Module)),
+        _ => (ItemContext::Normal, None),
+    }
+}
+
 fn items_info(rustdoc_crate: &Crate) -> HashMap<ItemId, ItemInfo<'_>> {
     let mut items_info: HashMap<ItemId, ItemInfo<'_>> =
         HashMap::with_capacity(rustdoc_crate.index.len());
 
-    for (&item_id, item_summary) in &rustdoc_crate.paths {
-        let item_info = ItemInfo::from(item_summary, None, ItemContext::Normal);
+    let path_to_kind: HashMap<ItemPath<'_>, rustdoc_types::ItemKind> =
+        rustdoc_crate.paths.values().map(|s| (ItemPath::new(&s.path), s.kind)).collect();
 
-        transitive_items(item_id, &item_info, ItemContext::Normal, rustdoc_crate, &mut items_info);
+    for (&item_id, item_summary) in &rustdoc_crate.paths {
+        let item_path = ItemPath::new(&item_summary.path);
+        let (item_context, parent_kind) = infer_context_from_path(&item_path, &path_to_kind);
+        let item_info = ItemInfo::from(item_summary, parent_kind, item_context);
+
+        transitive_items(item_id, &item_info, item_context, rustdoc_crate, &mut items_info);
     }
 
     items_info
