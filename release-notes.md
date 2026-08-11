@@ -1,5 +1,9 @@
 # Release notes
 
+## 2.2.1
+
+1. Fix detection of uncommitted changed with workspace projects pointing at the root's `Cargo.toml` (#285).
+
 ## 2.2.0
 
 1. Allow the rustdoc toolchain to be overridden with an env var (#271).
