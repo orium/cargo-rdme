@@ -449,23 +449,46 @@ fn transform_doc(
 /// This returns `None` if we were not able to determine that.
 fn git_is_current(path: impl AsRef<Path>) -> Option<bool> {
     use gix::bstr::BString;
+    use gix::config::AsBStr;
 
-    let repo = gix::discover(path.as_ref().parent()?).ok()?;
-    let work_dir = repo.workdir()?;
-    let path_in_repo = path.as_ref().strip_prefix(work_dir).ok()?;
+    /// Convert `path` to bytes using `/` as the separator, as git expects regardless of the OS.
+    fn path_to_git_bytes(path: &Path) -> Vec<u8> {
+        // TODO Use the stdlib intersperse one it is stabilized (https://github.com/rust-lang/rust/issues/79524).
+        itertools::Itertools::intersperse(
+            path.components().map(|c| c.as_os_str().as_encoded_bytes()),
+            b"/".as_slice(),
+        )
+        .flatten()
+        .copied()
+        .collect()
+    }
+
+    // Resolve `..`, otherwise we would not find the `path` on the git index.
+    // We use `dunce::canonicalize` to avoid Windows verbatim paths (`\\?\...`), which would not
+    // match the prefixes returned by `gix::discover` or `std::env::current_dir`.
+    let path = dunce::canonicalize(path).ok()?;
+
+    let repo = gix::discover(path.parent()?).ok()?;
+    let index = repo.index().ok()?;
+
+    let path_in_repo = {
+        let work_dir = repo.workdir()?;
+        let path_bytes = path_to_git_bytes(path.strip_prefix(work_dir).ok()?);
+        gix::bstr::BStr::new(&path_bytes).to_owned()
+    };
 
     // A file absent from the index is either untracked or gitignored. Either way, treat it as "not
     // current", to avoid silently overwriting a file that git is not tracking.
-    let path_bstr = gix::bstr::BStr::new(path_in_repo.as_os_str().as_encoded_bytes());
-    let index = repo.index().ok()?;
-    if index.entry_by_path(path_bstr).is_none() {
+    if index.entry_by_path(path_in_repo.as_bstr()).is_none() {
         return Some(false);
     }
 
     // File is tracked. Check for staged or unstaged changes.
-    let cwd = std::env::current_dir().ok()?;
-    let path = path.as_ref().strip_prefix(&cwd).ok()?;
-    let pattern = BString::from(path.as_os_str().as_encoded_bytes());
+    let path = {
+        let cwd = std::env::current_dir().ok()?;
+        path.strip_prefix(&cwd).ok()?
+    };
+    let pattern = BString::from(path_to_git_bytes(path));
 
     let items: Result<Vec<_>, _> =
         repo.status(gix::progress::Discard).ok()?.into_iter([pattern]).ok()?.collect();
