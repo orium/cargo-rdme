@@ -162,6 +162,7 @@ dependencies = [
  "cargo_metadata",
  "clap",
  "clap-cargo",
+ "dunce",
  "gix",
  "indoc",
  "itertools",

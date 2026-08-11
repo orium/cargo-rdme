@@ -450,21 +450,27 @@ fn transform_doc(
 fn git_is_current(path: impl AsRef<Path>) -> Option<bool> {
     use gix::bstr::BString;
 
-    let repo = gix::discover(path.as_ref().parent()?).ok()?;
+    // Resolve `..`, otherwise we would not find the `path` on the git index.
+    // We use `dunce::canonicalize` to avoid Windows verbatim paths (`\\?\...`), which would not
+    // match the prefixes returned by `gix::discover` or `std::env::current_dir`.
+    let path = dunce::canonicalize(path).ok()?;
+
+    let repo = gix::discover(path.parent()?).ok()?;
     let work_dir = repo.workdir()?;
-    let path_in_repo = path.as_ref().strip_prefix(work_dir).ok()?;
+    let path_in_repo = path.strip_prefix(work_dir).ok()?;
 
     // A file absent from the index is either untracked or gitignored. Either way, treat it as "not
     // current", to avoid silently overwriting a file that git is not tracking.
     let path_bstr = gix::bstr::BStr::new(path_in_repo.as_os_str().as_encoded_bytes());
     let index = repo.index().ok()?;
+
     if index.entry_by_path(path_bstr).is_none() {
         return Some(false);
     }
 
     // File is tracked. Check for staged or unstaged changes.
     let cwd = std::env::current_dir().ok()?;
-    let path = path.as_ref().strip_prefix(&cwd).ok()?;
+    let path = path.strip_prefix(&cwd).ok()?;
     let pattern = BString::from(path.as_os_str().as_encoded_bytes());
 
     let items: Result<Vec<_>, _> =

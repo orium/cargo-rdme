@@ -398,6 +398,20 @@ fn integration_test_option_cmd_workspace_dependency_collision() {
 }
 
 #[test]
+fn integration_test_option_cmd_workspace_with_project_inheriting_root_readme() {
+    let test_name = "option_cmd_workspace_with_project_inheriting_root_readme";
+
+    let options = TestOptions {
+        args: &["--workspace-project", "myproj"],
+        force: false,
+        check_readme_expected: false,
+        ..TestOptions::default()
+    };
+
+    run_test_with_options(test_name, &options);
+}
+
+#[test]
 fn integration_test_option_conf_file_intralinks_docs_rs_base_url() {
     run_test("option_conf_file_intralinks_docs_rs_base_url");
 }

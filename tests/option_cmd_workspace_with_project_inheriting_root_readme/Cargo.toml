@@ -1,0 +1,5 @@
+[workspace]
+members = ["myproj"]
+
+[workspace.package]
+readme = "README.md"
