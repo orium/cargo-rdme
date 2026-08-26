@@ -35,7 +35,7 @@ cargo_metadata = "0.23.1"
 clap = "4.6.5"
 clap-cargo = "0.18.3"
 dunce = "1.0.5"
-gix = { version = "0.86.0", default-features = false, features = ["status", "dirwalk", "sha1"] }
+gix = { version = "0.87.0", default-features = false, features = ["status", "dirwalk", "sha1"] }
 indoc = "2.0.7"
 itertools = "0.15.0"
 pulldown-cmark = "0.13.4"
