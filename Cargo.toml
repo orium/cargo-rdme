@@ -32,10 +32,10 @@ codecov = { repository = "orium/cargo-rdme", branch = "main", service = "github"
 
 [dependencies]
 cargo_metadata = "0.23.1"
-clap = "4.6.5"
-clap-cargo = "0.18.3"
+clap = "4.6.6"
+clap-cargo = "0.19.0"
 dunce = "1.0.5"
-gix = { version = "0.86.0", default-features = false, features = ["status", "dirwalk", "sha1"] }
+gix = { version = "0.87.1", default-features = false, features = ["status", "dirwalk", "sha1"] }
 indoc = "2.0.7"
 itertools = "0.15.0"
 pulldown-cmark = "0.13.4"
@@ -43,9 +43,9 @@ rustdoc-json = "0.9.10"
 rustdoc-types = "0.61.0"
 rustup-toolchain = "0.1.10"
 serde_json = "1.0.151"
-syn = { version = "3.0.0", features = ["full", "extra-traits"] }
+syn = { version = "3.0.4", features = ["full", "extra-traits"] }
 termcolor = "1.4.1"
-thiserror = "2.0.19"
+thiserror = "2.0.20"
 toml = "1.1.4"
 unicase = "2.9.0"
 
