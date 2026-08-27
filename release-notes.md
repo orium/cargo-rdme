@@ -1,5 +1,9 @@
 # Release notes
 
+## 2.2.2
+
+1. Update dependencies. Fix build issue due to GitoxideLabs/gitoxide#2939.
+
 ## 2.2.1
 
 1. Fix detection of uncommitted changed with workspace projects pointing at the root's `Cargo.toml` (#285).
