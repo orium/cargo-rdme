@@ -251,6 +251,13 @@ enum ItemContext {
     Trait,
 }
 
+/// Computes the information of an item inside `parent_path`.
+///
+/// We build the path from the parent item instead of using the one in rustdoc's `paths` because
+/// `paths` can record an inner item under a type alias of the item that owns it: given
+/// `enum Foo { Bar }` and `type Baz = Foo`, rustdoc gives the variant the path `Baz::Bar`, even
+/// when `Baz` is private ([#295](https://github.com/orium/cargo-rdme/issues/295)). The item that
+/// owns the inner item is the one that tells us where the inner item is documented.
 fn get_item_info<'a>(
     item_id: ItemId,
     parent_path: &ItemPath<'a>,
@@ -258,38 +265,37 @@ fn get_item_info<'a>(
     item_context: ItemContext,
     rustdoc_crate: &'a Crate,
 ) -> Option<ItemInfo<'a>> {
-    match rustdoc_crate.paths.get(&item_id) {
-        Some(item_summary) => Some(ItemInfo::from(item_summary, parent_kind, item_context)),
-        None => rustdoc_crate.index.get(&item_id).map(|item| {
+    match rustdoc_crate.index.get(&item_id) {
+        Some(item) => {
             let path = match item.name.as_ref() {
                 None => parent_path.clone(),
                 Some(name) => parent_path.add(name.clone()),
             };
             let item_kind = ItemKind::of_item(item, item_context);
 
-            ItemInfo::new(item.crate_id, path, item_kind, parent_kind)
-        }),
+            Some(ItemInfo::new(item.crate_id, path, item_kind, parent_kind))
+        }
+        // Items that are not in the index, such as the items of external crates, are only
+        // described by rustdoc's `paths`.
+        None => rustdoc_crate
+            .paths
+            .get(&item_id)
+            .map(|item_summary| ItemInfo::from(item_summary, parent_kind, item_context)),
     }
 }
 
-fn transitive_items<'a>(
+/// Adds to `items_info` the information of all the items inside `item_id`, recursively.
+///
+/// The information we compute here takes precedence over the one that came from rustdoc's `paths`,
+/// since walking the index tells us which item actually owns each inner item (see
+/// [`get_item_info()`]).
+fn inner_items_info<'a>(
     item_id: ItemId,
     item_info: &ItemInfo<'a>,
     item_context: ItemContext,
     rustdoc_crate: &'a Crate,
     items_info: &mut HashMap<ItemId, ItemInfo<'a>>,
 ) {
-    if item_info.kind != ItemKind::Impl {
-        items_info
-            .entry(item_id)
-            .and_modify(|existing_item_info| {
-                *existing_item_info = existing_item_info.merge(item_info).unwrap_or_else(|| {
-                    panic!("unmergeable item info: {item_info:?} and {existing_item_info:?}")
-                });
-            })
-            .or_insert_with(|| item_info.clone());
-    }
-
     let Some(item) = rustdoc_crate.index.get(&item_id) else {
         // This item is not in the index for some reason...
         return;
@@ -318,7 +324,16 @@ fn transitive_items<'a>(
         );
 
         if let Some(inner_item_info) = inner_item_info {
-            transitive_items(
+            if inner_item_info.kind != ItemKind::Impl {
+                let merged_item_info = items_info
+                    .get(&inner_item_id)
+                    .and_then(|existing_item_info| existing_item_info.merge(&inner_item_info))
+                    .unwrap_or_else(|| inner_item_info.clone());
+
+                items_info.insert(inner_item_id, merged_item_info);
+            }
+
+            inner_items_info(
                 inner_item_id,
                 &inner_item_info,
                 inner_item_context,
@@ -587,12 +602,29 @@ fn items_info(rustdoc_crate: &Crate) -> HashMap<ItemId, ItemInfo<'_>> {
     let path_to_kind: HashMap<ItemPath<'_>, rustdoc_types::ItemKind> =
         rustdoc_crate.paths.values().map(|s| (ItemPath::new(&s.path), s.kind)).collect();
 
-    for (&item_id, item_summary) in &rustdoc_crate.paths {
-        let item_path = ItemPath::new(&item_summary.path);
-        let (item_context, parent_kind) = infer_context_from_path(&item_path, &path_to_kind);
-        let item_info = ItemInfo::from(item_summary, parent_kind, item_context);
+    let paths_items_info: Vec<(ItemId, ItemInfo<'_>, ItemContext)> = rustdoc_crate
+        .paths
+        .iter()
+        .map(|(&item_id, item_summary)| {
+            let item_path = ItemPath::new(&item_summary.path);
+            let (item_context, parent_kind) = infer_context_from_path(&item_path, &path_to_kind);
 
-        transitive_items(item_id, &item_info, item_context, rustdoc_crate, &mut items_info);
+            (item_id, ItemInfo::from(item_summary, parent_kind, item_context), item_context)
+        })
+        .collect();
+
+    // rustdoc's `paths` is all we have for the items that are not in the index, such as the items
+    // of external crates.
+    for (item_id, item_info, _) in &paths_items_info {
+        if item_info.kind != ItemKind::Impl {
+            items_info.insert(*item_id, item_info.clone());
+        }
+    }
+
+    // Walking the index gives us better information for the items that are inside another item,
+    // so it overrides what we got from `paths` (see `get_item_info()`).
+    for (item_id, item_info, item_context) in &paths_items_info {
+        inner_items_info(*item_id, item_info, *item_context, rustdoc_crate, &mut items_info);
     }
 
     items_info

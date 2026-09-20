@@ -542,6 +542,11 @@ fn integration_test_transform_intralinks_reexported_module() {
 }
 
 #[test]
+fn integration_test_transform_intralinks_type_alias() {
+    run_test("transform_intralinks_type_alias");
+}
+
+#[test]
 fn integration_test_transform_intralinks_workspace_dep() {
     let test_name = "transform_intralinks_workspace_dep";
 
