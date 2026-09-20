@@ -1,5 +1,10 @@
 # Release notes
 
+## 2.2.3
+
+1. Fix intralink resolution when an item is reachable through a type alias (#295).
+2. Update dependencies.
+
 ## 2.2.2
 
 1. Update dependencies. Fix build issue due to GitoxideLabs/gitoxide#2939.
