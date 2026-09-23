@@ -25,6 +25,14 @@ pub fn extract_doc_from_source_file(
     extract_doc_from_source_str(&source, base_dir)
 }
 
+fn is_include_str_path(path: &syn::Path) -> bool {
+    match path.segments.iter().collect::<Vec<_>>().as_slice() {
+        [seg] => seg.ident == "include_str",
+        [prefix, seg] => prefix.ident == "std" && seg.ident == "include_str",
+        _ => false,
+    }
+}
+
 pub fn extract_doc_from_source_str(
     source: &str,
     base_dir: impl AsRef<Path>,
@@ -72,7 +80,7 @@ pub fn extract_doc_from_source_str(
                     }
                 }
             }
-            Expr::Macro(ExprMacro { mac, .. }) if mac.path.is_ident("include_str") => {
+            Expr::Macro(ExprMacro { mac, .. }) if is_include_str_path(&mac.path) => {
                 let lstr: syn::LitStr =
                     mac.parse_body().map_err(ExtractDocError::ErrorParsingSourceFile)?;
                 let path = base_dir.join(lstr.value());
@@ -217,6 +225,19 @@ mod tests {
         let lines: Vec<&str> = doc.lines().collect();
 
         assert_eq!(lines, vec!["# Included", "", "Hello from the included file."]);
+    }
+
+    #[test]
+    fn test_doc_from_source_str_std_include_str() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("included.md"), "included contents").unwrap();
+
+        let str = r#"#![doc = std::include_str!("included.md")]"#;
+
+        let doc = extract_doc_from_source_str(str, dir.path()).unwrap().unwrap();
+        let lines: Vec<&str> = doc.lines().collect();
+
+        assert_eq!(lines, vec!["included contents"]);
     }
 
     #[test]
