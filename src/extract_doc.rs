@@ -10,54 +10,78 @@ pub enum ExtractDocError {
     ErrorReadingSourceFile(PathBuf),
     #[error("cannot parse source file: {0}")]
     ErrorParsingSourceFile(syn::Error),
+    #[error("cannot open included file \"{0}\"")]
+    ErrorReadingIncludedFile(PathBuf),
 }
 
 pub fn extract_doc_from_source_file(
     file_path: impl AsRef<Path>,
 ) -> Result<Option<Doc>, ExtractDocError> {
-    let source: String = std::fs::read_to_string(file_path.as_ref())
-        .map_err(|_| ExtractDocError::ErrorReadingSourceFile(file_path.as_ref().to_path_buf()))?;
+    let file_path = file_path.as_ref();
+    let source: String = std::fs::read_to_string(file_path)
+        .map_err(|_| ExtractDocError::ErrorReadingSourceFile(file_path.to_path_buf()))?;
+    let base_dir = file_path.parent().unwrap_or_else(|| Path::new(""));
 
-    extract_doc_from_source_str(&source)
+    extract_doc_from_source_str(&source, base_dir)
 }
 
-pub fn extract_doc_from_source_str(source: &str) -> Result<Option<Doc>, ExtractDocError> {
-    use syn::{ExprLit, Lit, Meta, MetaNameValue, parse_str};
+pub fn extract_doc_from_source_str(
+    source: &str,
+    base_dir: impl AsRef<Path>,
+) -> Result<Option<Doc>, ExtractDocError> {
+    use syn::{ExprLit, ExprMacro, Lit, Meta, MetaNameValue, parse_str};
 
+    let base_dir = base_dir.as_ref();
     let ast: syn::File = parse_str(source).map_err(ExtractDocError::ErrorParsingSourceFile)?;
     let mut lines: Vec<String> = Vec::with_capacity(1024);
 
     for attr in &ast.attrs {
-        if Doc::is_toplevel_doc(attr)
-            && let Meta::NameValue(MetaNameValue {
-                value: Expr::Lit(ExprLit { lit: Lit::Str(lstr), .. }),
-                ..
-            }) = &attr.meta
-        {
-            let string: String = lstr.value();
+        if !Doc::is_toplevel_doc(attr) {
+            continue;
+        }
 
-            match string.lines().count() {
-                0 => lines.push(String::new()),
-                1 => {
-                    let line = string.strip_prefix(' ').map(ToOwned::to_owned).unwrap_or(string);
-                    lines.push(line);
-                }
+        let Meta::NameValue(MetaNameValue { value, .. }) = &attr.meta else {
+            continue;
+        };
 
-                // Multiline comment.
-                _ => {
-                    fn empty_line(str: &str) -> bool {
-                        str.chars().all(char::is_whitespace)
+        match value {
+            Expr::Lit(ExprLit { lit: Lit::Str(lstr), .. }) => {
+                let string: String = lstr.value();
+
+                match string.lines().count() {
+                    0 => lines.push(String::new()),
+                    1 => {
+                        let line =
+                            string.strip_prefix(' ').map(ToOwned::to_owned).unwrap_or(string);
+                        lines.push(line);
                     }
 
-                    let comment_lines = string
-                        .lines()
-                        .enumerate()
-                        .filter(|(i, l)| !(*i == 0 && empty_line(l)))
-                        .map(|(_, l)| l.to_owned());
+                    // Multiline comment.
+                    _ => {
+                        fn empty_line(str: &str) -> bool {
+                            str.chars().all(char::is_whitespace)
+                        }
 
-                    lines.extend(comment_lines);
+                        let comment_lines = string
+                            .lines()
+                            .enumerate()
+                            .filter(|(i, l)| !(*i == 0 && empty_line(l)))
+                            .map(|(_, l)| l.to_owned());
+
+                        lines.extend(comment_lines);
+                    }
                 }
             }
+            Expr::Macro(ExprMacro { mac, .. }) if mac.path.is_ident("include_str") => {
+                let lstr: syn::LitStr =
+                    mac.parse_body().map_err(ExtractDocError::ErrorParsingSourceFile)?;
+                let path = base_dir.join(lstr.value());
+                let content = std::fs::read_to_string(&path)
+                    .map_err(|_| ExtractDocError::ErrorReadingIncludedFile(path))?;
+
+                lines.extend(content.lines().map(ToOwned::to_owned));
+            }
+            _ => {}
         }
     }
 
@@ -82,7 +106,7 @@ mod tests {
             "#
         };
 
-        assert!(extract_doc_from_source_str(str).unwrap().is_none());
+        assert!(extract_doc_from_source_str(str, Path::new("")).unwrap().is_none());
     }
 
     #[test]
@@ -101,7 +125,7 @@ mod tests {
             "#
         };
 
-        let doc = extract_doc_from_source_str(str).unwrap().unwrap();
+        let doc = extract_doc_from_source_str(str, Path::new("")).unwrap().unwrap();
         let lines: Vec<&str> = doc.lines().collect();
 
         let expected = vec![
@@ -132,7 +156,7 @@ mod tests {
             "#
         };
 
-        let doc = extract_doc_from_source_str(str).unwrap().unwrap();
+        let doc = extract_doc_from_source_str(str, Path::new("")).unwrap().unwrap();
         let lines: Vec<&str> = doc.lines().collect();
 
         let expected = vec![
@@ -160,7 +184,7 @@ mod tests {
             "#
         };
 
-        let doc = extract_doc_from_source_str(str).unwrap().unwrap();
+        let doc = extract_doc_from_source_str(str, Path::new("")).unwrap().unwrap();
         let lines: Vec<&str> = doc.lines().collect();
 
         let expected = vec![
@@ -171,5 +195,108 @@ mod tests {
         ];
 
         assert_eq!(lines, expected);
+    }
+
+    #[test]
+    fn test_doc_from_source_str_include_str() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("included.md"),
+            "# Included\n\nHello from the included file.\n",
+        )
+        .unwrap();
+
+        let str = indoc! { r#"
+            #![doc = include_str!("included.md")]
+
+            struct Nothing {}
+            "#
+        };
+
+        let doc = extract_doc_from_source_str(str, dir.path()).unwrap().unwrap();
+        let lines: Vec<&str> = doc.lines().collect();
+
+        assert_eq!(lines, vec!["# Included", "", "Hello from the included file."]);
+    }
+
+    #[test]
+    fn test_doc_from_source_str_include_str_relative_to_base_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("docs")).unwrap();
+        std::fs::write(dir.path().join("docs/intro.md"), "intro contents").unwrap();
+
+        let str = r#"#![doc = include_str!("docs/intro.md")]"#;
+
+        let doc = extract_doc_from_source_str(str, dir.path()).unwrap().unwrap();
+        let lines: Vec<&str> = doc.lines().collect();
+
+        assert_eq!(lines, vec!["intro contents"]);
+    }
+
+    #[test]
+    fn test_doc_from_source_str_include_str_interleaved() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("mid.md"), "included line 1\nincluded line 2").unwrap();
+
+        let str = indoc! { r#"
+            //! Before the include.
+            #![doc = include_str!("mid.md")]
+            //! After the include.
+
+            struct Nothing {}
+            "#
+        };
+
+        let doc = extract_doc_from_source_str(str, dir.path()).unwrap().unwrap();
+        let lines: Vec<&str> = doc.lines().collect();
+
+        let expected = vec![
+            "Before the include.", //
+            "included line 1",     //
+            "included line 2",     //
+            "After the include.",  //
+        ];
+
+        assert_eq!(lines, expected);
+    }
+
+    #[test]
+    fn test_doc_from_source_str_include_str_verbatim() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("verbatim.md"), " leading space kept\n\ttab kept").unwrap();
+
+        let str = r#"#![doc = include_str!("verbatim.md")]"#;
+
+        let doc = extract_doc_from_source_str(str, dir.path()).unwrap().unwrap();
+        let lines: Vec<&str> = doc.lines().collect();
+
+        assert_eq!(lines, vec![" leading space kept", "\ttab kept"]);
+    }
+
+    #[test]
+    fn test_doc_from_source_str_include_str_missing_file() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let str = r#"#![doc = include_str!("does_not_exist.md")]"#;
+
+        let err = extract_doc_from_source_str(str, dir.path()).unwrap_err();
+
+        assert!(matches!(err, ExtractDocError::ErrorReadingIncludedFile(_)));
+    }
+
+    #[test]
+    fn test_doc_from_source_str_non_include_str_macro_skipped() {
+        let str = indoc! { r#"
+            //! Real doc line.
+            #![doc = concat!("a", "b")]
+
+            struct Nothing {}
+            "#
+        };
+
+        let doc = extract_doc_from_source_str(str, Path::new("")).unwrap().unwrap();
+        let lines: Vec<&str> = doc.lines().collect();
+
+        assert_eq!(lines, vec!["Real doc line."]);
     }
 }

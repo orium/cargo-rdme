@@ -145,6 +145,13 @@
 //! `CARGO_RDME_RUSTDOC_TOOLCHAIN` environment variable to a specific toolchain version, or to
 //! `"default"` in order to use the default toolchain.
 //!
+//! ## Macro support
+//!
+//! A macro can be used in a module doc such as `#![doc = include_str!("path/to/file.txt")]`. Cargo doc
+//! will expand those macros to produce your documentation. Cargo rdme supports the following macros:
+//!
+//! - [include_str!](https://doc.rust-lang.org/std/macro.include_str.html)
+//!
 //! ## Heading levels
 //!
 //! The heading levels in the crate’s documentation will, by default, be nested under the level

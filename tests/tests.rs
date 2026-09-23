@@ -50,6 +50,11 @@ fn integration_test_multiline_doc() {
 }
 
 #[test]
+fn integration_test_include_str_doc() {
+    run_test("include_str_doc");
+}
+
+#[test]
 fn integration_test_option_cmd_override_readme_path() {
     let test_name = "option_cmd_override_readme_path";
 
