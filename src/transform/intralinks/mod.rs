@@ -6,7 +6,9 @@ use crate::transform::intralinks::links::{
 pub use crate::transform::intralinks::rustdoc::{
     EXPECTED_RUST_TOOLCHAIN, install_expected_rust_toolchain, is_expected_rust_toolchain_installed,
 };
-use crate::transform::intralinks::rustdoc::{IntralinkResolver, create_intralink_resolver};
+use crate::transform::intralinks::rustdoc::{
+    IntralinkResolver, run_rustdoc, create_intralink_resolver,
+};
 use crate::{Doc, PackageTarget};
 use itertools::Itertools;
 use std::borrow::Cow;
@@ -202,13 +204,20 @@ where
                 // Create an empty resolver, since we are going to strip all intralinks.
                 IntralinkResolver::new(self.package_name.as_str(), &self.config.docs)
             }
-            false => create_intralink_resolver(
-                self.package_name.as_str(),
-                &self.package_target,
-                self.workspace_package.as_deref(),
-                &self.manifest_path,
-                &self.config,
-            )?,
+            false => {
+                let rustdoc_crate = run_rustdoc(
+                    &self.package_target,
+                    self.workspace_package.as_deref(),
+                    &self.manifest_path,
+                    &self.config,
+                )?;
+
+                create_intralink_resolver(
+                    &rustdoc_crate,
+                    self.package_name.as_str(),
+                    &self.config.docs,
+                )
+            }
         };
 
         let doc = rewrite_links(doc, &intralink_resolver, &self.emit_warning, &self.config);

@@ -500,7 +500,7 @@ impl<'a> IntralinkResolver<'a> {
     }
 }
 
-fn run_rustdoc(
+pub fn run_rustdoc(
     package_target: &PackageTarget,
     workspace_package: Option<&str>,
     manifest_path: &PathBuf,
@@ -631,17 +631,13 @@ fn items_info(rustdoc_crate: &Crate) -> HashMap<ItemId, ItemInfo<'_>> {
 }
 
 pub fn create_intralink_resolver<'a>(
+    rustdoc_crate: &Crate,
     package_name: &'a str,
-    package_target: &PackageTarget,
-    workspace_package: Option<&str>,
-    manifest_path: &PathBuf,
-    config: &'a IntralinksConfig,
-) -> Result<IntralinkResolver<'a>, IntralinkError> {
-    let rustdoc_crate = run_rustdoc(package_target, workspace_package, manifest_path, config)?;
-
-    let items_info: HashMap<ItemId, ItemInfo<'_>> = items_info(&rustdoc_crate);
-    let links_items_id = crate_rustdoc_intralinks(&rustdoc_crate);
-    let mut intralink_resolver = IntralinkResolver::new(package_name, &config.docs);
+    docs_config: &'a IntralinksDocsConfig,
+) -> IntralinkResolver<'a> {
+    let items_info: HashMap<ItemId, ItemInfo<'_>> = items_info(rustdoc_crate);
+    let links_items_id = crate_rustdoc_intralinks(rustdoc_crate);
+    let mut intralink_resolver = IntralinkResolver::new(package_name, docs_config);
 
     for (link, item_id) in links_items_id {
         let link = Link::new(link.clone());
@@ -653,7 +649,7 @@ pub fn create_intralink_resolver<'a>(
         intralink_resolver.add(link, item_info, &rustdoc_crate.external_crates);
     }
 
-    Ok(intralink_resolver)
+    intralink_resolver
 }
 
 #[cfg(test)]
