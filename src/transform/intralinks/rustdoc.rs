@@ -1,5 +1,5 @@
-use crate::PackageTarget;
 use crate::transform::intralinks::ItemPath;
+use crate::{Doc, PackageTarget};
 use crate::transform::intralinks::links::Link;
 use crate::transform::{IntralinkError, IntralinksConfig, IntralinksDocsConfig};
 use itertools::Itertools;
@@ -529,6 +529,18 @@ impl RustdocCrate {
     ) -> IntralinkResolver<'a> {
         create_intralink_resolver(&self.inner, package_name, docs_config)
     }
+
+    /// Returns `None` when the crate has no crate-level documentation.
+    #[must_use]
+    pub fn crate_level_doc(&self) -> Option<Doc> {
+        let root = self.inner.index.get(&self.inner.root)?;
+
+        crate_doc_from_rustdoc(root.docs.as_deref())
+    }
+}
+
+fn crate_doc_from_rustdoc(docs: Option<&str>) -> Option<Doc> {
+    docs.map(Doc::from_str)
 }
 
 fn run_rustdoc(
@@ -691,6 +703,19 @@ mod tests {
     #[test]
     fn test_rustdoc_format_supported_version() {
         assert_eq!(rustdoc_types::FORMAT_VERSION, EXPECTED_RUSTDOC_FORMAT_VERSION);
+    }
+
+    #[test]
+    fn test_crate_doc_from_rustdoc_none() {
+        assert!(crate_doc_from_rustdoc(None).is_none());
+    }
+
+    #[test]
+    fn test_crate_doc_from_rustdoc_multiline() {
+        let doc = crate_doc_from_rustdoc(Some("first line\n\nthird line")).unwrap();
+        let lines: Vec<&str> = doc.lines().collect();
+
+        assert_eq!(lines, vec!["first line", "", "third line"]);
     }
 
     fn make_item_info(
