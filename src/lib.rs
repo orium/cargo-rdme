@@ -10,7 +10,7 @@ mod markdown;
 pub mod transform;
 pub mod utils;
 
-pub use extract_doc::{ExtractDocError, extract_doc_from_source_file};
+pub use extract_doc::{ExtractDocError, ExtractedDoc, extract_doc_from_source_file};
 pub use inject_doc::{InjectDocError, MARKER_RDME, inject_doc_in_readme};
 
 #[derive(Error, Debug)]

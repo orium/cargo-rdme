@@ -232,7 +232,8 @@ use crate::options::{EntrypointOpt, LineTerminatorOpt};
 use cargo_rdme::transform::IntralinkError;
 use cargo_rdme::{Doc, ProjectError, Readme};
 use cargo_rdme::{
-    LineTerminator, PackageTarget, Project, extract_doc_from_source_file, infer_line_terminator,
+    ExtractedDoc, LineTerminator, PackageTarget, Project, extract_doc_from_source_file,
+    infer_line_terminator,
     inject_doc_in_readme,
 };
 use std::cell::Cell;
@@ -538,8 +539,10 @@ fn run(options: options::Options) -> Result<(), RunError> {
     let package_target: PackageTarget =
         package_target(&project, &options.entrypoint).ok_or(RunError::NoTargetPackage)?;
     let doc: Doc = match extract_doc_from_source_file(entryfile)? {
-        None => return Err(RunError::NoRustdoc),
-        Some(doc) => doc,
+        ExtractedDoc::Literal(doc) => doc,
+        ExtractedDoc::ContainsDocMacro { .. } | ExtractedDoc::NoModuleDoc => {
+            return Err(RunError::NoRustdoc);
+        }
     };
 
     let (doc, warnings) = transform_doc(&doc, &project, &package_target, &options)?;
