@@ -233,8 +233,7 @@ use cargo_rdme::transform::IntralinkError;
 use cargo_rdme::{Doc, ProjectError, Readme};
 use cargo_rdme::{
     ExtractedDoc, LineTerminator, PackageTarget, Project, extract_doc_from_source_file,
-    infer_line_terminator,
-    inject_doc_in_readme,
+    infer_line_terminator, inject_doc_in_readme,
 };
 use std::cell::Cell;
 use std::path::{Path, PathBuf};
@@ -412,6 +411,7 @@ struct Warnings {
 
 fn transform_doc(
     doc: &Doc,
+    doc_macro: Option<&str>,
     project: &Project,
     package_target: &PackageTarget,
     options: &options::Options,
@@ -421,18 +421,19 @@ fn transform_doc(
         DocTransformRustRemoveComments, IntralinkResolver, RustdocCrate, has_intralinks,
     };
 
-    let transform = DocTransformRustRemoveComments::new();
     // TODO Use `into_ok()` once it is stable (https://github.com/rust-lang/rust/issues/61695).
-    let doc = transform.transform(doc)?;
+    let pre_transform = |doc: &Doc| -> Result<Doc, RunError> {
+        let doc = DocTransformRustRemoveComments::new().transform(doc)?;
+        Ok(DocTransformRustMarkdownTag::new().transform(&doc)?)
+    };
 
-    let transform = DocTransformRustMarkdownTag::new();
-    // TODO Use `into_ok()` once it is stable (https://github.com/rust-lang/rust/issues/61695).
-    let doc = transform.transform(&doc)?;
+    let doc = pre_transform(doc)?;
 
     let had_warnings = Cell::new(false);
 
-    // If there are no intralinks return immediately. No need to run `rustdoc` at all.
-    if !has_intralinks(&doc) {
+    // We only run `rustdoc` when it has something to do: resolve intralinks, or expand a macro in
+    // the crate-level documentation (e.g. `#![doc = include_str!(…)]`).
+    if !has_intralinks(&doc) && doc_macro.is_none() {
         return Ok((doc, Warnings { had_warnings: had_warnings.into_inner() }));
     }
 
@@ -440,19 +441,33 @@ fn transform_doc(
     let package_name = project.get_package_name().as_str().to_owned();
     let strip_links = config.strip_links.unwrap_or(false);
 
-    let resolver: IntralinkResolver = match strip_links {
-        // Create an empty resolver, since we are going to strip all intralinks.
-        true => IntralinkResolver::new(&package_name, &config.docs),
-        false => {
-            let rustdoc_crate = RustdocCrate::build(
-                package_target,
-                options.workspace_project.as_deref(),
-                project.get_manifest_path(),
-                &config,
-            )?;
+    // rustdoc resolves intralinks and expands doc macros (such as `include_str!`). Stripping links
+    // needs neither a resolver nor rustdoc, so we only run it there to expand a doc macro.
+    let rustdoc_crate = match !strip_links || doc_macro.is_some() {
+        true => Some(RustdocCrate::build(
+            package_target,
+            options.workspace_project.as_deref(),
+            project.get_manifest_path(),
+            &config,
+        )?),
+        false => None,
+    };
 
+    // rustdoc's crate-level output already has any doc macro expanded, so it supersedes the parsed
+    // source whenever one is present.
+    let doc = match rustdoc_crate.as_ref().filter(|_| doc_macro.is_some()) {
+        Some(rustdoc_crate) => match rustdoc_crate.crate_level_doc() {
+            Some(json_doc) => pre_transform(&json_doc)?,
+            None => doc,
+        },
+        None => doc,
+    };
+
+    let resolver = match rustdoc_crate {
+        Some(rustdoc_crate) if !strip_links => {
             rustdoc_crate.create_intralink_resolver(&package_name, &config.docs)
         }
+        _ => IntralinkResolver::new(&package_name, &config.docs),
     };
 
     let transform = DocTransformIntralinks::new(resolver, strip_links, |msg| {
@@ -538,14 +553,16 @@ fn run(options: options::Options) -> Result<(), RunError> {
         entrypoint(&project, &options.entrypoint).ok_or(RunError::NoEntrySourceFile)?;
     let package_target: PackageTarget =
         package_target(&project, &options.entrypoint).ok_or(RunError::NoTargetPackage)?;
-    let doc: Doc = match extract_doc_from_source_file(entryfile)? {
-        ExtractedDoc::Literal(doc) => doc,
-        ExtractedDoc::ContainsDocMacro { .. } | ExtractedDoc::NoModuleDoc => {
-            return Err(RunError::NoRustdoc);
-        }
+    let (doc, doc_macro): (Doc, Option<String>) = match extract_doc_from_source_file(entryfile)? {
+        ExtractedDoc::Literal(doc) => (doc, None),
+        // A doc-attribute macro (e.g. `#![doc = include_str!(…)]`) produces documentation that only
+        // rustdoc can see, so we start from an empty doc and let rustdoc expand it.
+        ExtractedDoc::ContainsDocMacro { macro_name } => (Doc::from_str(""), Some(macro_name)),
+        ExtractedDoc::NoModuleDoc => return Err(RunError::NoRustdoc),
     };
 
-    let (doc, warnings) = transform_doc(&doc, &project, &package_target, &options)?;
+    let (doc, warnings) =
+        transform_doc(&doc, doc_macro.as_deref(), &project, &package_target, &options)?;
 
     let readme_path: PathBuf = match options.readme_path {
         None => project.get_readme_path().ok_or(RunError::NoReadmeFile)?,
