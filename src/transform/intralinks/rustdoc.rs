@@ -531,7 +531,7 @@ impl RustdocCrate {
     }
 }
 
-pub fn run_rustdoc(
+fn run_rustdoc(
     package_target: &PackageTarget,
     workspace_package: Option<&str>,
     manifest_path: &PathBuf,
@@ -661,7 +661,7 @@ fn items_info(rustdoc_crate: &Crate) -> HashMap<ItemId, ItemInfo<'_>> {
     items_info
 }
 
-pub fn create_intralink_resolver<'a>(
+fn create_intralink_resolver<'a>(
     rustdoc_crate: &Crate,
     package_name: &'a str,
     docs_config: &'a IntralinksDocsConfig,

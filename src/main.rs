@@ -412,12 +412,12 @@ struct Warnings {
 fn transform_doc(
     doc: &Doc,
     project: &Project,
-    package_target: PackageTarget,
+    package_target: &PackageTarget,
     options: &options::Options,
 ) -> Result<(Doc, Warnings), RunError> {
     use cargo_rdme::transform::{
         DocTransform, DocTransformIntralinks, DocTransformRustMarkdownTag,
-        DocTransformRustRemoveComments,
+        DocTransformRustRemoveComments, IntralinkResolver, RustdocCrate, has_intralinks,
     };
 
     let transform = DocTransformRustRemoveComments::new();
@@ -429,17 +429,35 @@ fn transform_doc(
     let doc = transform.transform(&doc)?;
 
     let had_warnings = Cell::new(false);
-    let transform = DocTransformIntralinks::new(
-        project.get_package_name().as_str().to_owned(),
-        package_target,
-        options.workspace_project.clone(),
-        project.get_manifest_path().clone(),
-        |msg| {
-            print_warning!("{}", msg);
-            had_warnings.set(true);
-        },
-        options.intralinks.clone(),
-    );
+
+    // If there are no intralinks return immediately. No need to run `rustdoc` at all.
+    if !has_intralinks(&doc) {
+        return Ok((doc, Warnings { had_warnings: had_warnings.into_inner() }));
+    }
+
+    let config = options.intralinks.clone().unwrap_or_default();
+    let package_name = project.get_package_name().as_str().to_owned();
+    let strip_links = config.strip_links.unwrap_or(false);
+
+    let resolver: IntralinkResolver = match strip_links {
+        // Create an empty resolver, since we are going to strip all intralinks.
+        true => IntralinkResolver::new(&package_name, &config.docs),
+        false => {
+            let rustdoc_crate = RustdocCrate::build(
+                package_target,
+                options.workspace_project.as_deref(),
+                project.get_manifest_path(),
+                &config,
+            )?;
+
+            rustdoc_crate.create_intralink_resolver(&package_name, &config.docs)
+        }
+    };
+
+    let transform = DocTransformIntralinks::new(resolver, strip_links, |msg| {
+        print_warning!("{}", msg);
+        had_warnings.set(true);
+    });
 
     Ok((transform.transform(&doc)?, Warnings { had_warnings: had_warnings.into_inner() }))
 }
@@ -524,7 +542,7 @@ fn run(options: options::Options) -> Result<(), RunError> {
         Some(doc) => doc,
     };
 
-    let (doc, warnings) = transform_doc(&doc, &project, package_target, &options)?;
+    let (doc, warnings) = transform_doc(&doc, &project, &package_target, &options)?;
 
     let readme_path: PathBuf = match options.readme_path {
         None => project.get_readme_path().ok_or(RunError::NoReadmeFile)?,

@@ -7,13 +7,11 @@ pub use crate::transform::intralinks::rustdoc::{
     EXPECTED_RUST_TOOLCHAIN, install_expected_rust_toolchain, is_expected_rust_toolchain_installed,
 };
 pub use crate::transform::intralinks::rustdoc::{IntralinkResolver, RustdocCrate};
-use crate::transform::intralinks::rustdoc::{run_rustdoc, create_intralink_resolver};
-use crate::{Doc, PackageTarget};
+use crate::Doc;
 use itertools::Itertools;
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt::Display;
-use std::path::PathBuf;
 use thiserror::Error;
 use unicase::UniCase;
 
@@ -85,35 +83,22 @@ pub struct IntralinksConfig {
     pub rustdoc_toolchain: Option<String>,
 }
 
-pub struct DocTransformIntralinks<F> {
-    package_name: String,
-    package_target: PackageTarget,
-    workspace_package: Option<String>,
-    manifest_path: PathBuf,
+pub struct DocTransformIntralinks<'a, F> {
+    resolver: IntralinkResolver<'a>,
+    strip_links: bool,
     emit_warning: F,
-    config: IntralinksConfig,
 }
 
-impl<F> DocTransformIntralinks<F>
+impl<'a, F> DocTransformIntralinks<'a, F>
 where
     F: Fn(&str),
 {
     pub fn new(
-        package_name: impl Into<String>,
-        package_target: PackageTarget,
-        workspace_package: Option<String>,
-        manifest_path: PathBuf,
+        resolver: IntralinkResolver<'a>,
+        strip_links: bool,
         emit_warning: F,
-        config: Option<IntralinksConfig>,
-    ) -> DocTransformIntralinks<F> {
-        DocTransformIntralinks {
-            package_name: package_name.into(),
-            package_target,
-            workspace_package,
-            manifest_path,
-            emit_warning,
-            config: config.unwrap_or_default(),
-        }
+    ) -> DocTransformIntralinks<'a, F> {
+        DocTransformIntralinks { resolver, strip_links, emit_warning }
     }
 }
 
@@ -166,7 +151,8 @@ impl Display for ItemPath<'_> {
     }
 }
 
-fn has_intralinks(doc: &Doc) -> bool {
+#[must_use]
+pub fn has_intralinks(doc: &Doc) -> bool {
     let link_targets =
         markdown_link_iterator(&doc.markdown).items().filter_map(|link| match link {
             MarkdownLink::Inline { link } => Some(link.link),
@@ -184,44 +170,14 @@ fn has_intralinks(doc: &Doc) -> bool {
     link_targets.chain(reference_links).any(|link| IntralinkResolver::is_intralink(&link))
 }
 
-impl<F> DocTransform for DocTransformIntralinks<F>
+impl<F> DocTransform for DocTransformIntralinks<'_, F>
 where
     F: Fn(&str),
 {
     type E = IntralinkError;
 
     fn transform(&self, doc: &Doc) -> Result<Doc, IntralinkError> {
-        // If there are no intralinks return immediately. No need to run `rustdoc` at all.
-        if !has_intralinks(doc) {
-            return Ok(doc.clone());
-        }
-
-        let strip_links = self.config.strip_links.unwrap_or(false);
-
-        let intralink_resolver: IntralinkResolver<'_> = match strip_links {
-            true => {
-                // Create an empty resolver, since we are going to strip all intralinks.
-                IntralinkResolver::new(self.package_name.as_str(), &self.config.docs)
-            }
-            false => {
-                let rustdoc_crate = run_rustdoc(
-                    &self.package_target,
-                    self.workspace_package.as_deref(),
-                    &self.manifest_path,
-                    &self.config,
-                )?;
-
-                create_intralink_resolver(
-                    &rustdoc_crate,
-                    self.package_name.as_str(),
-                    &self.config.docs,
-                )
-            }
-        };
-
-        let doc = rewrite_links(doc, &intralink_resolver, &self.emit_warning, &self.config);
-
-        Ok(doc)
+        Ok(rewrite_links(doc, &self.resolver, &self.emit_warning, self.strip_links))
     }
 }
 
@@ -229,16 +185,16 @@ fn rewrite_links(
     doc: &Doc,
     intralink_resolver: &IntralinkResolver,
     emit_warning: &impl Fn(&str),
-    config: &IntralinksConfig,
+    strip_links: bool,
 ) -> Doc {
     let RewriteReferenceLinksResult { doc, reference_links_to_remove } =
-        rewrite_reference_links_definitions(doc, intralink_resolver, emit_warning, config);
+        rewrite_reference_links_definitions(doc, intralink_resolver, emit_warning, strip_links);
 
     rewrite_markdown_links(
         &doc,
         intralink_resolver,
         emit_warning,
-        config,
+        strip_links,
         &reference_links_to_remove,
     )
 }
@@ -329,12 +285,11 @@ fn rewrite_markdown_links(
     doc: &Doc,
     intralink_resolver: &IntralinkResolver,
     emit_warning: &impl Fn(&str),
-    config: &IntralinksConfig,
+    strip_links: bool,
     reference_links_to_remove: &HashSet<UniCase<String>>,
 ) -> Doc {
     use crate::utils::ItemOrOther;
 
-    let strip_links = config.strip_links.unwrap_or(false);
     let mut new_doc = String::with_capacity(doc.as_string().len() + 1024);
 
     for item_or_other in markdown_link_iterator(&doc.markdown).complete() {
@@ -404,13 +359,12 @@ fn rewrite_reference_links_definitions(
     doc: &Doc,
     intralink_resolver: &IntralinkResolver,
     emit_warning: &impl Fn(&str),
-    config: &IntralinksConfig,
+    strip_links: bool,
 ) -> RewriteReferenceLinksResult {
     use crate::utils::ItemOrOther;
     let mut reference_links_to_remove = HashSet::new();
     let mut new_doc = String::with_capacity(doc.as_string().len() + 1024);
     let mut skip_next_newline = false;
-    let strip_links = config.strip_links.unwrap_or(false);
 
     let iter = markdown_reference_link_definition_iterator(&doc.markdown);
 
