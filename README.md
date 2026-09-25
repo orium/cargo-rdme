@@ -157,6 +157,39 @@ Alternatively, if you are sure that another installed toolchain is compatible, y
 `CARGO_RDME_RUSTDOC_TOOLCHAIN` environment variable to a specific toolchain version, or to
 `"default"` in order to use the default toolchain.
 
+### Macros in crate-level documentation
+
+A macro can be used in a module doc such as `#![doc = include_str!("path/to/file.txt")]`.
+Rustdoc will expand those macros to produce your documentation. For example, `include_str!`
+can be used to keep your documentation DRY:
+
+```rust
+//! # My crate
+//!
+//! ```text
+#![doc = include_str!("path/to/file.txt")]
+//! ```
+```
+
+To resolve macros, cargo rdme invokes `rustdoc` on your crate and consumes its JSON output,
+similar to the [intralink](#intralinks) support. It requires a specific nightly rust toolchain,
+because rustdoc’s JSON output is unstable (see
+[rust-lang/rust#76578](https://github.com/rust-lang/rust/issues/76578)) and can break between
+nightly updates. Install it with `cargo rdme install-rust-toolchain-for-intralinks`.
+
+Alternatively, if you are sure that another installed toolchain is compatible, you can either
+set `rustdoc-toolchain` in the `intralinks` section of the configuration file or the
+`CARGO_RDME_RUSTDOC_TOOLCHAIN` environment variable to a specific toolchain version, or to
+`"default"` in order to use the default toolchain.
+
+To detect and build macros cargo rdme looks for `#![doc = …]` calls. If you are using a macro
+that emits those tokens, but does not have a literal `doc = ` in the top level macro, you can
+force detection by adding a no-op macro at the bottom of your module docs:
+
+```text
+#![doc = concat!()]
+```
+
 ### Heading levels
 
 The heading levels in the crate’s documentation will, by default, be nested under the level

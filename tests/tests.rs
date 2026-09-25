@@ -369,6 +369,18 @@ fn integration_test_transform_intralinks_backticked() {
 }
 
 #[test]
+fn integration_test_include_str_doc() {
+    run_test("include_str_doc");
+}
+
+#[test]
+fn integration_test_include_str_doc_strip_links() {
+    let options = TestOptions { args: &["--intralinks-strip-links"], ..TestOptions::default() };
+
+    run_test_with_options("include_str_doc_strip_links", &options);
+}
+
+#[test]
 fn integration_test_option_conf_file_workspace() {
     run_test("option_conf_file_workspace");
 }
