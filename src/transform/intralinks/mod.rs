@@ -6,9 +6,8 @@ use crate::transform::intralinks::links::{
 pub use crate::transform::intralinks::rustdoc::{
     EXPECTED_RUST_TOOLCHAIN, install_expected_rust_toolchain, is_expected_rust_toolchain_installed,
 };
-use crate::transform::intralinks::rustdoc::{
-    IntralinkResolver, run_rustdoc, create_intralink_resolver,
-};
+pub use crate::transform::intralinks::rustdoc::{IntralinkResolver, RustdocCrate};
+use crate::transform::intralinks::rustdoc::{run_rustdoc, create_intralink_resolver};
 use crate::{Doc, PackageTarget};
 use itertools::Itertools;
 use std::borrow::Cow;

@@ -351,6 +351,7 @@ pub struct IntralinkResolver<'a> {
 }
 
 impl<'a> IntralinkResolver<'a> {
+    #[must_use]
     pub fn new(package_name: &'a str, config: &'a IntralinksDocsConfig) -> IntralinkResolver<'a> {
         IntralinkResolver { link_url: HashMap::new(), package_name, config }
     }
@@ -493,10 +494,40 @@ impl<'a> IntralinkResolver<'a> {
         self.link_url.get(link).map(String::as_str)
     }
 
+    #[must_use]
     pub fn is_intralink(link: &Link) -> bool {
         let has_lone_colon = || link.raw_link.replace("::", "").contains(':');
 
         !link.symbol().is_empty() && !link.raw_link.contains('/') && !has_lone_colon()
+    }
+}
+
+/// A crate's rustdoc JSON output
+///
+/// Used for extracting information like resolving intralinks.
+pub struct RustdocCrate {
+    inner: Crate,
+}
+
+impl RustdocCrate {
+    pub fn build(
+        package_target: &PackageTarget,
+        workspace_package: Option<&str>,
+        manifest_path: &PathBuf,
+        config: &IntralinksConfig,
+    ) -> Result<RustdocCrate, IntralinkError> {
+        let inner = run_rustdoc(package_target, workspace_package, manifest_path, config)?;
+
+        Ok(RustdocCrate { inner })
+    }
+
+    #[must_use]
+    pub fn create_intralink_resolver<'a>(
+        &self,
+        package_name: &'a str,
+        docs_config: &'a IntralinksDocsConfig,
+    ) -> IntralinkResolver<'a> {
+        create_intralink_resolver(&self.inner, package_name, docs_config)
     }
 }
 
