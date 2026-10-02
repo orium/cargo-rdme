@@ -204,9 +204,9 @@ pub fn run_test_with_options(test_name: &str, options: &TestOptions) {
         if expected != got {
             print_failure_readme_mismatch(&expected, &got, readme, expected_readme, &stderr);
             panic!("Test {test_name} failed.");
-        } else {
-            std::fs::remove_file(readme).unwrap();
         }
+
+        std::fs::remove_file(readme).unwrap();
     }
 }
 
