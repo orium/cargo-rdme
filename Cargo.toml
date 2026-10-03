@@ -7,7 +7,6 @@ authors = ["Diogo Sousa <diogogsousa@gmail.com>"]
 edition = "2024"
 rust-version = "1.96.0"
 
-homepage = "https://github.com/orium/cargo-rdme"
 repository = "https://github.com/orium/cargo-rdme"
 documentation = "https://docs.rs/cargo-rdme"
 readme = "README.md"
