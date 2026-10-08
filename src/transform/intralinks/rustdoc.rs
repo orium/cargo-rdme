@@ -1,5 +1,5 @@
-use crate::PackageTarget;
 use crate::transform::intralinks::ItemPath;
+use crate::{Doc, PackageTarget};
 use crate::transform::intralinks::links::Link;
 use crate::transform::{IntralinkError, IntralinksConfig, IntralinksDocsConfig};
 use itertools::Itertools;
@@ -351,6 +351,7 @@ pub struct IntralinkResolver<'a> {
 }
 
 impl<'a> IntralinkResolver<'a> {
+    #[must_use]
     pub fn new(package_name: &'a str, config: &'a IntralinksDocsConfig) -> IntralinkResolver<'a> {
         IntralinkResolver { link_url: HashMap::new(), package_name, config }
     }
@@ -493,11 +494,53 @@ impl<'a> IntralinkResolver<'a> {
         self.link_url.get(link).map(String::as_str)
     }
 
+    #[must_use]
     pub fn is_intralink(link: &Link) -> bool {
         let has_lone_colon = || link.raw_link.replace("::", "").contains(':');
 
         !link.symbol().is_empty() && !link.raw_link.contains('/') && !has_lone_colon()
     }
+}
+
+/// A crate's rustdoc JSON output
+///
+/// Used for extracting information like resolving intralinks.
+pub struct RustdocCrate {
+    inner: Crate,
+}
+
+impl RustdocCrate {
+    pub fn build(
+        package_target: &PackageTarget,
+        workspace_package: Option<&str>,
+        manifest_path: &PathBuf,
+        config: &IntralinksConfig,
+    ) -> Result<RustdocCrate, IntralinkError> {
+        let inner = run_rustdoc(package_target, workspace_package, manifest_path, config)?;
+
+        Ok(RustdocCrate { inner })
+    }
+
+    #[must_use]
+    pub fn create_intralink_resolver<'a>(
+        &self,
+        package_name: &'a str,
+        docs_config: &'a IntralinksDocsConfig,
+    ) -> IntralinkResolver<'a> {
+        create_intralink_resolver(&self.inner, package_name, docs_config)
+    }
+
+    /// Returns `None` when the crate has no crate-level documentation.
+    #[must_use]
+    pub fn crate_level_doc(&self) -> Option<Doc> {
+        let root = self.inner.index.get(&self.inner.root)?;
+
+        crate_doc_from_rustdoc(root.docs.as_deref())
+    }
+}
+
+fn crate_doc_from_rustdoc(docs: Option<&str>) -> Option<Doc> {
+    docs.map(Doc::from_str)
 }
 
 fn run_rustdoc(
@@ -630,18 +673,14 @@ fn items_info(rustdoc_crate: &Crate) -> HashMap<ItemId, ItemInfo<'_>> {
     items_info
 }
 
-pub fn create_intralink_resolver<'a>(
+fn create_intralink_resolver<'a>(
+    rustdoc_crate: &Crate,
     package_name: &'a str,
-    package_target: &PackageTarget,
-    workspace_package: Option<&str>,
-    manifest_path: &PathBuf,
-    config: &'a IntralinksConfig,
-) -> Result<IntralinkResolver<'a>, IntralinkError> {
-    let rustdoc_crate = run_rustdoc(package_target, workspace_package, manifest_path, config)?;
-
-    let items_info: HashMap<ItemId, ItemInfo<'_>> = items_info(&rustdoc_crate);
-    let links_items_id = crate_rustdoc_intralinks(&rustdoc_crate);
-    let mut intralink_resolver = IntralinkResolver::new(package_name, &config.docs);
+    docs_config: &'a IntralinksDocsConfig,
+) -> IntralinkResolver<'a> {
+    let items_info: HashMap<ItemId, ItemInfo<'_>> = items_info(rustdoc_crate);
+    let links_items_id = crate_rustdoc_intralinks(rustdoc_crate);
+    let mut intralink_resolver = IntralinkResolver::new(package_name, docs_config);
 
     for (link, item_id) in links_items_id {
         let link = Link::new(link.clone());
@@ -653,7 +692,7 @@ pub fn create_intralink_resolver<'a>(
         intralink_resolver.add(link, item_info, &rustdoc_crate.external_crates);
     }
 
-    Ok(intralink_resolver)
+    intralink_resolver
 }
 
 #[cfg(test)]
@@ -664,6 +703,19 @@ mod tests {
     #[test]
     fn test_rustdoc_format_supported_version() {
         assert_eq!(rustdoc_types::FORMAT_VERSION, EXPECTED_RUSTDOC_FORMAT_VERSION);
+    }
+
+    #[test]
+    fn test_crate_doc_from_rustdoc_none() {
+        assert!(crate_doc_from_rustdoc(None).is_none());
+    }
+
+    #[test]
+    fn test_crate_doc_from_rustdoc_multiline() {
+        let doc = crate_doc_from_rustdoc(Some("first line\n\nthird line")).unwrap();
+        let lines: Vec<&str> = doc.lines().collect();
+
+        assert_eq!(lines, vec!["first line", "", "third line"]);
     }
 
     fn make_item_info(
