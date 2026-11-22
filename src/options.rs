@@ -172,13 +172,13 @@ pub fn command() -> Command {
             Arg::new("check")
                 .long("check")
                 .short('c')
-                .help("checks if the README is up to date (exit code 3 if there’s a mismatch, 4 if warnings were emitted)")
+                .help("check if the README is up to date (exit 3 if it is stale, or exit 4 if it is current and intralink warnings were emitted)")
                 .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("no-fail-on-warnings")
                 .long("no-fail-on-warnings")
-                .help("do not exit with a error status code when checking if the README is up to date")
+                .help("ignore the intralink warning exit code (4) for an up-to-date README")
                 .action(ArgAction::SetTrue),
         )
         .arg(

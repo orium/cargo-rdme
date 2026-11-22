@@ -1,0 +1,4 @@
+[package]
+name = "missing-readme-marker"
+version = "0.1.0"
+edition = "2024"

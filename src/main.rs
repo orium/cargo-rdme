@@ -214,8 +214,11 @@
 //! # Integration with CI
 //!
 //! To verify that your README is up to date with your crate’s documentation you can run
-//! `cargo rdme --check`. The exit code will be `0` if the README is up to date, `3` if it’s
-//! not, or `4` if there were warnings.
+//! `cargo rdme --check`. The exit code is `0` if the README is up to date, `3` if it’s
+//! out of date, or `4` if it’s up to date and intralink warnings were emitted.
+//! Use `--no-fail-on-warnings` to ignore that warning exit code. A missing marker
+//! is an error (exit code `1`). Without `--check` or `--force`, a Git check that
+//! detects an uncommitted or untracked README still takes precedence (exit code `2`).
 //!
 //! If you use GitHub Actions you can add this step to verify if the README is up to date:
 //!
@@ -263,6 +266,7 @@ impl From<RunError> for ExitCode {
             | RunError::NoEntrySourceFile
             | RunError::NoTargetPackage
             | RunError::NoReadmeFile
+            | RunError::NoReadmeMarker(_)
             | RunError::NoRustdoc
             | RunError::InjectDocError(_)
             | RunError::TransformIntraLinkError(_)
@@ -290,6 +294,11 @@ enum RunError {
     NoTargetPackage,
     #[error("crate's README file not found")]
     NoReadmeFile,
+    #[error(
+        "No marker found in the README file ({0}).\n\nAdd the following marker where the crate documentation should appear.\n\n{marker}",
+        marker = cargo_rdme::MARKER_RDME
+    )]
+    NoReadmeMarker(PathBuf),
     #[error("crate-level rustdoc not found")]
     NoRustdoc,
     #[error("failed to inject the documentation in the README: {0}")]
@@ -496,18 +505,6 @@ fn git_is_current(path: impl AsRef<Path>) -> Option<bool> {
     Some(items.ok()?.is_empty())
 }
 
-fn update_readme(
-    new_readme: &Readme,
-    readme_path: impl AsRef<Path>,
-    line_terminator: LineTerminator,
-    ignore_uncommitted_changes: bool,
-) -> Result<(), RunError> {
-    match ignore_uncommitted_changes || git_is_current(&readme_path).unwrap_or(true) {
-        true => Ok(new_readme.write_to_file(&readme_path, line_terminator)?),
-        false => Err(RunError::ReadmeNotUpdatedUncommittedChanges),
-    }
-}
-
 fn run(options: options::Options) -> Result<(), RunError> {
     let project: Project = match options.workspace_project {
         None => Project::from_current_dir(options.manifest_path.as_deref())?,
@@ -538,24 +535,18 @@ fn run(options: options::Options) -> Result<(), RunError> {
     let original_readme: Readme = Readme::from_file(&readme_path)?;
     let new_readme = inject_doc_in_readme(&original_readme, &doc, options.heading_base_level)?;
 
-    if !new_readme.had_marker {
-        let msg = indoc::formatdoc! { "
-            No marker found in the README file ({readme_filepath}).
-
-            cargo-rdme expects a marker in the README where the crate’s documentation will
-            be inserted. This is the marker you should add to your README:
-
-            {marker}",
-            readme_filepath = readme_path.display(),
-            marker = cargo_rdme::MARKER_RDME,
-        };
-        print_info!("{}", msg);
-    }
-
     let line_terminator = line_terminator(options.line_terminator, &readme_path)?;
 
+    if !options.check && !options.force && git_is_current(&readme_path) == Some(false) {
+        return Err(RunError::ReadmeNotUpdatedUncommittedChanges);
+    }
+
+    if !new_readme.had_marker {
+        return Err(RunError::NoReadmeMarker(readme_path));
+    }
+
     match options.check {
-        false => update_readme(&new_readme.readme, readme_path, line_terminator, options.force),
+        false => Ok(new_readme.readme.write_to_file(&readme_path, line_terminator)?),
         true => {
             if !is_readme_up_to_date(&readme_path, &new_readme.readme, line_terminator)? {
                 return Err(RunError::CheckReadmeMismatch);
