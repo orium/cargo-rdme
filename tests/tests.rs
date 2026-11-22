@@ -287,6 +287,32 @@ fn integration_test_marker_inside_doc() {
 }
 
 #[test]
+fn integration_test_missing_readme_marker() {
+    let test_name = "missing_readme_marker";
+    let directory = test_dir(test_name);
+    let readme = directory.join("README.md");
+    let original = std::fs::read(test_readme_template(test_name)).unwrap();
+    let bin = env!(concat!("CARGO_BIN_EXE_", env!("CARGO_PKG_NAME")));
+    let cases = [
+        (&["--force"][..], original.trim_ascii_end()),
+        (&["--check", "--no-fail-on-warnings"][..], original.as_slice()),
+    ];
+
+    for (args, input) in cases {
+        std::fs::write(&readme, input).unwrap();
+        let result =
+            std::process::Command::new(bin).args(args).current_dir(&directory).output().unwrap();
+        let stderr = String::from_utf8_lossy(&result.stderr);
+
+        assert_eq!(std::fs::read(&readme).unwrap(), input, "{args:?}");
+        assert_eq!(result.status.code(), Some(1), "{args:?}: {stderr}");
+        assert!(stderr.contains("No marker found in the README file"), "{stderr}");
+        assert!(stderr.contains("<!-- cargo-rdme -->"), "{stderr}");
+    }
+    std::fs::remove_file(readme).unwrap();
+}
+
+#[test]
 fn integration_test_avoid_overwrite_uncommitted_readme() {
     use std::fs::File;
 

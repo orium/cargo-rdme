@@ -226,8 +226,11 @@ information.
 ## Integration with CI
 
 To verify that your README is up to date with your crate’s documentation you can run
-`cargo rdme --check`. The exit code will be `0` if the README is up to date, `3` if it’s
-not, or `4` if there were warnings.
+`cargo rdme --check`. The exit code is `0` if the README is up to date, `3` if it’s
+out of date, or `4` if it’s up to date and intralink warnings were emitted.
+Use `--no-fail-on-warnings` to ignore that warning exit code. A missing marker
+is an error (exit code `1`). Without `--check` or `--force`, a Git check that
+detects an uncommitted or untracked README still takes precedence (exit code `2`).
 
 If you use GitHub Actions you can add this step to verify if the README is up to date:
 
